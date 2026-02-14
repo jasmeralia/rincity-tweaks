@@ -2,13 +2,13 @@
 
 Automates a random throwback post from an Envira `manifest.json`.
 
-Current default behavior is unchanged: it posts to **X/Twitter only**.
+Default behavior posts to **both X/Twitter and Bluesky**.
 
 ## Features
 
 - Randomly selects an eligible set from `manifest.json`
-- Avoids repeats using `tweet_history.json`
-- Renders post text with Jinja template (`tweet_template.j2`)
+- Avoids repeats using `post_history.json`
+- Renders Twitter post text with Jinja template (`twitter_template.j2`)
 - Uploads image and posts to:
   - X/Twitter (`--platform twitter`)
   - Bluesky (`--platform bluesky`)
@@ -32,10 +32,10 @@ pip install -r requirements.txt
 
 ## Quick Start
 
-From `rin_throwback_tweet/`:
+From `rin_throwback_post/`:
 
 ```bash
-python3 rin_throwback_tweet.py --dry-run
+python3 rin_throwback_post.py --dry-run
 ```
 
 Default files:
@@ -44,39 +44,46 @@ Default files:
 - Images dir: `Rin_Covers/`
 - Twitter auth: `twitter_auth.json`
 - Bluesky auth: `bluesky_auth.json`
-- History: `tweet_history.json`
-- Template: `tweet_template.j2`
+- History: `post_history.json`
+- Twitter template: `twitter_template.j2`
+- Bluesky template: `bluesky_template.j2`
 
 ## Usage
 
-Twitter (default):
+Both platforms (default):
 
 ```bash
-python3 rin_throwback_tweet.py
+python3 rin_throwback_post.py
 ```
 
 Explicit Twitter:
 
 ```bash
-python3 rin_throwback_tweet.py --platform twitter
+python3 rin_throwback_post.py --platform twitter
 ```
 
 Bluesky only:
 
 ```bash
-python3 rin_throwback_tweet.py --platform bluesky --bluesky-auth bluesky_auth.json
+python3 rin_throwback_post.py --platform bluesky --bluesky-auth bluesky_auth.json --bluesky-template bluesky_template.j2
+```
+
+Retry a specific set on one platform (ignores history threshold filtering):
+
+```bash
+python3 rin_throwback_post.py --platform bluesky --set-name "Set Title Here" --bluesky-auth bluesky_auth.json
 ```
 
 Both platforms:
 
 ```bash
-python3 rin_throwback_tweet.py --platform both --twitter-auth twitter_auth.json --bluesky-auth bluesky_auth.json
+python3 rin_throwback_post.py --platform both --twitter-auth twitter_auth.json --bluesky-auth bluesky_auth.json
 ```
 
 Dry run with deterministic selection:
 
 ```bash
-python3 rin_throwback_tweet.py --dry-run --seed 123
+python3 rin_throwback_post.py --dry-run --seed 123
 ```
 
 ## Authentication Files
@@ -172,8 +179,10 @@ Official docs:
 --bluesky-auth PATH
 --history PATH
 --threshold-days INT
+--set-name "SET NAME"
 --seed VALUE
---template PATH
+--template PATH               # Twitter template
+--bluesky-template PATH
 --max-image-mb INT
 --platform {twitter,bluesky,both}
 --dry-run
@@ -182,6 +191,9 @@ Official docs:
 
 ## Notes
 
-- Default platform is `twitter`.
+- Default platform is `both`.
+- Bluesky posts include link facets so URLs become clickable links in-app.
 - For Bluesky posting, the script constrains image uploads to a conservative size for compatibility.
-- History is shared across platforms in `tweet_history.json`.
+- History is shared across platforms in `post_history.json`.
+- Legacy `post_template.j2` and `tweet_template.j2` are auto-detected for template backward compatibility.
+- Legacy `tweet_history.json` is still auto-detected for history backward compatibility.

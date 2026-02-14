@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-rin_throwback_tweet.py
+rin_throwback_post.py
 
 Reads an Envira cover manifest.json, randomly selects an eligible set (not posted within a threshold),
 and posts a "throwback" post with the cover image attached, linking to the set, mentioning original
@@ -12,14 +12,14 @@ Default files (override via CLI):
   - manifest:       ./Rin_Covers/manifest.json
   - images dir:     ./Rin_Covers
   - auth file:      ./twitter_auth.json
-  - history/state:  ./tweet_history.json
-  - tweet template: ./tweet_template.j2
+  - history/state:  ./post_history.json
+  - Twitter template: ./twitter_template.j2
 
 Requires:
   pip install tweepy
 
 Notes:
-- Twitter/X media upload uses the v1.1 endpoint; tweet creation uses v2.
+- Twitter/X media upload uses the v1.1 endpoint; post creation uses v2.
 - Bluesky posting uses AT Protocol HTTP endpoints directly.
 """
 
@@ -32,6 +32,7 @@ import json
 import mimetypes
 import os
 import random
+import re
 import shutil
 import subprocess
 import sys
@@ -177,7 +178,7 @@ def _prepare_image_for_upload(image_path: Path, max_bytes: int) -> tuple[Path, O
     return tmp_path, tmp_path
 
 
-def _render_tweet_text(template_path: Path, context: Dict[str, Any], max_len: int = 280) -> str:
+def _render_post_text(template_path: Path, context: Dict[str, Any], max_len: int = 280) -> str:
     if jinja2 is None:
         raise RuntimeError("jinja2 is not installed. Run: pip install jinja2")
     if not template_path.exists():
@@ -189,6 +190,30 @@ def _render_tweet_text(template_path: Path, context: Dict[str, Any], max_len: in
     if len(rendered) > max_len:
         return rendered[:max_len]
     return rendered
+
+
+def _render_template_text(template_path: Path, context: Dict[str, Any], max_len: int) -> str:
+    return _render_post_text(template_path=template_path, context=context, max_len=max_len)
+
+
+def _bluesky_link_facets(text: str) -> List[Dict[str, Any]]:
+    facets: List[Dict[str, Any]] = []
+    for match in re.finditer(r"https?://\S+", text):
+        raw_url = match.group(0)
+        url = raw_url.rstrip(".,;:!?)]}")
+        if not url:
+            continue
+        start = match.start()
+        end = start + len(url)
+        byte_start = len(text[:start].encode("utf-8"))
+        byte_end = len(text[:end].encode("utf-8"))
+        facets.append(
+            {
+                "index": {"byteStart": byte_start, "byteEnd": byte_end},
+                "features": [{"$type": "app.bsky.richtext.facet#link", "uri": url}],
+            }
+        )
+    return facets
 
 
 def _normalize_quotes(text: str) -> str:
@@ -216,7 +241,7 @@ def _eligible_entries(manifest: List[Dict[str, Any]], history: List[Dict[str, An
     last: Dict[str, dt.datetime] = {}
     for h in history:
         key = (h.get("set_url") or h.get("set_name") or "").strip()
-        ts = h.get("tweeted_at")
+        ts = h.get("posted_at") or h.get("tweeted_at")
         if not key or not ts:
             continue
         try:
@@ -237,6 +262,10 @@ def _eligible_entries(manifest: List[Dict[str, Any]], history: List[Dict[str, An
         if when is None or _days_ago(when, now) >= threshold_days:
             eligible.append(e)
     return eligible
+
+
+def _normalized_set_name_for_match(name: str) -> str:
+    return _normalize_quotes(html.unescape((name or "").strip())).casefold()
 
 
 def _load_auth(auth_path: Path) -> Dict[str, str]:
@@ -317,9 +346,29 @@ def _bluesky_login(auth: Dict[str, str]) -> Dict[str, str]:
     )
     access_jwt = session.get("accessJwt")
     did = session.get("did")
+    handle = session.get("handle")
     if not access_jwt or not did:
         raise RuntimeError("Bluesky session response missing accessJwt or did.")
-    return {"service": service, "access_jwt": str(access_jwt), "did": str(did)}
+    out = {"service": service, "access_jwt": str(access_jwt), "did": str(did)}
+    if handle:
+        out["handle"] = str(handle)
+    return out
+
+
+def _bluesky_web_url_from_at_uri(at_uri: str, profile_ref: str) -> Optional[str]:
+    # Expected AT URI format:
+    # at://did:plc:.../app.bsky.feed.post/<rkey>
+    prefix = "at://"
+    if not at_uri.startswith(prefix):
+        return None
+    remainder = at_uri[len(prefix) :]
+    parts = remainder.split("/")
+    if len(parts) != 3:
+        return None
+    _, collection, rkey = parts
+    if collection != "app.bsky.feed.post" or not rkey:
+        return None
+    return f"https://bsky.app/profile/{profile_ref}/post/{rkey}"
 
 
 def _bluesky_upload_blob(service: str, access_jwt: str, image_path: Path) -> Dict[str, Any]:
@@ -367,6 +416,9 @@ def _bluesky_create_post(
         "text": text,
         "createdAt": created_at,
     }
+    facets = _bluesky_link_facets(text)
+    if facets:
+        record["facets"] = facets
     record["embed"] = {
         "$type": "app.bsky.embed.images",
         "images": [
@@ -390,18 +442,28 @@ def main() -> int:
     p.add_argument("--auth", default="twitter_auth.json", help="Twitter auth JSON file (legacy flag)")
     p.add_argument("--twitter-auth", default=None, help="Twitter auth JSON file (overrides --auth)")
     p.add_argument("--bluesky-auth", default="bluesky_auth.json", help="Bluesky auth JSON file")
-    p.add_argument("--history", default="tweet_history.json", help="State file to avoid repeats")
+    p.add_argument("--history", default="post_history.json", help="State file to avoid repeats")
     p.add_argument("--threshold-days", type=int, default=90, help="Do not repeat a set within this many days")
+    p.add_argument(
+        "--set-name",
+        default=None,
+        help="Force a specific set_name from manifest (exact match, ignores history threshold filtering)",
+    )
     p.add_argument("--seed", default=None, help="Optional RNG seed for reproducible choice")
-    p.add_argument("--template", default="tweet_template.j2", help="Path to tweet template file")
+    p.add_argument("--template", default="twitter_template.j2", help="Path to Twitter template file")
+    p.add_argument(
+        "--bluesky-template",
+        default="bluesky_template.j2",
+        help="Path to Bluesky template file (falls back to --template if not found)",
+    )
     p.add_argument("--max-image-mb", type=int, default=5, help="Max image size for upload (MB)")
     p.add_argument(
         "--platform",
         choices=["twitter", "bluesky", "both"],
-        default="twitter",
-        help="Where to post. Default is twitter.",
+        default="both",
+        help="Where to post. Default is both.",
     )
-    p.add_argument("--dry-run", action="store_true", help="Do not post; just print what would be tweeted")
+    p.add_argument("--dry-run", action="store_true", help="Do not post; just print what would be posted")
     p.add_argument(
         "--record-dry-run",
         action="store_true",
@@ -415,6 +477,17 @@ def main() -> int:
     bluesky_auth_path = Path(args.bluesky_auth)
     history_path = Path(args.history)
     template_path = Path(args.template)
+    bluesky_template_path = Path(args.bluesky_template)
+    if args.history == "post_history.json" and not history_path.exists():
+        legacy_history = Path("tweet_history.json")
+        if legacy_history.exists():
+            history_path = legacy_history
+    if args.template == "twitter_template.j2" and not template_path.exists():
+        for legacy_name in ("post_template.j2", "tweet_template.j2"):
+            legacy_template = Path(legacy_name)
+            if legacy_template.exists():
+                template_path = legacy_template
+                break
 
     if not manifest_path.exists():
         print(f"ERROR: manifest not found: {manifest_path}", file=sys.stderr)
@@ -428,13 +501,22 @@ def main() -> int:
     history = _load_history(history_path)
     now = dt.datetime.now(dt.timezone.utc)
 
-    eligible = _eligible_entries(manifest, history, args.threshold_days, now)
-    if not eligible:
-        print(f"No eligible sets found (threshold_days={args.threshold_days}).", file=sys.stderr)
-        return 3
-
     rng = random.Random(args.seed) if args.seed is not None else random.Random()
-    chosen = rng.choice(eligible)
+    if args.set_name:
+        target = _normalized_set_name_for_match(args.set_name)
+        matches = [e for e in manifest if _normalized_set_name_for_match(str(e.get("set_name") or "")) == target]
+        if not matches:
+            print(f"ERROR: no manifest entry found for set_name: {args.set_name}", file=sys.stderr)
+            return 3
+        if len(matches) > 1:
+            print(f"WARNING: multiple manifest entries matched set_name; using first match: {args.set_name}")
+        chosen = matches[0]
+    else:
+        eligible = _eligible_entries(manifest, history, args.threshold_days, now)
+        if not eligible:
+            print(f"No eligible sets found (threshold_days={args.threshold_days}).", file=sys.stderr)
+            return 3
+        chosen = rng.choice(eligible)
 
     filename = (chosen.get("filename") or "").strip()
     set_name = html.unescape((chosen.get("set_name") or "").strip())
@@ -457,32 +539,29 @@ def main() -> int:
         return 5
 
     published = _fmt_publish_date(date_published)
+    template_context = {
+        "set_name": set_name,
+        "set_url": set_url,
+        "date_published_iso": date_published,
+        "published": published,
+        "tags": tags,
+        "max_len": 280,
+        "fit_tags": _fit_tags,
+    }
     try:
-        tweet_text = _render_tweet_text(
-            template_path=template_path,
-            context={
-                "set_name": set_name,
-                "set_url": set_url,
-                "date_published_iso": date_published,
-                "published": published,
-                "tags": tags,
-                "max_len": 280,
-                "fit_tags": _fit_tags,
-            },
-            max_len=280,
-        )
+        post_text = _render_template_text(template_path=template_path, context=template_context, max_len=280)
     except Exception as e:
         print(f"ERROR: template render failed: {e}", file=sys.stderr)
         return 9
 
     if args.dry_run:
-        print("DRY RUN - would tweet:\n")
-        print(tweet_text)
+        print("DRY RUN - would post:\n")
+        print(post_text)
         print("\nWith image:", str(image_path))
         if args.record_dry_run:
             record = {
-                "tweet_id": None,
-                "tweeted_at": now.isoformat(),
+                "twitter_post_id": None,
+                "posted_at": now.isoformat(),
                 "filename": filename,
                 "set_name": set_name,
                 "set_url": set_url,
@@ -495,10 +574,12 @@ def main() -> int:
     post_to_twitter = args.platform in {"twitter", "both"}
     post_to_bluesky = args.platform in {"bluesky", "both"}
 
-    tweet_id: Optional[str] = None
+    twitter_post_id: Optional[str] = None
     bluesky_uri: Optional[str] = None
+    bluesky_url: Optional[str] = None
     max_bytes_twitter = args.max_image_mb * 1024 * 1024
     max_bytes_bluesky = min(max_bytes_twitter, 1_000_000)
+    bluesky_text = post_text
 
     if post_to_twitter:
         if not twitter_auth_path.exists():
@@ -525,10 +606,10 @@ def main() -> int:
                 tmp_path.unlink(missing_ok=True)
 
         try:
-            resp = client_v2.create_tweet(text=tweet_text, media_ids=[media_id])
-            tweet_id = getattr(resp, "data", {}).get("id") if resp else None
+            resp = client_v2.create_tweet(text=post_text, media_ids=[media_id])
+            twitter_post_id = getattr(resp, "data", {}).get("id") if resp else None
         except Exception as e:
-            print(f"ERROR: tweet create failed: {e}", file=sys.stderr)
+            print(f"ERROR: Twitter post create failed: {e}", file=sys.stderr)
             return 8
 
     if post_to_bluesky:
@@ -538,6 +619,12 @@ def main() -> int:
         upload_path = image_path
         tmp_path = None
         try:
+            bsky_template_to_use = bluesky_template_path if bluesky_template_path.exists() else template_path
+            bluesky_text = _render_template_text(
+                template_path=bsky_template_to_use,
+                context={**template_context, "max_len": 300},
+                max_len=300,
+            )
             bsky_auth = _load_bluesky_auth(bluesky_auth_path)
             bsky_session = _bluesky_login(bsky_auth)
             upload_path, tmp_path = _prepare_image_for_upload(image_path, max_bytes=max_bytes_bluesky)
@@ -547,12 +634,15 @@ def main() -> int:
                 service=bsky_session["service"],
                 access_jwt=bsky_session["access_jwt"],
                 did=bsky_session["did"],
-                text=tweet_text[:300],
+                text=bluesky_text,
                 created_at=created_at,
                 image_blob=blob,
                 alt_text=f"Cover image for {set_name}",
             )
             bluesky_uri = str(post.get("uri")) if post.get("uri") else None
+            if bluesky_uri:
+                profile_ref = str(bsky_session.get("handle") or bsky_session["did"])
+                bluesky_url = _bluesky_web_url_from_at_uri(bluesky_uri, profile_ref)
         except Exception as e:
             print(f"ERROR: Bluesky post failed: {e}", file=sys.stderr)
             return 11
@@ -561,9 +651,10 @@ def main() -> int:
                 tmp_path.unlink(missing_ok=True)
 
     record = {
-        "tweet_id": str(tweet_id) if tweet_id else None,
+        "twitter_post_id": str(twitter_post_id) if twitter_post_id else None,
         "bluesky_uri": bluesky_uri,
-        "tweeted_at": now.isoformat(),
+        "bluesky_url": bluesky_url,
+        "posted_at": now.isoformat(),
         "filename": filename,
         "set_name": set_name,
         "set_url": set_url,
@@ -572,9 +663,11 @@ def main() -> int:
     _save_json(history_path, history)
 
     print(f"Posted throwback for set: {set_name}")
-    if tweet_id:
-        print(f"Tweet URL: https://x.com/i/web/status/{tweet_id}")
-    if bluesky_uri:
+    if twitter_post_id:
+        print(f"Twitter URL: https://x.com/i/web/status/{twitter_post_id}")
+    if bluesky_url:
+        print(f"Bluesky URL: {bluesky_url}")
+    elif bluesky_uri:
         print(f"Bluesky URI: {bluesky_uri}")
     return 0
 
