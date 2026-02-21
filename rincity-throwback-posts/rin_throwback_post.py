@@ -268,6 +268,89 @@ def _normalized_set_name_for_match(name: str) -> str:
     return _normalize_quotes(html.unescape((name or "").strip())).casefold()
 
 
+def _extract_envira_categories(entry: Dict[str, Any]) -> List[str]:
+    candidate_keys = [
+        "envira_categories",
+        "categories",
+        "category_names",
+        "envira_terms",
+        "terms",
+    ]
+    raw: Any = None
+    for key in candidate_keys:
+        value = entry.get(key)
+        if value:
+            raw = value
+            break
+    if raw is None:
+        return []
+
+    names: List[str] = []
+    if isinstance(raw, str):
+        names = [part.strip() for part in re.split(r"[,\n]", raw) if part.strip()]
+    elif isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, str):
+                name = item.strip()
+                if name:
+                    names.append(name)
+            elif isinstance(item, dict):
+                term_name = str(item.get("name") or item.get("term_name") or "").strip()
+                if term_name:
+                    names.append(term_name)
+    elif isinstance(raw, dict):
+        for key in ("names", "terms", "items"):
+            value = raw.get(key)
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, str) and item.strip():
+                        names.append(item.strip())
+                    elif isinstance(item, dict):
+                        term_name = str(item.get("name") or item.get("term_name") or "").strip()
+                        if term_name:
+                            names.append(term_name)
+    return names
+
+
+def _build_credit_context(categories: List[str]) -> Dict[str, str]:
+    photographer_credit = ""
+    other_model_credit = ""
+
+    excluded_photographers = {
+        "photographer: alternate history photography",
+        "photographer: rin",
+    }
+    for category in categories:
+        c = category.strip()
+        if not c:
+            continue
+        if c.casefold().startswith("photographer:") and c.casefold() not in excluded_photographers:
+            photographer_credit = f"{c}\n"
+            break
+
+    other_models: List[str] = []
+    for category in categories:
+        c = category.strip()
+        if not c:
+            continue
+        if not c.casefold().startswith("model:"):
+            continue
+        if c.casefold() == "model: rin":
+            continue
+        model_name = c.split(":", 1)[1].strip() if ":" in c else ""
+        if model_name:
+            other_models.append(model_name)
+
+    if other_models:
+        label = "Other Model" if len(other_models) == 1 else "Other Models"
+        other_model_credit = f"{label}: {', '.join(other_models)}\n"
+
+    return {
+        "PHOTOGRAPHER_CREDIT": photographer_credit,
+        "OTHER_MODEL_CREDIT": other_model_credit,
+    }
+
+
 def _load_auth(auth_path: Path) -> Dict[str, str]:
     auth = _load_json(auth_path)
     if not isinstance(auth, dict):
@@ -539,6 +622,8 @@ def main() -> int:
         return 5
 
     published = _fmt_publish_date(date_published)
+    envira_categories = _extract_envira_categories(chosen)
+    credit_context = _build_credit_context(envira_categories)
     template_context = {
         "set_name": set_name,
         "set_url": set_url,
@@ -548,6 +633,7 @@ def main() -> int:
         "max_len": 280,
         "fit_tags": _fit_tags,
     }
+    template_context.update(credit_context)
     try:
         post_text = _render_template_text(template_path=template_path, context=template_context, max_len=280)
     except Exception as e:
