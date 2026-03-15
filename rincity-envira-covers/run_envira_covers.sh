@@ -3,8 +3,8 @@ set -euo pipefail
 
 WP_BIN="${HOME}/wp-lsphp"
 WP_PATH="/usr/local/lsws/wordpress"
-SCRIPT="/home/morgan/rin_envira_covers/rin_envira_covers.php"
-LOG="/home/morgan/rin_envira_covers/cron.log"
+SCRIPT="/home/morgan/rincity-tweaks/rincity-envira-covers/rin_envira_covers.php"
+LOG="/home/morgan/rincity-tweaks/rincity-envira-covers/cron.log"
 OUT_DIR="${RIN_OUT:-${WP_PATH}/wp-content/uploads/Rin_Covers}"
 MANIFEST_PATH="${OUT_DIR}/manifest.json"
 
