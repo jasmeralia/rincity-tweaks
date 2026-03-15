@@ -8,10 +8,11 @@ A collection of tools and plugins for managing [Rin City](https://rin-city.com) 
 
 A WordPress plugin (v2.1.5) that extends Envira Gallery with:
 
-- RSS feed of the latest galleries
+- RSS feed of the latest galleries (Members Gallery album only)
 - Gallery table page with random gallery display (`[rc_envira_gallery_table]` shortcode)
-- Category widgets for galleries and albums
-- Random gallery redirect
+- Custom album display page (`[rincity_envira_album id="..."]` shortcode) — renders a styled grid of gallery cover thumbnails with titles and photo counts, with URL-based category filtering
+- **Envira Gallery Categories widget** — shows categories for the current gallery on single gallery pages, linking to the filtered album view
+- **Envira Album Categories widget** — shows a collapsible hierarchical category tree with gallery counts on album and Members Gallery pages
 
 See [rc_tweaks/README.md](rc_tweaks/README.md) for full documentation.
 

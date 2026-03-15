@@ -1,49 +1,85 @@
 # rc_tweaks WordPress Plugin
 
 ## Description
-The `rc_tweaks` plugin provides three main features for WordPress sites using the custom post type `envira`:
+The `rc_tweaks` plugin provides several features for WordPress sites using the Envira Gallery plugin:
 
-1. **Envira RSS Feed:** Generates an XML/RSS feed for the last 10 published `envira` posts, sorted by publication date (descending).
-2. **Envira Gallery Table Page:** Automatically creates a page that displays a table of 3 random published `envira` galleries (excluding those in the "Dustrat" category), each showing up to 3 images from the gallery, sorted by oldest publication date first, rendered within your theme's header and footer.
-3. **Envira Gallery Categories Widget:** Adds a widget that displays a bulleted list of Envira categories (with gallery counts) in the sidebar, only on single Envira gallery pages.
-4. **Envira Album Categories Widget:** Adds a widget that displays a bulleted list of all Envira categories (with gallery counts) in the sidebar, only on Envira album post type pages and album taxonomy pages (e.g. `/album/members-gallery`).
-
-## Features
-- Fetches the latest 10 published posts of type `envira` and outputs them as an RSS feed.
-- Adds a new page (`/envira-gallery-table/`) with a table of 3 random Envira galleries and images, sorted by oldest publication date first.
-- Excludes galleries in the "Dustrat" category from the gallery table.
-- Includes a shortcode `[rc_envira_gallery_table]` to display the gallery table anywhere.
-- Provides a widget to display Envira categories for galleries in the sidebar, visible only on single Envira gallery pages.
-- Provides a widget to display all Envira categories (with counts) on Envira album post type and album taxonomy pages.
-- Easy integration with WordPress.
+1. **Envira RSS Feed:** Generates an XML/RSS feed for the last 10 published `envira` posts (limited to those in the "Members Gallery" album), sorted by publication date descending.
+2. **Envira Gallery Table Page:** Automatically creates a page that displays a table of 3 random published `envira` galleries (excluding those in the "Dustrat" category), each showing up to 3 images, sorted by oldest publication date first.
+3. **Custom Album Display Page:** A shortcode that renders a custom grid of all galleries in a given Envira album, with cover thumbnails, titles, photo counts, and optional category filtering via URL parameter.
+4. **Envira Gallery Categories Widget:** Displays a bulleted list of Envira categories (with gallery counts) in the sidebar, only on single Envira gallery pages. Each category links to the Members Gallery album page filtered by that category.
+5. **Envira Album Categories Widget:** Displays a hierarchical, collapsible category tree with gallery counts in the sidebar, visible on Envira album pages, album taxonomy pages (e.g. `/album/members-gallery`), and the `/members-gallery/` page.
 
 ## Installation
 1. Download the `rc_tweaks` plugin files.
 2. Upload the `rc_tweaks` folder to the `/wp-content/plugins/` directory of your WordPress installation.
 3. Activate the plugin through the 'Plugins' menu in WordPress.
 
-## Usage
-
-### Envira RSS Feed
-Once activated, the plugin will automatically generate an RSS feed for the `envira` post type.  
-You can access the feed at the following URL:
-```
-http://yourdomain.com/?feed=envira-feed
-```
-
-### Envira Gallery Table Page
-- On activation, a page titled **Envira Gallery Table** is created at `/envira-gallery-table/`.
-- This page displays a table of the 3 most recent published Envira galleries, each with up to 3 images.
-- You can also use the `[rc_envira_gallery_table]` shortcode in any page or post to display the gallery table.
-
-### Envira Tags Widget
-- Go to **Appearance → Widgets** in your WordPress admin.
-- Add the **Envira Gallery Tags** widget to your sidebar or any widget area.
-- The widget will only appear on single Envira gallery pages and will display a list of tags for the current gallery.
-
 ## Requirements
 - WordPress 5.0 or higher
 - PHP 7.0 or higher
+- Envira Gallery plugin (with Albums addon for album features)
+
+## Usage
+
+### Envira RSS Feed
+Once activated, the plugin automatically generates an RSS feed for `envira` posts in the "Members Gallery" album. Access it at:
+```
+http://yourdomain.com/?feed=envira-feed
+```
+Scheduled (future) galleries are excluded from the feed.
+
+### Envira Gallery Table Page
+- On activation, a page titled **Envira Gallery Table** is created at `/envira-gallery-table/`.
+- This page displays a table of 3 random published Envira galleries, each with up to 3 images, sorted by oldest publication date first.
+- Galleries in the "Dustrat" category are excluded.
+- Use the `[rc_envira_gallery_table]` shortcode in any page or post to embed the same table elsewhere.
+
+### Custom Album Display Page
+The `[rincity_envira_album]` shortcode renders a custom grid layout for a given Envira album. It replaces the default Envira album display with a styled grid showing cover thumbnails, gallery titles (linked), and photo counts.
+
+**Shortcode attributes:**
+
+| Attribute | Required | Description |
+|-----------|----------|-------------|
+| `id` | Yes | The WordPress post ID of the Envira album to display |
+
+**Example:**
+```
+[rincity_envira_album id="1411"]
+```
+
+**Category filtering:**
+
+Galleries can be filtered by appending an `envira-category` query parameter to the page URL:
+```
+/members-gallery/?envira-category=envira-category-42
+```
+where `42` is the `term_id` of the desired category. The category widgets (see below) generate these URLs automatically.
+
+Galleries are displayed in reverse chronological order (newest first). Cover thumbnails use a 144×180 px cropped image derived from the album's stored cover image metadata.
+
+**Admin setting:**
+
+A lazy load option for the album display can be toggled in the WordPress admin via the `rincity_envira_album_lazyload` option (defaults to enabled).
+
+### Envira Gallery Categories Widget
+- Go to **Appearance → Widgets** in your WordPress admin.
+- Add the **Envira Gallery Categories** widget to your desired widget area.
+- The widget appears **only on single Envira gallery pages** and displays a bulleted list of the categories assigned to the current gallery, with a count of galleries in each category.
+- Each category name links to `/members-gallery/?envira-category=envira-category-{term_id}`, deep-linking into the filtered album view.
+- The widget hides itself automatically if the current gallery has no categories.
+
+### Envira Album Categories Widget
+- Go to **Appearance → Widgets** in your WordPress admin.
+- Add the **Envira Album Categories** widget to your desired widget area.
+- The widget appears on:
+  - Envira album post type pages
+  - Envira album taxonomy pages (e.g. `/album/members-gallery`)
+  - The `/members-gallery/` page
+- It displays a hierarchical category tree showing all Envira categories, with a gallery count for each category (counting only galleries in the Members Gallery album, ID 1411).
+- Top-level categories that have subcategories show a collapse/expand toggle (▶). Subcategory lists are hidden by default and revealed on click.
+- An **All Categories** link at the top of the list clears any active filter and shows the full album.
+- The widget hides itself if no categories are found.
 
 ## Support
 For support, please open an issue on the plugin's repository or contact the developer directly.
