@@ -1,6 +1,6 @@
 # rincity-tweaks
 
-A collection of tools and plugins for managing [Rin City](https://rincity.net) Envira Gallery content, from WordPress customization through automated social media posting.
+A collection of tools and plugins for managing [Rin City](https://rin-city.com) Envira Gallery content, from WordPress customization through automated social media posting.
 
 ## Components
 
