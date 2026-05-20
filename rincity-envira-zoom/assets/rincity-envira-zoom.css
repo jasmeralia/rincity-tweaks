@@ -2,15 +2,22 @@
  * Shell div that fills .envirabox-slide and serves as the Panzoom target.
  * Panzoom's zoomToPoint uses dims.elem vs effectiveArea (parent=slide); making
  * them equal fixes focal-point calculation when the image is smaller than the slide.
+ *
+ * !important overrides required: .envirabox-slide > * applies margin/padding/background/
+ * display to ALL direct children of the slide, which would break shell fill and
+ * corrupt the focal-point math.
  */
 .rin-zoom-shell {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    display: flex !important;
     z-index: 99996; /* above .envirabox-image-wrap (99995) */
-    display: flex;
     align-items: center;
     justify-content: center;
     cursor: grab;
@@ -36,4 +43,38 @@
 .rin-zoom-shell img.envirabox-image {
     pointer-events: none;
     display: block;
+}
+
+/* +/- zoom buttons — positioned top-right, above the shell */
+.rin-zoom-controls {
+    position: absolute !important;
+    top: 10px !important;
+    right: 60px !important; /* clear Envira's close button (~44px wide) */
+    z-index: 99999;
+    display: flex !important;
+    gap: 4px;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+}
+
+.rin-zoom-btn {
+    width: 32px;
+    height: 32px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 4px;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    user-select: none;
+}
+
+.rin-zoom-btn:hover {
+    background: rgba(0, 0, 0, 0.8);
 }
