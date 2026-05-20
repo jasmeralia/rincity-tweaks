@@ -101,13 +101,19 @@
             slide.removeEventListener('wheel', onWheel);
         };
 
-        // Double-click: zoom toward cursor, or reset if already zoomed
+        // Double-click: cycle through zoom steps toward cursor; reset after max
+        var DBLCLICK_STEPS = [2, 3.5, 5];
         zoomShell.addEventListener('dblclick', function (e) {
             if (!pz) return;
-            if (pz.getScale() > 1.2) {
-                pz.reset({ animate: true });
+            var scale = pz.getScale();
+            var next = null;
+            for (var i = 0; i < DBLCLICK_STEPS.length; i++) {
+                if (DBLCLICK_STEPS[i] > scale + 0.15) { next = DBLCLICK_STEPS[i]; break; }
+            }
+            if (next !== null) {
+                pz.zoomToPoint(next, { clientX: e.clientX, clientY: e.clientY }, { animate: true });
             } else {
-                pz.zoomToPoint(2.5, { clientX: e.clientX, clientY: e.clientY }, { animate: true });
+                pz.reset({ animate: true });
             }
         });
 
