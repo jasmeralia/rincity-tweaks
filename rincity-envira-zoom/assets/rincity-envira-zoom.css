@@ -48,17 +48,14 @@
     display: block;
 }
 
-/* +/- zoom buttons — positioned top-right, above the shell */
+/* +/- zoom buttons — fixed to viewport, appended to body to escape slide stacking context */
 .rin-zoom-controls {
-    position: absolute !important;
-    top: 10px !important;
-    right: 60px !important; /* clear Envira's close button (~44px wide) */
-    z-index: 99999;
-    display: flex !important;
+    position: fixed;
+    top: 6px;
+    right: 130px; /* clear Envira's toolbar (~110px wide at right:10px) */
+    z-index: 9999999;
+    display: flex;
     gap: 4px;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: transparent !important;
 }
 
 .rin-zoom-btn {

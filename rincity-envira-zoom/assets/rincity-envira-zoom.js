@@ -135,7 +135,7 @@
 
         zoomControls.appendChild(btnIn);
         zoomControls.appendChild(btnOut);
-        current.$slide[0].appendChild(zoomControls);
+        document.body.appendChild(zoomControls);
     }
 
     $(document).on('envirabox_api_before_show', function (e, obj, instance, current) {
