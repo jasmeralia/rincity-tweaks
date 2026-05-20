@@ -11,7 +11,7 @@
  */
 
 if ( ! defined('WP_CLI') || ! WP_CLI ) {
-  fwrite(STDERR, "This script must be run via WP-CLI eval-file.\n");
+  fwrite(defined('STDERR') ? STDERR : fopen('php://stderr', 'w'), "This script must be run via WP-CLI eval-file.\n");
   exit(1);
 }
 
