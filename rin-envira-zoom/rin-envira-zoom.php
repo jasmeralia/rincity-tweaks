@@ -20,16 +20,16 @@ add_action( 'wp_enqueue_scripts', function() {
     );
 
     wp_enqueue_script(
-        'rincity-envira-zoom',
-        plugin_dir_url( __FILE__ ) . 'assets/rincity-envira-zoom.js',
+        'rin-envira-zoom',
+        plugin_dir_url( __FILE__ ) . 'assets/rin-envira-zoom.js',
         [ 'jquery', 'panzoom' ],
         '0.1.0',
         true
     );
 
     wp_enqueue_style(
-        'rincity-envira-zoom',
-        plugin_dir_url( __FILE__ ) . 'assets/rincity-envira-zoom.css',
+        'rin-envira-zoom',
+        plugin_dir_url( __FILE__ ) . 'assets/rin-envira-zoom.css',
         [],
         '0.1.0'
     );

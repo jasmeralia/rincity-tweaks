@@ -26,6 +26,10 @@ A Python 3 application that reads the Envira cover manifest and posts throwback 
 
 See [rincity-throwback-posts/README.md](rincity-throwback-posts/README.md) for full documentation.
 
+### [rincity-envira-zoom](rincity-envira-zoom/)
+
+A WordPress plugin (v0.1.0) that replaces Envira's built-in ElevateZoom addon with [Panzoom](https://github.com/timmywil/panzoom) (`@panzoom/panzoom` v4.6.2). Provides scroll-wheel zoom, drag-to-pan, and double-click zoom-to-cursor on lightbox images. Panzoom is bundled locally (`assets/panzoom.min.js`) — no CDN dependency.
+
 ## Workflow
 
 ```
@@ -45,3 +49,4 @@ rincity-envira-covers  →  cover manifest (JSON)
 | rc_tweaks | WordPress 5.0+, PHP 7.0+, Envira Gallery plugin |
 | rincity-envira-covers | WP-CLI, PHP 7.0+ |
 | rincity-throwback-posts | Python 3.10+, tweepy 4.14.0+, jinja2 3.1.0+ |
+| rincity-envira-zoom | WordPress 5.0+, PHP 7.0+, Envira Gallery plugin |
