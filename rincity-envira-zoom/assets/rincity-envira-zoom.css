@@ -48,10 +48,15 @@
     display: block;
 }
 
-/* +/- zoom buttons — fixed to viewport, appended to body to escape slide stacking context */
+/*
+ * +/- zoom buttons — appended to .envirabox-container (position:fixed, full-viewport).
+ * Using position:absolute inside the fixed container is equivalent to position:fixed
+ * relative to the viewport, but avoids the body-level transform trap where a CSS
+ * transform on an ancestor converts position:fixed to position:absolute behavior.
+ */
 .rin-zoom-controls {
-    position: fixed;
-    top: 6px;
+    position: absolute;
+    top: 10px;
     right: 130px; /* clear Envira's toolbar (~110px wide at right:10px) */
     z-index: 9999999;
     display: flex;

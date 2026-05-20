@@ -135,7 +135,10 @@
 
         zoomControls.appendChild(btnIn);
         zoomControls.appendChild(btnOut);
-        document.body.appendChild(zoomControls);
+        // Append to the envirabox container (position:fixed, full-viewport) rather than
+        // document.body — body-level position:fixed breaks if any ancestor has a transform.
+        var enviraContainer = current.$slide[0].closest('.envirabox-container') || document.body;
+        enviraContainer.appendChild(zoomControls);
     }
 
     $(document).on('envirabox_api_before_show', function (e, obj, instance, current) {
