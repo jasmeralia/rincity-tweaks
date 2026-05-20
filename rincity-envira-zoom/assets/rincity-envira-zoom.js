@@ -3,6 +3,7 @@
 
     var pz               = null;
     var zoomShell        = null;
+    var zoomControls     = null;
     var savedWrapParent  = null;
     var savedWrapTransform = null;
     var wheelCleanup     = null;
@@ -31,6 +32,13 @@
                 zoomShell.parentNode.removeChild(zoomShell);
             }
             zoomShell = null;
+        }
+
+        if (zoomControls) {
+            if (zoomControls.parentNode) {
+                zoomControls.parentNode.removeChild(zoomControls);
+            }
+            zoomControls = null;
         }
 
         savedWrapParent    = null;
@@ -102,6 +110,32 @@
                 pz.zoomToPoint(2.5, { clientX: e.clientX, clientY: e.clientY }, { animate: true });
             }
         });
+
+        // +/- zoom buttons
+        zoomControls = document.createElement('div');
+        zoomControls.className = 'rin-zoom-controls';
+
+        var btnIn  = document.createElement('button');
+        btnIn.className  = 'rin-zoom-btn rin-zoom-in';
+        btnIn.type       = 'button';
+        btnIn.textContent = '+';
+        btnIn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (pz) pz.zoomIn({ animate: true });
+        });
+
+        var btnOut = document.createElement('button');
+        btnOut.className  = 'rin-zoom-btn rin-zoom-out';
+        btnOut.type       = 'button';
+        btnOut.textContent = '−';
+        btnOut.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (pz) pz.zoomOut({ animate: true });
+        });
+
+        zoomControls.appendChild(btnIn);
+        zoomControls.appendChild(btnOut);
+        current.$slide[0].appendChild(zoomControls);
     }
 
     $(document).on('envirabox_api_before_show', function (e, obj, instance, current) {
