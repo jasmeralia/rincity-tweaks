@@ -1,0 +1,39 @@
+/*
+ * Shell div that fills .envirabox-slide and serves as the Panzoom target.
+ * Panzoom's zoomToPoint uses dims.elem vs effectiveArea (parent=slide); making
+ * them equal fixes focal-point calculation when the image is smaller than the slide.
+ */
+.rin-zoom-shell {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 99996; /* above .envirabox-image-wrap (99995) */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    touch-action: none; /* required for Panzoom touch handling */
+}
+
+.rin-zoom-shell:active {
+    cursor: grabbing;
+}
+
+/*
+ * Image-wrap inside shell: switch from position:absolute (Envira default) to
+ * position:relative so flex centering applies.  Envira's inline width/height
+ * remain and size the flex item correctly.
+ */
+.rin-zoom-shell .envirabox-image-wrap {
+    position: relative !important;
+    top: 0 !important;
+    left: 0 !important;
+}
+
+/* Image: let shell handle all pointer/touch events */
+.rin-zoom-shell img.envirabox-image {
+    pointer-events: none;
+    display: block;
+}
