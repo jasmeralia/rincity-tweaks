@@ -60,7 +60,7 @@
  */
 .rin-zoom-controls {
     position: absolute;
-    top: 10px;
+    top: 8px;
     right: 120px;
     z-index: 9999999;
     display: flex;
