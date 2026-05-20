@@ -20,6 +20,7 @@
     z-index: 99996; /* above .envirabox-image-wrap (99995) */
     align-items: center;
     justify-content: center;
+    overflow: hidden; /* clip zoomed image to slide bounds; prevents covering controls */
     cursor: grab;
     touch-action: none; /* required for Panzoom touch handling */
 }
@@ -37,6 +38,8 @@
     position: relative !important;
     top: 0 !important;
     left: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
 }
 
 /* Image: let shell handle all pointer/touch events */
@@ -45,36 +48,43 @@
     display: block;
 }
 
-/* +/- zoom buttons — positioned top-right, above the shell */
+/*
+ * +/- zoom buttons — appended to .envirabox-container (position:fixed, full-viewport).
+ * Using position:absolute inside the fixed container is equivalent to position:fixed
+ * relative to the viewport, but avoids the body-level transform trap where a CSS
+ * transform on an ancestor converts position:fixed to position:absolute behavior.
+ *
+ * Size, gap, and right offset match Envira's dark toolbar aesthetic:
+ * toolbar is right:10px with ~4 × (16px + 9px margin) = ~100px wide, so
+ * right:120px puts our group 10px to the left of the toolbar's left edge.
+ */
 .rin-zoom-controls {
-    position: absolute !important;
-    top: 10px !important;
-    right: 60px !important; /* clear Envira's close button (~44px wide) */
-    z-index: 99999;
-    display: flex !important;
-    gap: 4px;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: transparent !important;
+    position: absolute;
+    top: 7px;
+    right: 120px;
+    z-index: 9999999;
+    display: flex;
+    align-items: center;
+    gap: 9px; /* match Envira toolbar's margin-left: 9px spacing */
 }
 
 .rin-zoom-btn {
-    width: 32px;
-    height: 32px;
-    background: rgba(0, 0, 0, 0.55);
+    width: 16px;
+    height: 16px;
+    background: none;
+    border: none;
     color: #fff;
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    border-radius: 4px;
-    font-size: 20px;
-    line-height: 1;
+    font-size: 18px;
+    line-height: 16px;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     padding: 0;
+    margin: 0;
+    display: block;
     user-select: none;
+    opacity: 1;
+    text-indent: 0;
 }
 
 .rin-zoom-btn:hover {
-    background: rgba(0, 0, 0, 0.8);
+    opacity: 0.7;
 }
