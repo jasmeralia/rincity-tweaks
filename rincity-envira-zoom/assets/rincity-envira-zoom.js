@@ -94,13 +94,14 @@
         if (!$img.length) return;
         var img = $img[0];
 
-        // Resolve the true pre-scale original. Base = Envira's retina URL if set,
-        // otherwise the current src (the WP-scaled version). Strip WP's "-scaled"
-        // suffix to get the original file; the regex is extension-agnostic (.jpg,
-        // .png, etc.) and a no-op when no "-scaled" is present (older galleries that
-        // were never scaled are already at full res).
+        // Resolve the true pre-scale original. Use the retina URL saved by the
+        // before_load hook (_rcRetina), falling back to enviraRetina if the hook
+        // didn't fire (e.g. already-open lightbox on first show), then to prevSrc.
+        // Strip WP's "-scaled" suffix to get the original file; the regex is
+        // extension-agnostic (.jpg, .png, etc.) and a no-op when no "-scaled" is
+        // present (older galleries that were never scaled are already at full res).
         var prevSrc   = img.getAttribute('src');
-        var base      = current.enviraRetina || prevSrc;
+        var base      = current._rcRetina || current.enviraRetina || prevSrc;
         var fullRes   = base ? base.replace(/-scaled(\.[^.]+)$/, '$1') : null;
         var needsSwap = !!(fullRes && prevSrc !== fullRes);
 
@@ -247,6 +248,18 @@
             enviraContainer.appendChild(zoomControls);
         }
     }
+
+    // Intercept before envirabox's setImage() runs.  On retina devices (DPR ≥ 2)
+    // envirabox builds srcset as "-scaled.png 1x, original.png 2x", which causes
+    // the browser to skip the scaled version and download the full original immediately.
+    // We save enviraRetina on a private property and clear it so envirabox only gets
+    // a 1x srcset; initZoom then background-loads the original itself.
+    $(document).on('envirabox_api_before_load', function (e, obj, instance, current) {
+        if (current.enviraRetina) {
+            current._rcRetina   = current.enviraRetina;
+            current.enviraRetina = '';
+        }
+    });
 
     $(document).on('envirabox_api_before_show', function (e, obj, instance, current) {
         // Fires before the next image animates in; tear down zoom so Envira can
