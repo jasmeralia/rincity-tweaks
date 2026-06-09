@@ -129,6 +129,45 @@
 }
 
 /*
+ * HD indicator — a small element appended to .rin-zoom-controls when there is a
+ * full-res original to load.  Two states:
+ *   rin-zoom-hd-loading : spinning ring (via ::after) while the original is in flight
+ *   rin-zoom-hd-ready   : "HD" text that fades out once the original has decoded
+ */
+.rin-zoom-hd-indicator {
+    display: inline-block;
+    vertical-align: middle;
+    position: relative;
+    width: 12px;
+    height: 12px;
+    margin: 0 0 0 9px;
+}
+
+.rin-zoom-hd-indicator.rin-zoom-hd-loading::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    box-sizing: border-box;
+    width: 12px;
+    height: 12px;
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    border-top-color: rgba(255, 255, 255, 0.7);
+    border-radius: 50%;
+    animation: rin-zoom-spin 0.8s linear infinite;
+}
+
+.rin-zoom-hd-indicator.rin-zoom-hd-ready {
+    width: auto;
+    height: auto;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 16px;
+    letter-spacing: 0.06em;
+}
+
+/*
  * Spinner overlay shown on the shell while the full-size original is loading.
  * Rendered as a ::after pseudo-element so no extra DOM node is needed.
  * Removed (class stripped) on image load or error; shell teardown via destroyZoom
