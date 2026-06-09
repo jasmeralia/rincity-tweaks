@@ -49,44 +49,45 @@
 }
 
 /*
- * +/- zoom buttons — appended to .envirabox-container (position:fixed, full-viewport).
- * Using position:absolute inside the fixed container is equivalent to position:fixed
- * relative to the viewport, but avoids the body-level transform trap where a CSS
- * transform on an ancestor converts position:fixed to position:absolute behavior.
- *
- * Size, gap, and right offset match Envira's dark toolbar aesthetic:
- * toolbar is right:10px with ~4 × (16px + 9px margin) = ~100px wide, so
- * right:120px puts our group 10px to the left of the toolbar's left edge.
+ * +/- zoom buttons — inserted as first children of .envirabox-toolbar so they flow
+ * naturally with Envira's own toolbar buttons regardless of how many are shown.
+ * Sized to match Envira's .envirabox-button (44×44 px) for visual consistency.
  */
 .rin-zoom-controls {
-    position: absolute;
-    top: 7px;
-    right: 120px;
-    z-index: 9999999;
-    display: flex;
-    align-items: center;
-    gap: 9px; /* match Envira toolbar's margin-left: 9px spacing */
+    display: inline-flex;
+    vertical-align: top;
 }
 
 .rin-zoom-btn {
-    width: 16px;
-    height: 16px;
-    background: none;
-    border: none;
-    color: #fff;
-    font-size: 18px;
-    line-height: 16px;
-    cursor: pointer;
-    padding: 0;
+    box-sizing: border-box;
+    display: inline-block;
+    vertical-align: top;
+    width: 44px;
+    height: 44px;
     margin: 0;
-    display: block;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: rgba(30, 30, 30, 0.6);
+    color: #ccc;
+    font-size: 22px;
+    line-height: 44px;
+    text-align: center;
+    cursor: pointer;
     user-select: none;
-    opacity: 1;
-    text-indent: 0;
+    transition: color 0.3s ease;
 }
 
 .rin-zoom-btn:hover {
-    opacity: 0.7;
+    color: #fff;
+}
+
+/* Fallback when .envirabox-toolbar is absent (toolbar:false gallery config). */
+.rin-zoom-controls--floating {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 9999999;
 }
 
 /*

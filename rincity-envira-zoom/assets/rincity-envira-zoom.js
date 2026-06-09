@@ -163,10 +163,20 @@
 
         zoomControls.appendChild(btnIn);
         zoomControls.appendChild(btnOut);
-        // Append to the envirabox container (position:fixed, full-viewport) rather than
-        // document.body — body-level position:fixed breaks if any ancestor has a transform.
-        var enviraContainer = current.$slide[0].closest('.envirabox-container') || document.body;
-        enviraContainer.appendChild(zoomControls);
+        // Use instance.$refs.container (direct reference) rather than .closest() traversal.
+        // Insert into .envirabox-toolbar so the buttons flow naturally with the other toolbar
+        // buttons regardless of how many are shown; avoids a hardcoded pixel offset.
+        // Falls back to container-level append (with --floating positioning) if the toolbar
+        // was removed (toolbar:false gallery config).
+        var $c = instance.$refs && instance.$refs.container;
+        var enviraContainer = ($c && $c[0]) || current.$slide[0].closest('.envirabox-container') || document.body;
+        var toolbar = enviraContainer.querySelector('.envirabox-toolbar');
+        if (toolbar) {
+            toolbar.insertBefore(zoomControls, toolbar.firstChild);
+        } else {
+            zoomControls.classList.add('rin-zoom-controls--floating');
+            enviraContainer.appendChild(zoomControls);
+        }
     }
 
     $(document).on('envirabox_api_before_show', function (e, obj, instance, current) {

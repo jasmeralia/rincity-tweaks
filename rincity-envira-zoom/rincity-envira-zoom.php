@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Rin Envira Zoom
  * Description: Replaces Envira's ElevateZoom with Panzoom (scroll/pinch/drag).
- * Version: 0.6.0
+ * Version: 0.6.1
  * Author: Morgan Blackthorne
  */
 
@@ -23,7 +23,7 @@ add_action( 'wp_enqueue_scripts', function() {
         'rincity-envira-zoom',
         plugin_dir_url( __FILE__ ) . 'assets/rincity-envira-zoom.js',
         [ 'jquery', 'panzoom' ],
-        '0.6.0',
+        '0.6.1',
         true
     );
 
@@ -31,6 +31,6 @@ add_action( 'wp_enqueue_scripts', function() {
         'rincity-envira-zoom',
         plugin_dir_url( __FILE__ ) . 'assets/rincity-envira-zoom.css',
         [],
-        '0.6.0'
+        '0.6.1'
     );
 }, 20 );
