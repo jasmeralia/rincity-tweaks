@@ -85,6 +85,7 @@ A lazy load option for the album display can be toggled in the WordPress admin v
 For support, please open an issue on the plugin's repository or contact the developer directly.
 
 ## Changelog
+- **2.1.6** - Removed unused `rincity-thumb` (320×400) image size registration; size suppression for Envira gallery uploads is now handled by the `rincity-image-size-control` plugin.
 - **1.20.5** - Envira category links in widgets now point to the Members Gallery album page with the correct query parameter for deep linking.
 - **1.20.4** - Version bump and changelog update.
 - **1.20.3** - Minor code cleanup and maintenance for Envira deeplink support.

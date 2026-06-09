@@ -1,10 +1,4 @@
 <?php
-// Register thumbnail size
-function rincity_register_image_sizes() {
-    add_image_size( 'rincity-thumb', 320, 400, true );
-}
-add_action( 'init', 'rincity_register_image_sizes' );
-
 // Enqueue styles
 function rincity_enqueue_assets() {
     wp_enqueue_style( 'rincity-style', plugin_dir_url( dirname( __FILE__ ) ) . 'assets/css/style.css' );
