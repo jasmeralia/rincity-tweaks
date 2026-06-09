@@ -68,6 +68,8 @@
             $img[0].addEventListener('error', function () {
                 if (prevSrc) { $img[0].src = prevSrc; }
             }, { once: true });
+            // srcset takes precedence over src — clear it so the browser actually fetches fullRes.
+            $img[0].removeAttribute('srcset');
             $img[0].src = fullRes;
         }
 
