@@ -49,42 +49,107 @@
 }
 
 /*
- * +/- zoom buttons — appended to .envirabox-container (position:fixed, full-viewport).
- * Using position:absolute inside the fixed container is equivalent to position:fixed
- * relative to the viewport, but avoids the body-level transform trap where a CSS
- * transform on an ancestor converts position:fixed to position:absolute behavior.
+ * +/- zoom buttons — inserted into .envirabox-toolbar so they sit inline with Envira's
+ * native controls (thumbnails / fullscreen / slideshow / close).
  *
- * Size, gap, and right offset match Envira's dark toolbar aesthetic:
- * toolbar is right:10px with ~4 × (16px + 9px margin) = ~100px wide, so
- * right:120px puts our group 10px to the left of the toolbar's left edge.
+ * The wrapper is a <span> (see the JS): the base_dark lightbox theme hijacks every
+ * direct child *<div>* of the toolbar into a 16×16 icon-font slot with
+ * text-indent:-9999px — which is exactly what made the 0.6.1 controls vanish. A <span>
+ * stays in the toolbar row but escapes that `.envirabox-toolbar > div` rule.
+ *
+ * The buttons are sized/coloured to match base_dark's native 16px white toolbar glyphs
+ * (16px, #fff, transparent, 9px gap). The explicit text-indent/appearance/visibility
+ * resets harden them against the theme's toolbar rules and global `button` styles.
  */
 .rin-zoom-controls {
-    position: absolute;
-    top: 7px;
-    right: 120px;
-    z-index: 9999999;
-    display: flex;
-    align-items: center;
-    gap: 9px; /* match Envira toolbar's margin-left: 9px spacing */
+    display: inline-block;
+    vertical-align: middle;
+    white-space: nowrap;
 }
 
 .rin-zoom-btn {
+    box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance: none;
+    display: inline-block;
+    vertical-align: middle;
+    visibility: visible;
+    opacity: 0.85;
     width: 16px;
     height: 16px;
-    background: none;
-    border: none;
-    color: #fff;
-    font-size: 18px;
-    line-height: 16px;
-    cursor: pointer;
+    margin: 0 0 0 9px; /* match base_dark's native .envirabox-toolbar > div spacing */
     padding: 0;
-    margin: 0;
-    display: block;
-    user-select: none;
-    opacity: 1;
+    border: 0;
+    background: none;
+    color: #fff;
+    font-size: 19px;
+    line-height: 16px;
+    text-align: center;
     text-indent: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: opacity 0.2s ease;
 }
 
 .rin-zoom-btn:hover {
-    opacity: 0.7;
+    opacity: 1;
+}
+
+/*
+ * Fallback when .envirabox-toolbar is absent (toolbar:false gallery config): float the
+ * controls in the upper-right corner as a stacked pair, clear of the caption bar and the
+ * vertically-centred prev/next nav arrows.
+ */
+.rin-zoom-controls--floating {
+    position: absolute;
+    top: 56px;
+    right: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 99998; /* above slide (99994) / stage (99993) */
+}
+
+.rin-zoom-controls--floating .rin-zoom-btn {
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    border-radius: 4px;
+    background: rgba(30, 30, 30, 0.6);
+    color: #ccc;
+    opacity: 1;
+    font-size: 26px;
+    line-height: 44px;
+    transition: color 0.2s ease, background 0.2s ease;
+}
+
+.rin-zoom-controls--floating .rin-zoom-btn:hover {
+    color: #fff;
+    background: rgba(30, 30, 30, 0.85);
+}
+
+/*
+ * Spinner overlay shown on the shell while the full-size original is loading.
+ * Rendered as a ::after pseudo-element so no extra DOM node is needed.
+ * Removed (class stripped) on image load or error; shell teardown via destroyZoom
+ * discards the node entirely so no explicit cleanup is needed on slide change.
+ */
+.rin-zoom-shell.rin-zoom-loading::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 34px;
+    height: 34px;
+    margin: -17px 0 0 -17px;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: rgba(255, 255, 255, 0.85);
+    border-radius: 50%;
+    animation: rin-zoom-spin 0.8s linear infinite;
+    pointer-events: none;
+    z-index: 99997;
+}
+
+@keyframes rin-zoom-spin {
+    to { transform: rotate(360deg); }
 }
