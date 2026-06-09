@@ -54,11 +54,20 @@
         var $img = $wrap.find('img.envirabox-image');
         if (!$img.length) return;
 
-        // Swap to the full-resolution image if Envira has one.
-        // data-envira-retina on the gallery link is normalised to enviraRetina by jQuery
-        // when envirabox copies link data onto the slide object.
-        var fullRes = current.enviraRetina;
-        if (fullRes && $img[0].getAttribute('src') !== fullRes) {
+        // Swap to the true pre-scale original. Base = Envira's retina URL if set,
+        // otherwise the current src (which is the WP-scaled version). Strip WP's
+        // "-scaled" suffix to get the original file; the regex is extension-agnostic
+        // (.jpg, .png, etc.) and a no-op when no "-scaled" is present (older galleries
+        // where no scaling occurred are already at full res).
+        // The error handler restores the scaled src if the original 404s (e.g. original
+        // was deleted from disk), so the user always sees something.
+        var prevSrc = $img[0].getAttribute('src');
+        var base    = current.enviraRetina || prevSrc;
+        var fullRes = base ? base.replace(/-scaled(\.[^.]+)$/, '$1') : null;
+        if (fullRes && prevSrc !== fullRes) {
+            $img[0].addEventListener('error', function () {
+                if (prevSrc) { $img[0].src = prevSrc; }
+            }, { once: true });
             $img[0].src = fullRes;
         }
 
@@ -80,6 +89,19 @@
         // Move image-wrap into shell; CSS re-centres it via flexbox
         zoomShell.appendChild($wrap[0]);
         $wrap[0].style.transform = '';  // clear Envira's translate so flexbox takes over
+
+        // Show a spinner while the original (potentially large) file is loading.
+        // Fires only when we actually kicked off a new fetch and it isn't already done.
+        // clearSpinner is safe to call after destroyZoom: the classList.remove is a
+        // no-op on a detached node, and { once:true } prevents double-fire.
+        if (fullRes && prevSrc !== fullRes && !$img[0].complete) {
+            zoomShell.classList.add('rin-zoom-loading');
+            var clearSpinner = function () {
+                if (zoomShell) { zoomShell.classList.remove('rin-zoom-loading'); }
+            };
+            $img[0].addEventListener('load',  clearSpinner, { once: true });
+            $img[0].addEventListener('error', clearSpinner, { once: true });
+        }
 
         // Apply Panzoom to the shell (which fills the slide)
         pz = Panzoom(zoomShell, {
