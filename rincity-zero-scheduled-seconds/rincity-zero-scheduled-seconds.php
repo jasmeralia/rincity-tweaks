@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: Zero Scheduled Seconds
+ * Plugin Name: Rincity Zero Scheduled Seconds
  * Description: Strips sub-minute precision from scheduled post times so WP-Cron fires on the exact minute.
  * Version: 1.0.0
  */
