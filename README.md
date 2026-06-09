@@ -30,6 +30,24 @@ See [rincity-throwback-posts/README.md](rincity-throwback-posts/README.md) for f
 
 A WordPress plugin (v0.1.0) that replaces Envira's built-in ElevateZoom addon with [Panzoom](https://github.com/timmywil/panzoom) (`@panzoom/panzoom` v4.6.2). Provides scroll-wheel zoom, drag-to-pan, and double-click zoom-to-cursor on lightbox images. Panzoom is bundled locally (`assets/panzoom.min.js`) — no CDN dependency.
 
+### [rincity-wordfence-temp-allowlist](rincity-wordfence-temp-allowlist/)
+
+A WordPress must-use plugin (v1.0.0) that automatically adds Rin's current client IP to the Wordfence IP allowlist for 6 hours after she successfully logs in. Removes any prior temporary entry on each login and expires the allowlist entry via WP-Cron. Wordfence remains fully active for all other traffic.
+
+**Deploy path:** `wp-content/mu-plugins/rincity-wordfence-temp-allowlist.php`
+
+**Required constants in `wp-config.php`:**
+```php
+define('RINCITY_WF_TEMP_ALLOWLIST_USER_IDS', '3,50'); // Rin's WP user IDs
+define('RINCITY_WF_TEMP_ALLOWLIST_TTL', 21600);       // 6 hours in seconds
+```
+
+**WP-CLI:**
+```bash
+~/bin/wp-lsphp --path=/usr/local/lsws/wordpress rincity-wf-temp-allowlist status
+~/bin/wp-lsphp --path=/usr/local/lsws/wordpress rincity-wf-temp-allowlist clear
+```
+
 ## Workflow
 
 ```
