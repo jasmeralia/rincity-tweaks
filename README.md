@@ -48,6 +48,12 @@ define('RINCITY_WF_TEMP_ALLOWLIST_TTL', 21600);       // 6 hours in seconds
 ~/bin/wp-lsphp --path=/usr/local/lsws/wordpress rincity-wf-temp-allowlist clear
 ```
 
+### [zero-scheduled-seconds](zero-scheduled-seconds/)
+
+A WordPress must-use plugin (v1.0.0) that strips sub-minute precision from scheduled post times. WordPress records the wall-clock seconds when a post is saved (e.g. `07:00:25 UTC`), which causes posts scheduled for "midnight" to briefly show "missed schedule" and publish up to a minute late. This filter zeroes the seconds on every `future`-status save so the stored time is exactly `07:00:00 UTC`.
+
+**Deploy path:** `wp-content/mu-plugins/zero-scheduled-seconds.php`
+
 ## Workflow
 
 ```
@@ -68,3 +74,5 @@ rincity-envira-covers  →  cover manifest (JSON)
 | rincity-envira-covers | WP-CLI, PHP 7.0+ |
 | rincity-throwback-posts | Python 3.10+, tweepy 4.14.0+, jinja2 3.1.0+ |
 | rincity-envira-zoom | WordPress 5.0+, PHP 7.0+, Envira Gallery plugin |
+| rincity-wordfence-temp-allowlist | WordPress 5.0+, PHP 7.0+, Wordfence plugin |
+| zero-scheduled-seconds | WordPress 5.0+, PHP 5.3+ |
