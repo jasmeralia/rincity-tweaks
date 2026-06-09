@@ -49,45 +49,83 @@
 }
 
 /*
- * +/- zoom buttons — inserted as first children of .envirabox-toolbar so they flow
- * naturally with Envira's own toolbar buttons regardless of how many are shown.
- * Sized to match Envira's .envirabox-button (44×44 px) for visual consistency.
+ * +/- zoom buttons — inserted into .envirabox-toolbar so they sit inline with Envira's
+ * native controls (thumbnails / fullscreen / slideshow / close).
+ *
+ * The wrapper is a <span> (see the JS): the base_dark lightbox theme hijacks every
+ * direct child *<div>* of the toolbar into a 16×16 icon-font slot with
+ * text-indent:-9999px — which is exactly what made the 0.6.1 controls vanish. A <span>
+ * stays in the toolbar row but escapes that `.envirabox-toolbar > div` rule.
+ *
+ * The buttons are sized/coloured to match base_dark's native 16px white toolbar glyphs
+ * (16px, #fff, transparent, 9px gap). The explicit text-indent/appearance/visibility
+ * resets harden them against the theme's toolbar rules and global `button` styles.
  */
 .rin-zoom-controls {
-    display: inline-flex;
-    vertical-align: top;
+    display: inline-block;
+    vertical-align: middle;
+    white-space: nowrap;
 }
 
 .rin-zoom-btn {
     box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance: none;
     display: inline-block;
-    vertical-align: top;
-    width: 44px;
-    height: 44px;
-    margin: 0;
+    vertical-align: middle;
+    visibility: visible;
+    opacity: 0.85;
+    width: 16px;
+    height: 16px;
+    margin: 0 0 0 9px; /* match base_dark's native .envirabox-toolbar > div spacing */
     padding: 0;
     border: 0;
-    border-radius: 0;
-    background: rgba(30, 30, 30, 0.6);
-    color: #ccc;
-    font-size: 22px;
-    line-height: 44px;
+    background: none;
+    color: #fff;
+    font-size: 19px;
+    line-height: 16px;
     text-align: center;
+    text-indent: 0;
     cursor: pointer;
     user-select: none;
-    transition: color 0.3s ease;
+    transition: opacity 0.2s ease;
 }
 
 .rin-zoom-btn:hover {
-    color: #fff;
+    opacity: 1;
 }
 
-/* Fallback when .envirabox-toolbar is absent (toolbar:false gallery config). */
+/*
+ * Fallback when .envirabox-toolbar is absent (toolbar:false gallery config): float the
+ * controls in the upper-right corner as a stacked pair, clear of the caption bar and the
+ * vertically-centred prev/next nav arrows.
+ */
 .rin-zoom-controls--floating {
     position: absolute;
-    top: 0;
-    right: 0;
-    z-index: 9999999;
+    top: 56px;
+    right: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 99998; /* above slide (99994) / stage (99993) */
+}
+
+.rin-zoom-controls--floating .rin-zoom-btn {
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    border-radius: 4px;
+    background: rgba(30, 30, 30, 0.6);
+    color: #ccc;
+    opacity: 1;
+    font-size: 26px;
+    line-height: 44px;
+    transition: color 0.2s ease, background 0.2s ease;
+}
+
+.rin-zoom-controls--floating .rin-zoom-btn:hover {
+    color: #fff;
+    background: rgba(30, 30, 30, 0.85);
 }
 
 /*
