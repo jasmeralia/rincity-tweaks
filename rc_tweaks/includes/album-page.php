@@ -1,4 +1,48 @@
 <?php
+// Default "Make Gallery Title Linkable?" to enabled for all galleries in all albums.
+// Only fires on first pencil save for a given gallery (when the key doesn't exist yet).
+add_filter( 'envira_albums_update_gallery', function( $album_data, $meta, $gallery_id, $post_id ) {
+    if ( ! array_key_exists( 'link_title_gallery', $album_data['galleries'][ $gallery_id ] ) ) {
+        $album_data['galleries'][ $gallery_id ]['link_title_gallery'] = '1';
+    }
+    return $album_data;
+}, 10, 4 );
+
+// Include future-status galleries in the album picker (both the initial metabox list and the
+// AJAX search). Without this, galleries scheduled via WordPress native scheduling are invisible
+// in the album editor until they publish.
+add_action( 'pre_get_posts', function( $query ) {
+    if ( ! is_admin() ) {
+        return;
+    }
+    if ( $query->get( 'post_type' ) !== 'envira' ) {
+        return;
+    }
+    if ( $query->get( 'post_status' ) !== 'publish' ) {
+        return;
+    }
+    if ( ! current_user_can( 'edit_posts' ) ) {
+        return;
+    }
+    $action = isset( $_POST['action'] ) ? sanitize_key( wp_unslash( $_POST['action'] ) ) : '';
+    $screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+    $in_album_context =
+        $action === 'envira_albums_search_galleries' ||
+        ( $screen && isset( $screen->post_type ) && $screen->post_type === 'envira_album' );
+    if ( $in_album_context ) {
+        $query->set( 'post_status', array( 'publish', 'future' ) );
+    }
+} );
+
+// Allow admins to preview a future-status gallery via the WordPress preview link.
+// Envira's standalone_maybe_redirect() explicitly 404s future posts without checking is_preview().
+add_filter( 'envira_allowed_publish_statuses', function( $statuses ) {
+    if ( is_preview() && current_user_can( 'edit_posts' ) ) {
+        $statuses[] = 'future';
+    }
+    return $statuses;
+} );
+
 // Enqueue styles
 function rincity_enqueue_assets() {
     wp_enqueue_style( 'rincity-style', plugin_dir_url( dirname( __FILE__ ) ) . 'assets/css/style.css' );
@@ -8,14 +52,11 @@ add_action( 'wp_enqueue_scripts', 'rincity_enqueue_assets' );
 function rincity_envira_album_shortcode( $atts ) {
     $atts = shortcode_atts( array(
         'id' => '',
-        // 'lazyload' => '1', // Remove this attribute
     ), $atts, 'rincity_envira_album' );
 
-    // Use the admin setting instead of shortcode attribute
     $use_lazy = get_option('rincity_envira_album_lazyload', true);
 
     $album_id = intval( $atts['id'] );
-    // $debug    = filter_var( $atts['debug'], FILTER_VALIDATE_BOOLEAN );
 
     if ( ! $album_id ) {
         return '<p>No album ID provided.</p>';
@@ -26,9 +67,6 @@ function rincity_envira_album_shortcode( $atts ) {
     
     // Fetch album data via post meta
     $album_data = get_post_meta( $album_id, '_eg_album_data', true );
-    // if ( $debug ) {
-    //     echo '<textarea style="width:100%;height:150px;"><strong>Album Data:</strong> ' . esc_html( print_r( $album_data, true ) ) . '</textarea>';
-    // }
 
     // Prepare IDs and gallery metadata
     $ids = array();
@@ -50,10 +88,11 @@ function rincity_envira_album_shortcode( $atts ) {
             $term_id = intval($matches[1]);
         }
         $args = array(
-            'post_type' => 'envira',
-            'post__in'  => $ids,
+            'post_type'   => 'envira',
+            'post__in'    => $ids,
             'posts_per_page' => -1,
-            'orderby'   => 'post__in',
+            'orderby'     => 'post__in',
+            'post_status' => current_user_can( 'edit_posts' ) ? array( 'publish', 'future' ) : 'publish',
         );
         if ($term_id) {
             $args['tax_query'] = array(
@@ -89,11 +128,6 @@ function rincity_envira_album_shortcode( $atts ) {
     foreach ( $posts as $gid => $data ) {
         $p    = $data['post'];
         $meta = $data['meta'];
-
-        // Debug: output the full $meta array for this gallery
-        $output .= '<!-- data: ' . esc_html( print_r( $data, true ) ) . " -->\n";
-        // $output .= '<!-- album meta: ' . esc_html( print_r( $meta, true ) ) . " -->\n";
-        // $output .= '<!-- gallery post: ' . esc_html( print_r( $p, true ) ) . " -->\n";
 
         // ——————————————————————————————————————————
         // Instead of envira_resize_image(), do a straight rename
@@ -134,17 +168,21 @@ function rincity_envira_album_shortcode( $atts ) {
         $title = ! empty( $meta['title'] ) ? esc_html( $meta['title'] ) : get_the_title( $gid );
         $link  = get_permalink( $gid );
 
-        $output .= '<div class="envira-gallery-item">' . "\n";
+        $is_future  = 'future' === $p->post_status;
+
+        $output .= '<div class="envira-gallery-item' . ( $is_future ? ' rincity-future-gallery' : '' ) . '">' . "\n";
         if ( $thumb ) {
             $output .= '<a href="' . esc_url( $link ) . '">' . $thumb . '</a>' . "\n";
         }
         $output .= '<div class="envira-album-title"><a href="' . esc_url( $link ) . '">' . $title . '</a></div>' . "\n";
         $output .= '<div class="envira-album-image-count">' . intval( $count ) . ' Photos</div>' . "\n";
+        if ( $is_future ) {
+            $coming = 'Coming ' . date_i18n( 'Y-m-d', strtotime( $p->post_date ) ) . '!';
+            $output .= '<div class="rincity-scheduled-badge"><em>' . esc_html( $coming ) . '</em></div>' . "\n";
+        }
         $output .= '</div>' . "\n";
     }
     $output .= '</div>';
-
-    $output .= '<!-- full album data: ' . esc_html( print_r( $album_data, true ) ) . " -->\n";
 
     return $output;
 }
