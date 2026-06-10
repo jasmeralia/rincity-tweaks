@@ -33,3 +33,15 @@
     color: #666;
     margin-top: 5px;
 } */
+
+/* Scheduled gallery badge — admin-only, shown below the photo count for future-status galleries */
+.rincity-scheduled-badge {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #aaa;
+    margin-top: 2px;
+}
+
