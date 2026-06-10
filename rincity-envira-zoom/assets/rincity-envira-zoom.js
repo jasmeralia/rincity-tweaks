@@ -9,32 +9,23 @@
     var wheelCleanup       = null;
 
     // --- Full-res background-load state ---
-    // bgLoader      : detached Image() preloading the original off-screen
-    // originalReady : true once the original has loaded (or errored — in which case
-    //                 we keep the scaled image and just let zoom act on it)
-    // pendingZoom   : the most recent zoom gesture requested before the original was
-    //                 ready; replayed once it arrives
-    var bgLoader      = null;
-    var originalReady = false;
-    var pendingZoom   = null;
+    // bgLoader : detached Image() preloading the original off-screen
+    var bgLoader = null;
 
-    function showSpinner() {
-        if (zoomShell) { zoomShell.classList.add('rin-zoom-loading'); }
-    }
-    function clearSpinner() {
-        if (zoomShell) { zoomShell.classList.remove('rin-zoom-loading'); }
-    }
-
-    // Run a zoom action now if the original is ready; otherwise queue it and show the
-    // spinner over the (still-visible) scaled image. We never wipe the scaled image —
-    // it stays in place until the original has decoded and can be swapped in cleanly.
-    function runWhenReady(action) {
-        if (originalReady) {
-            action();
-        } else {
-            pendingZoom = action;
-            showSpinner();
+    function setHdReady() {
+        if (!zoomControls) { return; }
+        zoomControls.classList.remove('rin-zoom-pending');
+        var ind = zoomControls.querySelector('.rin-zoom-hd-indicator');
+        if (ind) {
+            ind.textContent = 'HD';
+            ind.className = 'rin-zoom-hd-indicator rin-zoom-hd-ready';
         }
+    }
+    function removeHdIndicator() {
+        if (!zoomControls) { return; }
+        zoomControls.classList.remove('rin-zoom-pending');
+        var ind = zoomControls.querySelector('.rin-zoom-hd-indicator');
+        if (ind && ind.parentNode) { ind.parentNode.removeChild(ind); }
     }
 
     function destroyZoom() {
@@ -50,9 +41,6 @@
             bgLoader.src = '';
             bgLoader = null;
         }
-        originalReady = false;
-        pendingZoom   = null;
-
         if (pz) {
             pz.destroy();
             pz = null;
@@ -94,13 +82,14 @@
         if (!$img.length) return;
         var img = $img[0];
 
-        // Resolve the true pre-scale original. Base = Envira's retina URL if set,
-        // otherwise the current src (the WP-scaled version). Strip WP's "-scaled"
-        // suffix to get the original file; the regex is extension-agnostic (.jpg,
-        // .png, etc.) and a no-op when no "-scaled" is present (older galleries that
-        // were never scaled are already at full res).
+        // Resolve the true pre-scale original. Use the retina URL saved by the
+        // before_load hook (_rcRetina), falling back to enviraRetina if the hook
+        // didn't fire (e.g. already-open lightbox on first show), then to prevSrc.
+        // Strip WP's "-scaled" suffix to get the original file; the regex is
+        // extension-agnostic (.jpg, .png, etc.) and a no-op when no "-scaled" is
+        // present (older galleries that were never scaled are already at full res).
         var prevSrc   = img.getAttribute('src');
-        var base      = current.enviraRetina || prevSrc;
+        var base      = current._rcRetina || current.enviraRetina || prevSrc;
         var fullRes   = base ? base.replace(/-scaled(\.[^.]+)$/, '$1') : null;
         var needsSwap = !!(fullRes && prevSrc !== fullRes);
 
@@ -123,43 +112,29 @@
         zoomShell.appendChild($wrap[0]);
         $wrap[0].style.transform = '';  // clear Envira's translate so flexbox takes over
 
-        // --- Background load of the original (no spinner by default) ---
-        // The visible <img> keeps showing the scaled version (via its srcset/src) the
-        // whole time the original downloads in the background. When the original is
-        // decoded we swap it into the visible <img> in one step — no flash, no blanking,
-        // no spinner. The spinner only ever appears if the user tries to zoom *before*
-        // the original is ready (see runWhenReady), and even then it overlays the scaled
-        // image rather than replacing it.
-        if (!needsSwap) {
-            // Scaled === original (older gallery): zoom can act immediately, no fetch.
-            originalReady = true;
-        } else {
-            originalReady = false;
+        // --- Background load of the original ---
+        // The visible <img> shows the scaled version while the original downloads.
+        // Zoom operates on the scaled image immediately; when the original is decoded
+        // it swaps in at whatever zoom/pan the user is already at, revealing detail.
+        if (needsSwap) {
             bgLoader = new Image();
             bgLoader.onload = function () {
                 bgLoader = null;
-                originalReady = true;
-                // srcset takes precedence over src, so clear it before swapping.
-                // fullRes is already in the browser cache, so this is instant.
                 img.removeAttribute('srcset');
                 img.src = fullRes;
-                clearSpinner();
-                if (pendingZoom) { var f = pendingZoom; pendingZoom = null; f(); }
+                setHdReady();
             };
             bgLoader.onerror = function () {
                 bgLoader = null;
-                // Give up on the original (e.g. deleted from disk); keep the scaled
-                // image in place and let zoom operate on it.
-                originalReady = true;
-                clearSpinner();
-                if (pendingZoom) { var f = pendingZoom; pendingZoom = null; f(); }
+                // Give up on the original (e.g. deleted from disk); keep scaled.
+                removeHdIndicator();
             };
             bgLoader.src = fullRes;
         }
 
         // Apply Panzoom to the shell (which fills the slide)
         pz = Panzoom(zoomShell, {
-            maxScale: 5,
+            maxScale: 15,
             minScale: 1,
             step:     0.3,
         });
@@ -172,7 +147,7 @@
             e.stopPropagation();
             if (!pz) return;
             var ev = e;
-            runWhenReady(function () { if (pz) pz.zoomWithWheel(ev); });
+            if (pz) pz.zoomWithWheel(ev);
         }
         slide.addEventListener('wheel', onWheel, { passive: false });
         wheelCleanup = function () {
@@ -180,22 +155,19 @@
         };
 
         // Double-click: cycle through zoom steps toward cursor; reset after max
-        var DBLCLICK_STEPS = [2, 3.5, 5];
+        var DBLCLICK_STEPS = [2, 4, 7, 11, 15];
         zoomShell.addEventListener('dblclick', function (e) {
-            var ev = e;
-            runWhenReady(function () {
-                if (!pz) return;
-                var scale = pz.getScale();
-                var next = null;
-                for (var i = 0; i < DBLCLICK_STEPS.length; i++) {
-                    if (DBLCLICK_STEPS[i] > scale + 0.15) { next = DBLCLICK_STEPS[i]; break; }
-                }
-                if (next !== null) {
-                    pz.zoomToPoint(next, { clientX: ev.clientX, clientY: ev.clientY }, { animate: true });
-                } else {
-                    pz.reset({ animate: true });
-                }
-            });
+            if (!pz) return;
+            var scale = pz.getScale();
+            var next = null;
+            for (var i = 0; i < DBLCLICK_STEPS.length; i++) {
+                if (DBLCLICK_STEPS[i] > scale + 0.15) { next = DBLCLICK_STEPS[i]; break; }
+            }
+            if (next !== null) {
+                pz.zoomToPoint(next, { clientX: e.clientX, clientY: e.clientY }, { animate: true });
+            } else {
+                pz.reset({ animate: true });
+            }
         });
 
         // +/- zoom buttons.
@@ -214,7 +186,7 @@
         btnIn.textContent = '+';
         btnIn.addEventListener('click', function (e) {
             e.stopPropagation();
-            runWhenReady(function () { if (pz) pz.zoomIn({ animate: true }); });
+            if (pz) pz.zoomIn({ animate: true });
         });
 
         var btnOut = document.createElement('button');
@@ -224,11 +196,21 @@
         btnOut.textContent = '−';
         btnOut.addEventListener('click', function (e) {
             e.stopPropagation();
-            runWhenReady(function () { if (pz) pz.zoomOut({ animate: true }); });
+            if (pz) pz.zoomOut({ animate: true });
         });
 
         zoomControls.appendChild(btnIn);
         zoomControls.appendChild(btnOut);
+
+        // Pending-state indicator: dim buttons and show a spinning ring while the
+        // full-res original is loading; switches to a brief "HD" badge on load.
+        if (needsSwap) {
+            zoomControls.classList.add('rin-zoom-pending');
+            var hdIndicator = document.createElement('span');
+            hdIndicator.className = 'rin-zoom-hd-indicator rin-zoom-hd-loading';
+            hdIndicator.setAttribute('aria-hidden', 'true');
+            zoomControls.appendChild(hdIndicator);
+        }
 
         // Insert into .envirabox-toolbar as the first item so the +/- buttons flow
         // inline with Envira's native controls (thumbnails / fullscreen / slideshow /
@@ -247,6 +229,18 @@
             enviraContainer.appendChild(zoomControls);
         }
     }
+
+    // Intercept before envirabox's setImage() runs.  On retina devices (DPR ≥ 2)
+    // envirabox builds srcset as "-scaled.png 1x, original.png 2x", which causes
+    // the browser to skip the scaled version and download the full original immediately.
+    // We save enviraRetina on a private property and clear it so envirabox only gets
+    // a 1x srcset; initZoom then background-loads the original itself.
+    $(document).on('envirabox_api_before_load', function (e, obj, instance, current) {
+        if (current.enviraRetina) {
+            current._rcRetina   = current.enviraRetina;
+            current.enviraRetina = '';
+        }
+    });
 
     $(document).on('envirabox_api_before_show', function (e, obj, instance, current) {
         // Fires before the next image animates in; tear down zoom so Envira can
