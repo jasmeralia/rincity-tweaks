@@ -2,7 +2,7 @@
 /**
  * Plugin Name: RinCity Wordfence Temp Allowlist
  * Description: Temporarily allowlists Rin's client IP in Wordfence on successful login.
- * Version:     1.0.0
+ * Version:     1.0.1
  * Author:      Morgan Blackthorne
  *
  * Must-use plugin — place at wp-content/mu-plugins/rincity-wordfence-temp-allowlist.php
@@ -46,14 +46,14 @@ function rincity_wf_on_login( $user_login, $user ) {
 		return;
 	}
 
-	rincity_wf_activate( $user->ID, $ip );
+	rincity_wf_activate( $user->ID, $user_login, $ip );
 }
 
 // ---------------------------------------------------------------------------
 // Allowlist activation
 // ---------------------------------------------------------------------------
 
-function rincity_wf_activate( $user_id, $ip ) {
+function rincity_wf_activate( $user_id, $user_login, $ip ) {
 	if ( ! class_exists( 'wfConfig' ) ) {
 		rincity_wf_log( 'Skipped: wfConfig class not available (Wordfence inactive?).' );
 		return;
@@ -93,7 +93,8 @@ function rincity_wf_activate( $user_id, $ip ) {
 	wp_schedule_single_event( $expires_at, RINCITY_WF_CRON_HOOK );
 
 	rincity_wf_log( sprintf(
-		'Added temporary allowlist entry: user %d, IP %s, expires %s UTC.',
+		'%s (user ID %d) logged in from %s, added to Wordfence allowlist, expires %s UTC.',
+		$user_login,
 		$user_id,
 		$ip,
 		gmdate( 'Y-m-d H:i:s', $expires_at )
@@ -116,7 +117,7 @@ function rincity_wf_expire() {
 	rincity_wf_remove_ip( $ip );
 	delete_option( RINCITY_WF_OPTION );
 
-	rincity_wf_log( "Expired temporary allowlist entry, IP {$ip}." );
+	rincity_wf_log( "Expired {$ip} from Wordfence allowlist." );
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +146,7 @@ function rincity_wf_lazy_cleanup() {
 	}
 	delete_option( RINCITY_WF_OPTION );
 
-	rincity_wf_log( "Lazy-expired temporary allowlist entry, IP {$ip}." );
+	rincity_wf_log( "Lazy-expired {$ip} from Wordfence allowlist." );
 }
 
 // ---------------------------------------------------------------------------
@@ -217,9 +218,7 @@ function rincity_wf_get_client_ip() {
 // ---------------------------------------------------------------------------
 
 function rincity_wf_log( $message ) {
-	if ( defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {
-		error_log( '[rincity-wf-temp-allowlist] ' . $message );
-	}
+	error_log( '[' . gmdate( 'Y-m-d H:i:s' ) . ' UTC] [rincity-wf-temp-allowlist] ' . $message );
 }
 
 // ---------------------------------------------------------------------------
