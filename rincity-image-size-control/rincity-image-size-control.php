@@ -1,8 +1,8 @@
 <?php
 /**
- * Plugin Name: Rin City Image Size Control
+ * Plugin Name: RinCity Image Size Control
  * Description: Suppresses unused WordPress/Ashe derivative sizes for Envira gallery uploads.
- * Version: 0.1.0
+ * Version: 0.1.1
  * Author: Morgan Blackthorne
  */
 
