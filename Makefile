@@ -3,9 +3,9 @@ PLUGINS     := $(WP_CONTENT)/plugins
 MU_PLUGINS  := $(WP_CONTENT)/mu-plugins
 OWNER       := nobody:nogroup
 
-.PHONY: all rc_tweaks rincity-envira-zoom rincity-image-size-control rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds help
+.PHONY: all rc_tweaks rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds help
 
-all: rc_tweaks rincity-envira-zoom rincity-image-size-control rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds ## Deploy all plugins
+all: rc_tweaks rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds ## Deploy all plugins
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*##"}; {printf "  %-40s %s\n", $$1, $$2}'
@@ -15,6 +15,9 @@ rc_tweaks: ## Deploy rc_tweaks to wp-content/plugins/rc_tweaks/
 
 rincity-envira-zoom: ## Deploy rincity-envira-zoom to wp-content/plugins/rincity-envira-zoom/
 	sudo rsync -av --chown=$(OWNER) rincity-envira-zoom/ $(PLUGINS)/rincity-envira-zoom/
+
+rincity-gallery-favorites: ## Deploy rincity-gallery-favorites to wp-content/plugins/rincity-gallery-favorites/
+	sudo rsync -av --chown=$(OWNER) rincity-gallery-favorites/ $(PLUGINS)/rincity-gallery-favorites/
 
 rincity-image-size-control: ## Deploy rincity-image-size-control to wp-content/plugins/rincity-image-size-control/
 	sudo rsync -av --chown=$(OWNER) rincity-image-size-control/ $(PLUGINS)/rincity-image-size-control/
