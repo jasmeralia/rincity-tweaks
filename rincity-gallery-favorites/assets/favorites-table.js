@@ -12,11 +12,13 @@
     // State
     // -------------------------------------------------------------------------
 
-    let allRows   = [];
-    let sortCol   = 'favorite_added_at';
-    let sortDir   = 'desc';
+    let allRows    = [];
+    let sortCol    = 'favorite_added_at';
+    let sortDir    = 'desc';
     let searchTerm = '';
     let editingId  = null; // gallery_id currently being edited
+    let tableBody  = null; // stable div — never recreated during typing
+    let loading    = true;
 
     const SORT_COLS = ['title', 'gallery_published_at', 'favorite_added_at', 'note_updated_at'];
 
@@ -24,7 +26,36 @@
     // Boot
     // -------------------------------------------------------------------------
 
+    initShell();
     loadFavorites();
+
+    // -------------------------------------------------------------------------
+    // Shell — created once; search input is never replaced while the user types
+    // -------------------------------------------------------------------------
+
+    function initShell() {
+        container.textContent = '';
+        tableBody = null;
+
+        const searchWrap  = el('div', { className: 'rincgf-search-wrap' });
+        const searchInput = el('input', {
+            type        : 'search',
+            className   : 'rincgf-search',
+            placeholder : 'Search by title, note, or category…',
+            value       : searchTerm,
+        });
+        // Update table only — never recreate the input — so mobile keyboards stay open.
+        searchInput.addEventListener('input', e => {
+            searchTerm = e.target.value;
+            editingId  = null;
+            updateTable();
+        });
+        searchWrap.appendChild(searchInput);
+        container.appendChild(searchWrap);
+
+        tableBody = el('div', { className: 'rincgf-table-body' });
+        container.appendChild(tableBody);
+    }
 
     // -------------------------------------------------------------------------
     // Data loading
@@ -34,8 +65,10 @@
         try {
             const data = await apiFetch('GET', '/favorites');
             allRows = data.rows || [];
-            render();
+            loading = false;
+            updateTable();
         } catch (err) {
+            loading = false;
             showError('Could not load favorites. Please refresh the page.');
         }
     }
@@ -51,7 +84,8 @@
             const term = searchTerm.toLowerCase();
             rows = rows.filter(r =>
                 r.title.toLowerCase().includes(term) ||
-                (r.note || '').toLowerCase().includes(term)
+                (r.note || '').toLowerCase().includes(term) ||
+                (r.categories || []).some(c => c.name.toLowerCase().includes(term))
             );
         }
 
@@ -67,54 +101,57 @@
     }
 
     // -------------------------------------------------------------------------
-    // Rendering — DOM only, no innerHTML
+    // Rendering
     // -------------------------------------------------------------------------
 
+    // Full re-render: rebuilds shell + table (called on sort, edit, save, cancel).
     function render() {
-        container.textContent = '';
+        initShell();
+        updateTable();
+    }
 
-        // Search bar
-        const searchWrap = el('div', { className: 'rincgf-search-wrap' });
-        const searchInput = el('input', {
-            type        : 'search',
-            className   : 'rincgf-search',
-            placeholder : 'Search by title or note…',
-            value       : searchTerm,
-        });
-        searchInput.addEventListener('input', e => {
-            searchTerm = e.target.value;
-            editingId  = null;
+    // Table-only update: never touches the search input (called on keypress).
+    function updateTable() {
+        if (!tableBody) {
             render();
-        });
-        searchWrap.appendChild(searchInput);
-        container.appendChild(searchWrap);
+            return;
+        }
+        tableBody.textContent = '';
+
+        if (loading) {
+            const p = el('p', { className: 'rincgf-table-loading' });
+            p.textContent = 'Loading…';
+            tableBody.appendChild(p);
+            return;
+        }
 
         const rows = visibleRows();
 
         if (allRows.length === 0) {
             const p = el('p', { className: 'rincgf-empty' });
             p.textContent = 'You have no favorite galleries yet. Visit a gallery page to add one.';
-            container.appendChild(p);
+            tableBody.appendChild(p);
             return;
         }
 
         if (rows.length === 0) {
             const p = el('p', { className: 'rincgf-empty' });
             p.textContent = 'No favorites match your search.';
-            container.appendChild(p);
+            tableBody.appendChild(p);
             return;
         }
 
-        const table  = el('table', { className: 'rincgf-table' });
-        const thead  = document.createElement('thead');
-        const hrow   = document.createElement('tr');
+        const table = el('table', { className: 'rincgf-table' });
+        const thead = document.createElement('thead');
+        const hrow  = document.createElement('tr');
 
-        renderTh(hrow, 'title',                'Gallery',        true);
-        renderTh(hrow, 'gallery_published_at',  'Published',     true);
-        renderTh(hrow, 'favorite_added_at',     'Favorited',     true);
-        renderTh(hrow, 'note_updated_at',       'Note updated',  true);
-        renderTh(hrow, null,                    'Note',          false);
-        renderTh(hrow, null,                    'Actions',       false);
+        renderTh(hrow, 'title',               'Gallery',       true);
+        renderTh(hrow, null,                  'Categories',    false);
+        renderTh(hrow, 'gallery_published_at', 'Published',    true);
+        renderTh(hrow, 'favorite_added_at',    'Favorited',    true);
+        renderTh(hrow, 'note_updated_at',      'Note updated', true);
+        renderTh(hrow, null,                   'Note',         false);
+        renderTh(hrow, null,                   'Actions',      false);
 
         thead.appendChild(hrow);
         table.appendChild(thead);
@@ -123,13 +160,7 @@
         rows.forEach(row => tbody.appendChild(buildRow(row)));
         table.appendChild(tbody);
 
-        container.appendChild(table);
-
-        // Re-focus search after re-render so the user can keep typing.
-        const newSearch = container.querySelector('.rincgf-search');
-        if (newSearch && document.activeElement && document.activeElement.className === 'rincgf-search') {
-            newSearch.focus();
-        }
+        tableBody.appendChild(table);
     }
 
     function renderTh(parent, col, label, sortable) {
@@ -186,6 +217,23 @@
         }
         tr.appendChild(tdTitle);
 
+        // Categories
+        const tdCats = document.createElement('td');
+        tdCats.className = 'rincgf-cats-cell';
+        (row.categories || []).forEach((cat, i) => {
+            if (i > 0) {
+                tdCats.appendChild(document.createTextNode(', '));
+            }
+            if (cat.url) {
+                const a = el('a', { href: cat.url });
+                a.textContent = cat.name;
+                tdCats.appendChild(a);
+            } else {
+                tdCats.appendChild(document.createTextNode(cat.name));
+            }
+        });
+        tr.appendChild(tdCats);
+
         // Published date
         tr.appendChild(dateCell(row.gallery_published_at));
 
@@ -236,7 +284,7 @@
         btnEdit.addEventListener('click', () => { editingId = row.gallery_id; render(); });
         tdActions.appendChild(btnEdit);
 
-        tdActions.appendChild(document.createTextNode(' '));
+        tdActions.appendChild(document.createElement('br'));
 
         const btnRemove = el('button', { type: 'button', className: 'rincgf-btn rincgf-btn-remove' });
         btnRemove.textContent = 'Remove';
@@ -293,6 +341,7 @@
 
     function showError(msg) {
         container.textContent = '';
+        tableBody = null;
         const p = el('p', { className: 'rincgf-error' });
         p.textContent = msg;
         container.appendChild(p);

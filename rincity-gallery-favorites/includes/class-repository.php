@@ -146,11 +146,26 @@ final class RinCity_Gallery_Favorites_Repository {
             $gallery_id = (int) $row['gallery_id'];
             $available  = ( $row['post_status'] === 'publish' );
 
+            $categories = [];
+            if ( $available ) {
+                $terms = get_the_terms( $gallery_id, 'envira-category' );
+                if ( $terms && ! is_wp_error( $terms ) ) {
+                    foreach ( $terms as $term ) {
+                        $link         = get_term_link( $term );
+                        $categories[] = [
+                            'name' => $term->name,
+                            'url'  => is_wp_error( $link ) ? null : (string) $link,
+                        ];
+                    }
+                }
+            }
+
             $result[] = [
                 'gallery_id'           => $gallery_id,
                 'title'                => $available ? (string) $row['post_title'] : 'Unavailable gallery',
                 'url'                  => $available ? (string) get_permalink( $gallery_id ) : null,
                 'cover_image_url'      => $available ? $this->get_cover_image_url( $gallery_id ) : null,
+                'categories'           => $categories,
                 'gallery_published_at' => $row['gallery_published_at'],
                 'favorite_added_at'    => $row['favorite_added_at'],
                 'note'                 => (string) ( $row['note'] ?? '' ),
