@@ -195,6 +195,16 @@
     resize: vertical;
 }
 
+.rincgf-cats-cell {
+    font-size: 0.82em;
+    min-width: 100px;
+}
+
+.rincgf-actions-cell .rincgf-btn {
+    display: block;
+    margin-bottom: 0.3em;
+}
+
 .rincgf-actions-cell {
     white-space: nowrap;
 }

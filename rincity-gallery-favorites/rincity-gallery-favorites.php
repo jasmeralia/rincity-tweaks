@@ -21,6 +21,7 @@ require_once RINCGF_PLUGIN_DIR . 'includes/class-rest-controller.php';
 require_once RINCGF_PLUGIN_DIR . 'includes/class-sidebar-widget.php';
 require_once RINCGF_PLUGIN_DIR . 'includes/class-shortcodes.php';
 require_once RINCGF_PLUGIN_DIR . 'includes/class-assets.php';
+require_once RINCGF_PLUGIN_DIR . 'includes/class-admin-columns.php';
 
 register_activation_hook( __FILE__, [ 'RinCity_Gallery_Favorites_Activator', 'activate' ] );
 
@@ -40,6 +41,10 @@ add_action( 'wp_enqueue_scripts', [ 'RinCity_Gallery_Favorites_Assets', 'enqueue
 add_action( 'wp_footer', [ 'RinCity_Gallery_Favorites_Assets', 'render_gallery_count' ], 20 );
 
 add_shortcode( 'rincity_gallery_favorites_page', [ 'RinCity_Gallery_Favorites_Shortcodes', 'render' ] );
+
+if ( is_admin() ) {
+    RinCity_Gallery_Favorites_Admin_Columns::register();
+}
 
 // ---------------------------------------------------------------------------
 // WP-CLI diagnostic
