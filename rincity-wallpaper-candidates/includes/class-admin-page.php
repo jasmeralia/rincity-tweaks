@@ -240,6 +240,7 @@ final class RinCity_Wallpaper_Admin_Page {
                 <img src="<?php echo esc_url( $c['thumbnail_url'] ); ?>"
                      alt=""
                      width="240"
+                     loading="lazy"
                      style="width:240px;height:auto;display:block">
             </td>
             <td><?php echo esc_html( $c['position'] . ' of ' . $c['set_total'] ); ?></td>
