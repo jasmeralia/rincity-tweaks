@@ -26,9 +26,30 @@ A Python 3 application that reads the Envira cover manifest and posts throwback 
 
 See [rincity-throwback-posts/README.md](rincity-throwback-posts/README.md) for full documentation.
 
+### [rincity-envira-search-enhancements](rincity-envira-search-enhancements/)
+
+A WordPress plugin (v1.3.0) that extends the default WordPress search to include Envira galleries. Features:
+
+- Galleries matching the search term by **Envira category or tag** are included in results alongside posts and pages
+- Each gallery result is prefixed with a thumbnail (400 px wide, first image in the gallery) and a media count line (e.g. "80 photos & 2 videos")
+- Photo/video detection uses `envira_video_get_video_type()` when available, with a fallback to URL pattern matching for `.mp4`/`.webm` and YouTube/Vimeo links
+- Only active gallery items are counted
+
 ### [rincity-envira-zoom](rincity-envira-zoom/)
 
 A WordPress plugin (v0.1.0) that replaces Envira's built-in ElevateZoom addon with [Panzoom](https://github.com/timmywil/panzoom) (`@panzoom/panzoom` v4.6.2). Provides scroll-wheel zoom, drag-to-pan, and double-click zoom-to-cursor on lightbox images. Panzoom is bundled locally (`assets/panzoom.min.js`) — no CDN dependency.
+
+### [rincity-news-widget](rincity-news-widget/)
+
+A WordPress plugin (v1.0.0) that registers a **RinCity Recent Updates** sidebar widget. Shows a unified date-sorted feed of recent posts and Envira galleries with:
+
+- Color-coded badges: **NEW POST** (blue) for standard posts, **NEW GALLERY** (green outline) for Envira galleries
+- Photo/video counts on galleries (e.g. "Bloomlight (80 photos)")
+- Author and publish date on each item
+- All titles linked to their respective pages
+- Dark-card visual style with RSS icon in the header
+
+Widget settings: title (default "Recent Updates") and item count (default 5, max 20).
 
 ### [rincity-wordfence-temp-allowlist](rincity-wordfence-temp-allowlist/)
 
@@ -73,6 +94,8 @@ rincity-envira-covers  →  cover manifest (JSON)
 | rc_tweaks | WordPress 5.0+, PHP 7.0+, Envira Gallery plugin |
 | rincity-envira-covers | WP-CLI, PHP 7.0+ |
 | rincity-throwback-posts | Python 3.10+, tweepy 4.14.0+, jinja2 3.1.0+ |
+| rincity-envira-search-enhancements | WordPress 5.0+, PHP 7.0+, Envira Gallery plugin |
 | rincity-envira-zoom | WordPress 5.0+, PHP 7.0+, Envira Gallery plugin |
+| rincity-news-widget | WordPress 5.0+, PHP 7.0+, Envira Gallery plugin |
 | rincity-wordfence-temp-allowlist | WordPress 5.0+, PHP 7.0+, Wordfence plugin |
 | rincity-zero-scheduled-seconds | WordPress 5.0+, PHP 5.3+ |
