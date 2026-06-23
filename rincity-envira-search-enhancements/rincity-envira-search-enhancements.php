@@ -2,7 +2,7 @@
 /**
  * Plugin Name: RinCity Envira Search Enhancements
  * Description: Extends default WordPress search to include Envira Gallery posts whose Envira Categories/Tags match the search term. Shows a thumbnail preview in search results.
- * Version: 1.3.0
+ * Version: 1.5.0
  * Author: Morgan Blackthorne
  */
 
@@ -24,6 +24,7 @@ class RinCity_Envira_Search_By_Category {
         add_filter( 'posts_search',     array( $this, 'extend_search_with_envira_terms' ), 10, 2 );
         add_filter( 'posts_distinct',   array( $this, 'make_distinct' ), 10, 2 );
         add_filter( 'the_content',      array( $this, 'prepend_search_thumbnail' ) );
+        add_filter( 'option_ashe_options', array( $this, 'envira_more_button_label' ) );
     }
 
     public function include_envira_in_search( $query ) {
@@ -201,6 +202,16 @@ class RinCity_Envira_Search_By_Category {
         }
 
         return $img . $count_html . $content;
+    }
+
+    // Changes the "Read More" button label to "View Set" for Envira gallery posts in search results.
+    // Hooks into option_ashe_options because the theme reads the label directly from that option
+    // with no intervening filter.
+    public function envira_more_button_label( $value ) {
+        if ( is_search() && get_post_type() === 'envira' && is_array( $value ) ) {
+            $value['blog_page_more_text'] = 'View Set';
+        }
+        return $value;
     }
 }
 
