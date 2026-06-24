@@ -173,33 +173,37 @@
         };
 
         // Touch propagation guard. Panzoom uses pointer events, so blocking touch
-        // events does not affect zoom or pan.
-        // - Multi-touch (pinch): always blocked — Panzoom handles zoom via pointer events
-        //   and Envira shouldn't see a two-finger gesture as a swipe.
-        // - Single-touch at scale > 1: blocked — the user is panning, not swiping.
-        // - Single-touch at scale = 1: allowed through so Envira's swipe-nav works.
-        //   At scale=1 disablePan=true so Panzoom doesn't capture pointer events and
-        //   the image won't slide off-screen while Envira handles the swipe.
-        // touchStartX/Y: used by the double-tap touchend to tell taps from drags.
+        // events does not affect zoom or pan. We block ALL touch propagation to
+        // Envira's parent handlers unconditionally, at every scale.
+        //
+        // Why unconditionally (changed in 0.6.16): Envira's guestures module
+        // (envirabox-guestures.js) routes any content touch that ends without a
+        // >10px swipe to onTap -> clickContent:'toggleControls', which hides the
+        // toolbar — including the +/−/HD/zoom controls we inject there. Previously
+        // we let touch through at scale=1 so Envira's own swipe-nav would work, but
+        // that is exactly the path that toggles the toolbar on short drags
+        // (task 310). Instead we swallow all touch here and reimplement horizontal
+        // swipe-nav ourselves (see the single-touch touchend handler below) via
+        // Envira's public instance.next()/previous() API.
+        //
+        // touchStartX/Y: used by the swipe-nav and double-tap touchend handlers to
+        // tell taps from drags and measure swipe distance/direction.
         var touchStartX = 0;
         var touchStartY = 0;
         zoomShell.addEventListener('touchstart', function (e) {
             if (e.touches.length === 1) {
                 touchStartX = e.touches[0].clientX;
                 touchStartY = e.touches[0].clientY;
-                if (pz && pz.getScale() > 1.05) { e.stopPropagation(); }
             } else {
                 lastTap = 0; // multi-touch (pinch) resets any pending double-tap
-                e.stopPropagation();
             }
+            e.stopPropagation();
         }, { passive: true });
         zoomShell.addEventListener('touchmove', function (e) {
-            if (e.touches.length > 1 || (pz && pz.getScale() > 1.05)) {
-                e.stopPropagation();
-            }
+            e.stopPropagation();
         }, { passive: true });
         zoomShell.addEventListener('touchend', function (e) {
-            if (pz && pz.getScale() > 1.05) { e.stopPropagation(); }
+            e.stopPropagation();
         }, { passive: true });
 
         // Double-click (desktop) and double-tap (mobile): cycle zoom steps toward cursor; reset after max.
@@ -223,6 +227,14 @@
         zoomShell.addEventListener('dblclick', function (e) {
             doZoomStep(e.clientX, e.clientY);
         });
+        // Self-implemented horizontal swipe-nav. Because we now block all touch from
+        // reaching Envira's guestures (see the touch guard above), Envira's built-in
+        // swipe navigation no longer fires — so we re-create it here. Only active at
+        // scale<=1 (when zoomed in, a horizontal drag is a pan handled by Panzoom).
+        // SWIPE_THRESHOLD is well above Envira's 10px tap cutoff to avoid accidental
+        // flips, and we require horizontal dominance (|dx|>|dy|) to mirror Envira's
+        // 45° angle test in guestures' onSwipe.
+        var SWIPE_THRESHOLD = 40;
         var lastTap = 0;
         var lastTapX = 0;
         var lastTapY = 0;
@@ -233,7 +245,17 @@
             // not a tap. Reset lastTap so the drag-end doesn't poison the double-tap sequence.
             var mdx = touch.clientX - touchStartX;
             var mdy = touch.clientY - touchStartY;
-            if (mdx * mdx + mdy * mdy > 100) { lastTap = 0; return; }
+            if (mdx * mdx + mdy * mdy > 100) {
+                lastTap = 0;
+                // Horizontal swipe at scale=1 navigates the gallery via Envira's public
+                // API. Guard on group length so single-image galleries don't navigate.
+                if (pz && pz.getScale() <= 1.05 &&
+                    Math.abs(mdx) > SWIPE_THRESHOLD && Math.abs(mdx) > Math.abs(mdy) &&
+                    instance && instance.group && instance.group.length > 1) {
+                    if (mdx < 0) { instance.next(); } else { instance.previous(); }
+                }
+                return;
+            }
             var now = Date.now();
             var dx = touch.clientX - lastTapX;
             var dy = touch.clientY - lastTapY;
