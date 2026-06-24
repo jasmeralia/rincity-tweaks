@@ -7,6 +7,7 @@
     var savedWrapParent    = null;
     var savedWrapTransform = null;
     var wheelCleanup       = null;
+    var wrapObserver       = null;
 
     // --- Full-res background-load state ---
     // bgLoader : detached Image() preloading the original off-screen
@@ -29,6 +30,11 @@
     }
 
     function destroyZoom() {
+        if (wrapObserver) {
+            wrapObserver.disconnect();
+            wrapObserver = null;
+        }
+
         if (wheelCleanup) {
             wheelCleanup();
             wheelCleanup = null;
@@ -111,6 +117,15 @@
         // Move image-wrap into shell; CSS re-centres it via flexbox
         zoomShell.appendChild($wrap[0]);
         $wrap[0].style.transform = '';  // clear Envira's translate so flexbox takes over
+        // Envira sometimes re-sets the centering transform asynchronously after after_show
+        // fires (race on first open, timing varies). A MutationObserver re-clears it the
+        // instant Envira writes it back, regardless of how many times or how late it fires.
+        wrapObserver = new MutationObserver(function () {
+            if ($wrap[0].style.transform !== '') {
+                $wrap[0].style.transform = '';
+            }
+        });
+        wrapObserver.observe($wrap[0], { attributes: true, attributeFilter: ['style'] });
 
         // --- Background load of the original ---
         // The visible <img> shows the scaled version while the original downloads.
@@ -132,11 +147,14 @@
             bgLoader.src = fullRes;
         }
 
-        // Apply Panzoom to the shell (which fills the slide)
+        // Apply Panzoom to the shell (which fills the slide).
+        // disablePan starts true: at scale=1 we want Panzoom to stay out of the way so
+        // Envira's swipe-nav can work. It is toggled false in panzoomzoom once scale > 1.
         pz = Panzoom(zoomShell, {
-            maxScale: 15,
-            minScale: 1,
-            step:     0.3,
+            maxScale:   15,
+            minScale:   1,
+            step:       0.3,
+            disablePan: true,
         });
 
         // Wheel zoom on the slide (parent of shell); stopPropagation prevents
@@ -154,9 +172,42 @@
             slide.removeEventListener('wheel', onWheel);
         };
 
-        // Double-click: cycle through zoom steps toward cursor; reset after max
+        // Touch propagation guard. Panzoom uses pointer events, so blocking touch
+        // events does not affect zoom or pan.
+        // - Multi-touch (pinch): always blocked — Panzoom handles zoom via pointer events
+        //   and Envira shouldn't see a two-finger gesture as a swipe.
+        // - Single-touch at scale > 1: blocked — the user is panning, not swiping.
+        // - Single-touch at scale = 1: allowed through so Envira's swipe-nav works.
+        //   At scale=1 disablePan=true so Panzoom doesn't capture pointer events and
+        //   the image won't slide off-screen while Envira handles the swipe.
+        // touchStartX/Y: used by the double-tap touchend to tell taps from drags.
+        var touchStartX = 0;
+        var touchStartY = 0;
+        zoomShell.addEventListener('touchstart', function (e) {
+            if (e.touches.length === 1) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+                if (pz && pz.getScale() > 1.05) { e.stopPropagation(); }
+            } else {
+                lastTap = 0; // multi-touch (pinch) resets any pending double-tap
+                e.stopPropagation();
+            }
+        }, { passive: true });
+        zoomShell.addEventListener('touchmove', function (e) {
+            if (e.touches.length > 1 || (pz && pz.getScale() > 1.05)) {
+                e.stopPropagation();
+            }
+        }, { passive: true });
+        zoomShell.addEventListener('touchend', function (e) {
+            if (pz && pz.getScale() > 1.05) { e.stopPropagation(); }
+        }, { passive: true });
+
+        // Double-click (desktop) and double-tap (mobile): cycle zoom steps toward cursor; reset after max.
+        // dblclick is not synthesised from touch events when touch-action:none is set, so mobile
+        // needs its own touchend-based handler. preventDefault() on the double-tap touchend suppresses
+        // the synthetic click/dblclick, so the two handlers never fire for the same gesture.
         var DBLCLICK_STEPS = [2, 4, 7, 11, 15];
-        zoomShell.addEventListener('dblclick', function (e) {
+        function doZoomStep(clientX, clientY) {
             if (!pz) return;
             var scale = pz.getScale();
             var next = null;
@@ -164,10 +215,63 @@
                 if (DBLCLICK_STEPS[i] > scale + 0.15) { next = DBLCLICK_STEPS[i]; break; }
             }
             if (next !== null) {
-                pz.zoomToPoint(next, { clientX: e.clientX, clientY: e.clientY }, { animate: true });
+                pz.zoomToPoint(next, { clientX: clientX, clientY: clientY }, { animate: true });
             } else {
                 pz.reset({ animate: true });
             }
+        }
+        zoomShell.addEventListener('dblclick', function (e) {
+            doZoomStep(e.clientX, e.clientY);
+        });
+        var lastTap = 0;
+        var lastTapX = 0;
+        var lastTapY = 0;
+        zoomShell.addEventListener('touchend', function (e) {
+            if (e.changedTouches.length !== 1) { lastTap = 0; return; }
+            var touch = e.changedTouches[0];
+            // If the finger moved more than 10px from where it landed, this is a drag-end,
+            // not a tap. Reset lastTap so the drag-end doesn't poison the double-tap sequence.
+            var mdx = touch.clientX - touchStartX;
+            var mdy = touch.clientY - touchStartY;
+            if (mdx * mdx + mdy * mdy > 100) { lastTap = 0; return; }
+            var now = Date.now();
+            var dx = touch.clientX - lastTapX;
+            var dy = touch.clientY - lastTapY;
+            if (now - lastTap < 300 && (dx * dx + dy * dy) < 900) {
+                // Double-tap confirmed (within 300ms and 30px radius)
+                e.preventDefault();
+                e.stopPropagation();
+                lastTap = 0;
+                doZoomStep(touch.clientX, touch.clientY);
+            } else {
+                lastTap = now;
+                lastTapX = touch.clientX;
+                lastTapY = touch.clientY;
+            }
+        }, { passive: false });
+
+        // Zoom-level indicator ("2x", "3x" …). Built here so the panzoomzoom listener
+        // below can reference it; inserted into zoomControls as its first child later.
+        var zoomIndicator = document.createElement('span');
+        zoomIndicator.className = 'rin-zoom-scale-indicator';
+        zoomIndicator.setAttribute('aria-hidden', 'true');
+        zoomIndicator.style.display = 'none';
+
+        zoomShell.addEventListener('panzoomzoom', function (e) {
+            var scale = e.detail.scale;
+            // Pan is only useful when zoomed in; at scale=1 keep it disabled so
+            // Panzoom doesn't capture pointer events and block Envira's swipe-nav.
+            if (pz) { pz.setOptions({ disablePan: scale <= 1.05 }); }
+            if (scale <= 1.05) {
+                zoomIndicator.style.display = 'none';
+            } else {
+                zoomIndicator.style.display = '';
+                zoomIndicator.textContent = parseFloat(scale.toFixed(1)) + 'x';
+            }
+        });
+        zoomShell.addEventListener('panzoomreset', function () {
+            if (pz) { pz.setOptions({ disablePan: true }); }
+            zoomIndicator.style.display = 'none';
         });
 
         // +/- zoom buttons.
@@ -178,6 +282,15 @@
         // row alongside the native buttons but is not matched by that rule.
         zoomControls = document.createElement('span');
         zoomControls.className = 'rin-zoom-controls';
+
+        // Stop touch events on controls from reaching Envira's tap-to-toggle-toolbar handler.
+        // On mobile, tapping a button emits touchstart+touchend before the synthetic click;
+        // if those propagate, Envira hides the toolbar and the controls disappear.
+        ['touchstart', 'touchend'].forEach(function (evtName) {
+            zoomControls.addEventListener(evtName, function (e) {
+                e.stopPropagation();
+            }, { passive: true });
+        });
 
         var btnIn  = document.createElement('button');
         btnIn.className  = 'rin-zoom-btn rin-zoom-in';
@@ -199,6 +312,7 @@
             if (pz) pz.zoomOut({ animate: true });
         });
 
+        zoomControls.appendChild(zoomIndicator);
         zoomControls.appendChild(btnIn);
         zoomControls.appendChild(btnOut);
 
