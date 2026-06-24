@@ -1,6 +1,6 @@
 # rincity-envira-zoom
 
-**Version:** 0.6.10  
+**Version:** 0.6.15  
 **Deploy path:** `wp-content/plugins/rincity-envira-zoom/`
 
 ## Description
@@ -41,5 +41,10 @@ make rincity-envira-zoom
 
 ## Changelog
 
-- **0.6.10** — Current version.
+- **0.6.15** — Fix centering on first open: replace single-rAF guard with a MutationObserver that re-clears the wrap transform immediately whenever Envira writes it back, regardless of timing or frequency.
+- **0.6.14** — Restore swipe-nav: initialize Panzoom with `disablePan:true` and toggle it via `panzoomzoom`/`panzoomreset` so Panzoom doesn't capture pointer events at scale=1 (previously caused the image to slide off-screen instead of Envira navigating); restore conditional touch propagation (allow at scale=1, block at scale>1 and multi-touch). Fix intermittent centering on first open: add a `requestAnimationFrame` second-clear of the wrap transform to catch Envira re-setting it asynchronously after `after_show`.
+- **0.6.13** — Fix scale=1 touch bugs: stop all touch propagation from shell unconditionally (previously only blocked at scale>1, letting Envira's tap-to-hide-toolbar handler fire on drag-end); fix double-tap state corruption from drag-ending touchends by comparing against the touchstart position (drags reset lastTap instead of recording a phantom "first tap").
+- **0.6.12** — Add zoom-level indicator ("2x", "3x" …) to the left of +/− buttons; hidden at 1x, updated live via the `panzoomzoom` event.
+- **0.6.11** — Fix three mobile touch bugs: drag after zoom-in no longer resets zoom (touch events now blocked from Envira's swipe-nav handler when zoomed or pinching); tapping +/−/HD controls no longer hides the toolbar (touch events stopped on the controls span); double-tap to zoom now works (custom touchend handler, since `dblclick` is not synthesised when `touch-action:none` is set).
+- **0.6.10** — Previous version.
 - **0.1.0** — Initial release.

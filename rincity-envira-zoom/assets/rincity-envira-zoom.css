@@ -129,6 +129,32 @@
 }
 
 /*
+ * Zoom-level indicator — shown left of the +/- buttons when scale > 1x.
+ * Hidden at 1x; JS sets display:'' / display:'none' via inline style.
+ * Sized to sit flush with the toolbar baseline alongside the HD badge.
+ */
+.rin-zoom-scale-indicator {
+    display: inline-block;
+    vertical-align: middle;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 16px;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    margin: 0 0 0 9px; /* match toolbar item spacing */
+}
+
+.rin-zoom-controls--floating .rin-zoom-scale-indicator {
+    width: 44px;
+    height: 20px;
+    margin: 0;
+    font-size: 11px;
+    line-height: 20px;
+    text-align: center;
+}
+
+/*
  * HD indicator — a small element appended to .rin-zoom-controls when there is a
  * full-res original to load.  Two states:
  *   rin-zoom-hd-loading : spinning ring (via ::after) while the original is in flight
