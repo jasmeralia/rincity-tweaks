@@ -15,8 +15,10 @@ add_filter( 'determine_current_user', function( $user_id ) {
         return $user_id;
     }
 
-    // aMember plugin must be active and configured.
-    if ( ! class_exists( 'am4PluginsManager' ) ) {
+    // aMember plugin must be active and fully initialised. am4_Settings_Config is
+    // loaded lazily; in non-HTTP contexts (e.g. wp-cron.php) it may not exist yet
+    // when Wordfence triggers determine_current_user early in bootstrap.
+    if ( ! class_exists( 'am4PluginsManager' ) || ! class_exists( 'am4_Settings_Config' ) ) {
         return $user_id;
     }
 
