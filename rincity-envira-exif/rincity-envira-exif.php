@@ -104,7 +104,14 @@ function rincity_envira_exif_format( $exif ) {
 
     // Camera name
     if ( 'envira' === $source ) {
-        $camera = trim( ( $exif['Make'] ?? '' ) . ' ' . ( $exif['Model'] ?? '' ) );
+        $make  = trim( $exif['Make'] ?? '' );
+        $model = trim( $exif['Model'] ?? '' );
+        // Canon (and others) embed Make at the start of Model; avoid "Canon Canon EOS R10".
+        if ( $make && str_starts_with( $model, $make ) ) {
+            $camera = $model;
+        } else {
+            $camera = trim( $make . ' ' . $model );
+        }
     } else {
         $camera = $exif['camera'] ?? '';
     }
