@@ -218,3 +218,57 @@
 @keyframes rin-zoom-spin {
     to { transform: rotate(360deg); }
 }
+
+/*
+ * Image info — "Image X of Y [WxH]" (no parens in text; CSS ::before/::after on
+ * .envirabox-image-counter supply the surrounding parentheses automatically).
+ * Injected into .envirabox-image-counter, which is in the caption-area bar. The
+ * ::before override below prefixes two non-breaking spaces before the "(" so the
+ * counter doesn't run directly into a caption text when one is set.
+ * Falls back to .rin-image-info--floating when image_counter:0.
+ */
+.rin-image-info {
+    white-space: nowrap;
+}
+
+/*
+ * Suppress Envira's native ::before "(" / ::after ")" parens on the image counter div.
+ * We format the text ourselves in JS as "(Image X of Y) [WxH]" with the bracket outside
+ * the parens, plus leading non-breaking spaces for separation from any caption text.
+ * !important required: our CSS is enqueued before envira.css and base_dark/style.css,
+ * so Envira's later-loaded rules would otherwise win the cascade.
+ */
+.envirabox-image-counter::before {
+    content: "\00a0\00a0" !important;
+}
+.envirabox-image-counter::after {
+    content: "" !important;
+}
+
+/*
+ * Move the lightbox caption bar and toolbar flush with the top of the viewport.
+ * The base_dark theme has both at top:0, but the admin-bar overrides push the
+ * toolbar to top:42px and the caption-wrap to top:32px — the full-screen lightbox
+ * shouldn't need to accommodate the admin bar.
+ */
+.envirabox-theme-base_dark .envirabox-caption-wrap,
+.admin-bar .envirabox-theme-base_dark .envirabox-caption-wrap {
+    top: 0 !important;
+}
+.envirabox-theme-base_dark .envirabox-toolbar,
+.admin-bar .envirabox-theme-base_dark .envirabox-toolbar {
+    top: 0 !important;
+}
+
+.rin-image-info--floating {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    z-index: 99999;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 12px;
+    line-height: 1;
+    font-family: sans-serif;
+    pointer-events: none;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}

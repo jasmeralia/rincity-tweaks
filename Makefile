@@ -3,15 +3,18 @@ PLUGINS     := $(WP_CONTENT)/plugins
 MU_PLUGINS  := $(WP_CONTENT)/mu-plugins
 OWNER       := nobody:nogroup
 
-.PHONY: all rc_tweaks rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-news-widget rincity-wallpaper-candidates rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds help
+.PHONY: all rc_tweaks rincity-envira-exif rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-news-widget rincity-wallpaper-candidates rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds help
 
-all: rc_tweaks rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-news-widget rincity-wallpaper-candidates rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds ## Deploy all plugins
+all: rc_tweaks rincity-envira-exif rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-news-widget rincity-wallpaper-candidates rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds ## Deploy all plugins
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*##"}; {printf "  %-40s %s\n", $$1, $$2}'
 
 rc_tweaks: ## Deploy rc_tweaks to wp-content/plugins/rc_tweaks/
 	sudo rsync -av --chown=$(OWNER) --exclude='README.md' rc_tweaks/ $(PLUGINS)/rc_tweaks/
+
+rincity-envira-exif: ## Deploy rincity-envira-exif to wp-content/plugins/rincity-envira-exif/
+	sudo rsync -av --chown=$(OWNER) --exclude='README.md' rincity-envira-exif/ $(PLUGINS)/rincity-envira-exif/
 
 rincity-envira-search-enhancements: ## Deploy rincity-envira-search-enhancements to wp-content/plugins/
 	sudo rsync -av --chown=$(OWNER) --exclude='README.md' rincity-envira-search-enhancements/ $(PLUGINS)/rincity-envira-search-enhancements/

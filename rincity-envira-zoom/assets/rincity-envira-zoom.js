@@ -4,6 +4,7 @@
     var pz                 = null;
     var zoomShell          = null;
     var zoomControls       = null;
+    var imageInfo          = null;
     var savedWrapParent    = null;
     var savedWrapTransform = null;
     var wheelCleanup       = null;
@@ -27,6 +28,10 @@
         zoomControls.classList.remove('rin-zoom-pending');
         var ind = zoomControls.querySelector('.rin-zoom-hd-indicator');
         if (ind && ind.parentNode) { ind.parentNode.removeChild(ind); }
+    }
+
+    function rincityImageInfoText(index, total, w, h) {
+        return '(Image ' + index + ' of ' + total + ') [' + w + '\xd7' + h + ']';
     }
 
     function destroyZoom() {
@@ -72,6 +77,13 @@
                 zoomControls.parentNode.removeChild(zoomControls);
             }
             zoomControls = null;
+        }
+
+        if (imageInfo) {
+            if (imageInfo.parentNode) {
+                imageInfo.parentNode.removeChild(imageInfo);
+            }
+            imageInfo = null;
         }
 
         savedWrapParent    = null;
@@ -134,10 +146,18 @@
         if (needsSwap) {
             bgLoader = new Image();
             bgLoader.onload = function () {
+                // Read original dimensions before nulling bgLoader and swapping src.
+                var origW = bgLoader.naturalWidth;
+                var origH = bgLoader.naturalHeight;
                 bgLoader = null;
                 img.removeAttribute('srcset');
                 img.src = fullRes;
                 setHdReady();
+                if (imageInfo) {
+                    imageInfo.textContent = rincityImageInfoText(
+                        instance.currIndex + 1, instance.group.length, origW, origH
+                    );
+                }
             };
             bgLoader.onerror = function () {
                 bgLoader = null;
@@ -363,6 +383,35 @@
         } else {
             zoomControls.classList.add('rin-zoom-controls--floating');
             enviraContainer.appendChild(zoomControls);
+        }
+
+        // Image info: "(Image X of Y) [WxH]".
+        // Preferred: inject into .envirabox-image-counter, replacing Envira's native
+        // "Image X of Y" text (rendered by image_counter:1 in gallery config into the
+        // caption area). The native [data-envirabox-index/count] spans are removed;
+        // Envira's update calls become no-ops since initZoom recreates the text fresh
+        // on every after_show. Falls back to floating overlay when image_counter is off.
+        // NOTE: .envirabox-infobar is removed from the DOM entirely when infobar:false
+        // (Envira calls self.$refs.infobar.remove()), so that element cannot be targeted.
+        imageInfo = document.createElement('span');
+        imageInfo.className = 'rin-image-info';
+        imageInfo.setAttribute('aria-hidden', 'true');
+        imageInfo.textContent = rincityImageInfoText(
+            instance.currIndex + 1, instance.group.length,
+            img.naturalWidth, img.naturalHeight
+        );
+        ['touchstart', 'touchend'].forEach(function (evtName) {
+            imageInfo.addEventListener(evtName, function (e) {
+                e.stopPropagation();
+            }, { passive: true });
+        });
+        var imageCounter = enviraContainer.querySelector('.envirabox-image-counter');
+        if (imageCounter) {
+            imageCounter.innerHTML = '';
+            imageCounter.appendChild(imageInfo);
+        } else {
+            imageInfo.classList.add('rin-image-info--floating');
+            enviraContainer.appendChild(imageInfo);
         }
     }
 
