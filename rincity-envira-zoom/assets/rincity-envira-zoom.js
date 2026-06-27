@@ -386,9 +386,13 @@
         }
 
         // Image info: "(Image X of Y) [WxH]".
-        // Preferred: inject into .envirabox-infobar__body, replacing the native "X / Y"
-        // counter (which Envira still tries to update on its hidden spans — harmless no-op).
-        // Fallback: floating overlay at top-left when the infobar is absent.
+        // Preferred: inject into .envirabox-image-counter, replacing Envira's native
+        // "Image X of Y" text (rendered by image_counter:1 in gallery config into the
+        // caption area). The native [data-envirabox-index/count] spans are removed;
+        // Envira's update calls become no-ops since initZoom recreates the text fresh
+        // on every after_show. Falls back to floating overlay when image_counter is off.
+        // NOTE: .envirabox-infobar is removed from the DOM entirely when infobar:false
+        // (Envira calls self.$refs.infobar.remove()), so that element cannot be targeted.
         imageInfo = document.createElement('span');
         imageInfo.className = 'rin-image-info';
         imageInfo.setAttribute('aria-hidden', 'true');
@@ -401,10 +405,10 @@
                 e.stopPropagation();
             }, { passive: true });
         });
-        var infobarBody = enviraContainer.querySelector('.envirabox-infobar__body');
-        if (infobarBody) {
-            infobarBody.innerHTML = '';
-            infobarBody.appendChild(imageInfo);
+        var imageCounter = enviraContainer.querySelector('.envirabox-image-counter');
+        if (imageCounter) {
+            imageCounter.innerHTML = '';
+            imageCounter.appendChild(imageInfo);
         } else {
             imageInfo.classList.add('rin-image-info--floating');
             enviraContainer.appendChild(imageInfo);
