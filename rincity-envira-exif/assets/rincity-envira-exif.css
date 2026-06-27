@@ -1,0 +1,17 @@
+/*
+ * Camera EXIF summary block appended to Envira gallery page content.
+ * Sits inside .post-content at the bottom, visually between the gallery grid
+ * and footer.post-footer (author / social share area).
+ */
+.rincity-gallery-exif {
+    font-size: 0.85em;
+    color: #888;
+    padding: 0.75em 0 0.25em;
+    text-align: center;
+    letter-spacing: 0.01em;
+}
+
+.rincity-gallery-exif-sep {
+    opacity: 0.45;
+    margin: 0 0.1em;
+}

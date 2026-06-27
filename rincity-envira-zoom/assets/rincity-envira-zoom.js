@@ -4,6 +4,7 @@
     var pz                 = null;
     var zoomShell          = null;
     var zoomControls       = null;
+    var imageInfo          = null;
     var savedWrapParent    = null;
     var savedWrapTransform = null;
     var wheelCleanup       = null;
@@ -27,6 +28,10 @@
         zoomControls.classList.remove('rin-zoom-pending');
         var ind = zoomControls.querySelector('.rin-zoom-hd-indicator');
         if (ind && ind.parentNode) { ind.parentNode.removeChild(ind); }
+    }
+
+    function rincityImageInfoText(index, total, w, h) {
+        return '(Image ' + index + ' of ' + total + ') [' + w + '\xd7' + h + ']';
     }
 
     function destroyZoom() {
@@ -72,6 +77,13 @@
                 zoomControls.parentNode.removeChild(zoomControls);
             }
             zoomControls = null;
+        }
+
+        if (imageInfo) {
+            if (imageInfo.parentNode) {
+                imageInfo.parentNode.removeChild(imageInfo);
+            }
+            imageInfo = null;
         }
 
         savedWrapParent    = null;
@@ -134,10 +146,18 @@
         if (needsSwap) {
             bgLoader = new Image();
             bgLoader.onload = function () {
+                // Read original dimensions before nulling bgLoader and swapping src.
+                var origW = bgLoader.naturalWidth;
+                var origH = bgLoader.naturalHeight;
                 bgLoader = null;
                 img.removeAttribute('srcset');
                 img.src = fullRes;
                 setHdReady();
+                if (imageInfo) {
+                    imageInfo.textContent = rincityImageInfoText(
+                        instance.currIndex + 1, instance.group.length, origW, origH
+                    );
+                }
             };
             bgLoader.onerror = function () {
                 bgLoader = null;
@@ -364,6 +384,24 @@
             zoomControls.classList.add('rin-zoom-controls--floating');
             enviraContainer.appendChild(zoomControls);
         }
+
+        // Image info overlay: "(Image X of Y) [WxH]" — top-left of the lightbox.
+        // naturalWidth/Height are available once after_show fires (image is visible).
+        // For galleries without a scaled version (needsSwap=false) the initial
+        // dimensions are already the originals and the text never needs updating.
+        imageInfo = document.createElement('span');
+        imageInfo.className = 'rin-image-info';
+        imageInfo.setAttribute('aria-hidden', 'true');
+        imageInfo.textContent = rincityImageInfoText(
+            instance.currIndex + 1, instance.group.length,
+            img.naturalWidth, img.naturalHeight
+        );
+        ['touchstart', 'touchend'].forEach(function (evtName) {
+            imageInfo.addEventListener(evtName, function (e) {
+                e.stopPropagation();
+            }, { passive: true });
+        });
+        enviraContainer.appendChild(imageInfo);
     }
 
     // Intercept before envirabox's setImage() runs.  On retina devices (DPR ≥ 2)

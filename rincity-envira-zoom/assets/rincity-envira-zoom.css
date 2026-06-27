@@ -218,3 +218,23 @@
 @keyframes rin-zoom-spin {
     to { transform: rotate(360deg); }
 }
+
+/*
+ * Image info overlay — "(Image X of Y) [WxH]" — top-left corner of the lightbox.
+ * Absolute within .envirabox-container (which fills the viewport).
+ * pointer-events:none so clicks pass through to the lightbox background close handler.
+ * Updates from scaled → original dimensions when the HD swap fires.
+ */
+.rin-image-info {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    z-index: 99999;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 12px;
+    line-height: 1;
+    font-family: sans-serif;
+    white-space: nowrap;
+    pointer-events: none;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
