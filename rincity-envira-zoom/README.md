@@ -1,6 +1,6 @@
 # rincity-envira-zoom
 
-**Version:** 0.6.21  
+**Version:** 0.6.22  
 **Deploy path:** `wp-content/plugins/rincity-envira-zoom/`
 
 ## Description
@@ -41,6 +41,7 @@ make rincity-envira-zoom
 
 ## Changelog
 
+- **0.6.22** — Add `!important` to `::before`/`::after` overrides: our stylesheet loads before `envira.css` and `base_dark/style.css` in the page, so Envira's later-loaded rules were winning and the suppression had no effect.
 - **0.6.21** — Suppress Envira's CSS `::before`/`::after` parens on `.envirabox-image-counter` entirely (they wrapped the full div content including `[WxH]`); put parens back in JS text as `(Image X of Y) [WxH]` so brackets stay outside. Leading non-breaking spaces from `::before` retained for caption separation.
 - **0.6.20** — Strip parens from image info text (Envira's CSS `::before`/`::after` already wraps `.envirabox-image-counter` in `()`); override `::before` content to prefix two non-breaking spaces before the `(` so the counter has separation when a caption precedes it; move caption-bar and toolbar to `top:0` overriding admin-bar rules that pushed them ~20px down.
 - **0.6.19** — Fix image info target element: use `.envirabox-image-counter` (Envira's `image_counter:1` caption-area div) instead of `.envirabox-infobar__body`. The infobar element is removed from the DOM entirely when `infobar:false`, making it untargetable; the image counter div persists in the caption area and is the correct host for the combined counter+resolution text.

@@ -235,12 +235,14 @@
  * Suppress Envira's native ::before "(" / ::after ")" parens on the image counter div.
  * We format the text ourselves in JS as "(Image X of Y) [WxH]" with the bracket outside
  * the parens, plus leading non-breaking spaces for separation from any caption text.
+ * !important required: our CSS is enqueued before envira.css and base_dark/style.css,
+ * so Envira's later-loaded rules would otherwise win the cascade.
  */
 .envirabox-image-counter::before {
-    content: "\00a0\00a0";
+    content: "\00a0\00a0" !important;
 }
 .envirabox-image-counter::after {
-    content: "";
+    content: "" !important;
 }
 
 /*
