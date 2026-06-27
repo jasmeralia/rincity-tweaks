@@ -1,6 +1,6 @@
 # rincity-envira-zoom
 
-**Version:** 0.6.19  
+**Version:** 0.6.20  
 **Deploy path:** `wp-content/plugins/rincity-envira-zoom/`
 
 ## Description
@@ -41,6 +41,7 @@ make rincity-envira-zoom
 
 ## Changelog
 
+- **0.6.20** — Strip parens from image info text (Envira's CSS `::before`/`::after` already wraps `.envirabox-image-counter` in `()`); override `::before` content to prefix two non-breaking spaces before the `(` so the counter has separation when a caption precedes it; move caption-bar and toolbar to `top:0` overriding admin-bar rules that pushed them ~20px down.
 - **0.6.19** — Fix image info target element: use `.envirabox-image-counter` (Envira's `image_counter:1` caption-area div) instead of `.envirabox-infobar__body`. The infobar element is removed from the DOM entirely when `infobar:false`, making it untargetable; the image counter div persists in the caption area and is the correct host for the combined counter+resolution text.
 - **0.6.18** — Fix image info placement: inject into infobar body rather than floating overlay. (Superseded by 0.6.19 — wrong target element.)
 - **0.6.17** — Add image info overlay to lightbox: `(Image X of Y) [WxH]`. Shows scaled dimensions on open; updates to original dimensions once the HD background load completes (reads from `bgLoader.naturalWidth/Height` before src swap). Tears down with `destroyZoom()` alongside `zoomControls`.

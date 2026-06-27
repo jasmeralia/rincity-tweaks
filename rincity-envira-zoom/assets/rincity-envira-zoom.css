@@ -220,13 +220,35 @@
 }
 
 /*
- * Image info — "(Image X of Y) [WxH]".
- * Normally injected into .envirabox-infobar__body (replacing the native "X / Y" counter),
- * so it inherits the infobar's colour and sizing with no extra positioning needed.
- * Falls back to .rin-image-info--floating when the infobar is absent (toolbar:false config).
+ * Image info — "Image X of Y [WxH]" (no parens in text; CSS ::before/::after on
+ * .envirabox-image-counter supply the surrounding parentheses automatically).
+ * Injected into .envirabox-image-counter, which is in the caption-area bar. The
+ * ::before override below prefixes two non-breaking spaces before the "(" so the
+ * counter doesn't run directly into a caption text when one is set.
+ * Falls back to .rin-image-info--floating when image_counter:0.
  */
 .rin-image-info {
     white-space: nowrap;
+}
+
+/* Prefix non-breaking spaces before the "(" so counter has breathing room after a caption. */
+.envirabox-image-counter::before {
+    content: "\00a0\00a0(";
+}
+
+/*
+ * Move the lightbox caption bar and toolbar flush with the top of the viewport.
+ * The base_dark theme has both at top:0, but the admin-bar overrides push the
+ * toolbar to top:42px and the caption-wrap to top:32px — the full-screen lightbox
+ * shouldn't need to accommodate the admin bar.
+ */
+.envirabox-theme-base_dark .envirabox-caption-wrap,
+.admin-bar .envirabox-theme-base_dark .envirabox-caption-wrap {
+    top: 0 !important;
+}
+.envirabox-theme-base_dark .envirabox-toolbar,
+.admin-bar .envirabox-theme-base_dark .envirabox-toolbar {
+    top: 0 !important;
 }
 
 .rin-image-info--floating {
