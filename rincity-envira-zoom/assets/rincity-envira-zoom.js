@@ -31,7 +31,7 @@
     }
 
     function rincityImageInfoText(index, total, w, h) {
-        return 'Image ' + index + ' of ' + total + ' [' + w + '\xd7' + h + ']';
+        return '(Image ' + index + ' of ' + total + ') [' + w + '\xd7' + h + ']';
     }
 
     function destroyZoom() {

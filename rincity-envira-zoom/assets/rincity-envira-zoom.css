@@ -231,9 +231,16 @@
     white-space: nowrap;
 }
 
-/* Prefix non-breaking spaces before the "(" so counter has breathing room after a caption. */
+/*
+ * Suppress Envira's native ::before "(" / ::after ")" parens on the image counter div.
+ * We format the text ourselves in JS as "(Image X of Y) [WxH]" with the bracket outside
+ * the parens, plus leading non-breaking spaces for separation from any caption text.
+ */
 .envirabox-image-counter::before {
-    content: "\00a0\00a0(";
+    content: "\00a0\00a0";
+}
+.envirabox-image-counter::after {
+    content: "";
 }
 
 /*
