@@ -1,6 +1,6 @@
 # rincity-envira-zoom
 
-**Version:** 0.6.17  
+**Version:** 0.6.18  
 **Deploy path:** `wp-content/plugins/rincity-envira-zoom/`
 
 ## Description
@@ -41,7 +41,8 @@ make rincity-envira-zoom
 
 ## Changelog
 
-- **0.6.17** — Add image info overlay to lightbox: `(Image X of Y) [WxH]` displayed top-left, positioned absolutely on `.envirabox-container`. Shows scaled dimensions on open; updates to original dimensions once the HD background load completes (reads from `bgLoader.naturalWidth/Height` before src swap). Tears down with `destroyZoom()` alongside `zoomControls`.
+- **0.6.18** — Fix image info placement: inject `rin-image-info` into `.envirabox-infobar__body` (replacing the native "X / Y" counter) instead of as a separate floating overlay, eliminating the duplicate counter. Falls back to floating overlay when the infobar is absent.
+- **0.6.17** — Add image info overlay to lightbox: `(Image X of Y) [WxH]`. Shows scaled dimensions on open; updates to original dimensions once the HD background load completes (reads from `bgLoader.naturalWidth/Height` before src swap). Tears down with `destroyZoom()` alongside `zoomControls`.
 - **0.6.16** — Fix toolbar hiding on short pan/drag at scale=1 (task 310): block *all* touch propagation from the shell unconditionally (previously allowed at scale=1 for swipe-nav), so Envira's guestures can no longer route a drag-end to `clickContent:'toggleControls'` and hide the +/−/HD/zoom controls. Reimplement horizontal swipe-nav ourselves at scale=1 via Envira's public `instance.next()`/`instance.previous()` API (40px threshold, horizontal-dominant, guarded on multi-image galleries). Side effect: tap-to-toggle-toolbar is intentionally disabled, so the toolbar now stays visible while the lightbox is open.
 - **0.6.15** — Fix centering on first open: replace single-rAF guard with a MutationObserver that re-clears the wrap transform immediately whenever Envira writes it back, regardless of timing or frequency.
 - **0.6.14** — Restore swipe-nav: initialize Panzoom with `disablePan:true` and toggle it via `panzoomzoom`/`panzoomreset` so Panzoom doesn't capture pointer events at scale=1 (previously caused the image to slide off-screen instead of Envira navigating); restore conditional touch propagation (allow at scale=1, block at scale>1 and multi-touch). Fix intermittent centering on first open: add a `requestAnimationFrame` second-clear of the wrap transform to catch Envira re-setting it asynchronously after `after_show`.

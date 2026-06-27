@@ -385,10 +385,10 @@
             enviraContainer.appendChild(zoomControls);
         }
 
-        // Image info overlay: "(Image X of Y) [WxH]" — top-left of the lightbox.
-        // naturalWidth/Height are available once after_show fires (image is visible).
-        // For galleries without a scaled version (needsSwap=false) the initial
-        // dimensions are already the originals and the text never needs updating.
+        // Image info: "(Image X of Y) [WxH]".
+        // Preferred: inject into .envirabox-infobar__body, replacing the native "X / Y"
+        // counter (which Envira still tries to update on its hidden spans — harmless no-op).
+        // Fallback: floating overlay at top-left when the infobar is absent.
         imageInfo = document.createElement('span');
         imageInfo.className = 'rin-image-info';
         imageInfo.setAttribute('aria-hidden', 'true');
@@ -401,7 +401,14 @@
                 e.stopPropagation();
             }, { passive: true });
         });
-        enviraContainer.appendChild(imageInfo);
+        var infobarBody = enviraContainer.querySelector('.envirabox-infobar__body');
+        if (infobarBody) {
+            infobarBody.innerHTML = '';
+            infobarBody.appendChild(imageInfo);
+        } else {
+            imageInfo.classList.add('rin-image-info--floating');
+            enviraContainer.appendChild(imageInfo);
+        }
     }
 
     // Intercept before envirabox's setImage() runs.  On retina devices (DPR ≥ 2)

@@ -220,12 +220,16 @@
 }
 
 /*
- * Image info overlay — "(Image X of Y) [WxH]" — top-left corner of the lightbox.
- * Absolute within .envirabox-container (which fills the viewport).
- * pointer-events:none so clicks pass through to the lightbox background close handler.
- * Updates from scaled → original dimensions when the HD swap fires.
+ * Image info — "(Image X of Y) [WxH]".
+ * Normally injected into .envirabox-infobar__body (replacing the native "X / Y" counter),
+ * so it inherits the infobar's colour and sizing with no extra positioning needed.
+ * Falls back to .rin-image-info--floating when the infobar is absent (toolbar:false config).
  */
 .rin-image-info {
+    white-space: nowrap;
+}
+
+.rin-image-info--floating {
     position: absolute;
     top: 14px;
     left: 14px;
@@ -234,7 +238,6 @@
     font-size: 12px;
     line-height: 1;
     font-family: sans-serif;
-    white-space: nowrap;
     pointer-events: none;
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
 }
