@@ -1,14 +1,11 @@
 $(document).ready(function () {
 
-    // Prevent href="#" parent items from scrolling to top in both navs
-    $('#main-menu .menu-item-has-children > a[href="#"], #mobile-menu .menu-item-has-children > a[href="#"]').on('click', function (e) {
-        e.preventDefault();
-    });
-
     // ── Mobile nav (#mobile-menu) ─────────────────────────────────────────────
     // The theme injects .sub-menu-btn-icon chevrons but gives them no handler
     // (the .sub-menu-btn overlay it tries to use is dead, covered by the anchor's
     // z-index:5). Wire the chevrons and toggle submenus on parent anchor clicks.
+    // Parent items have no href (stripped by nav_menu_link_attributes filter in
+    // rincity-nav-tweaks.php), so no preventDefault is needed.
 
     $('#mobile-menu .sub-menu-btn-icon').on('click', function (e) {
         e.stopPropagation();
