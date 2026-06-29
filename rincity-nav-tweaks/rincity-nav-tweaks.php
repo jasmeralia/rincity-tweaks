@@ -2,7 +2,7 @@
 /**
  * Plugin Name: RinCity Nav Tweaks
  * Description: Fixes mobile submenu expand/collapse on the Ashe Pro theme.
- * Version: 1.0.3
+ * Version: 1.0.4
  * Author: Morgan Blackthorne
  */
 
@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'RINCITY_NAV_TWEAKS_VERSION', '1.0.3' );
+define( 'RINCITY_NAV_TWEAKS_VERSION', '1.0.4' );
 
 add_action( 'wp_enqueue_scripts', function () {
     if ( is_admin() ) {

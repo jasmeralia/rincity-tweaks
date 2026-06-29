@@ -18,29 +18,31 @@ $(document).ready(function () {
     });
 
     // ── Desktop nav (#main-menu) touch support ────────────────────────────────
-    // The theme uses mouseenter/mouseleave only. On touch devices submenus never
-    // open intentionally. Must use native addEventListener with { passive: false }
-    // — jQuery's .on('touchstart') does not pass this option, so the browser
-    // silently ignores preventDefault() calls from those handlers.
-    //
-    // Behavior:
-    //   First tap  → open submenu, don't navigate
-    //   Second tap, href="#"  → close submenu
-    //   Second tap, real link → fall through, browser navigates normally
+    // Strategy: touchstart opens the submenu immediately (passive, no preventDefault
+    // needed). Navigation is blocked by a capture-phase click handler that always
+    // calls preventDefault() — click is consistently interceptable unlike touchstart.
+    // A per-element justOpened flag distinguishes "this click came from the tap that
+    // just opened the menu" (don't navigate) vs "submenu already open, second tap"
+    // (navigate for real links, close for href="#").
 
     (function () {
         var mainMenu = document.getElementById('main-menu');
         if (!mainMenu) { return; }
 
-        var anchors = mainMenu.querySelectorAll('.menu-item-has-children > a');
+        var lastTouchTime = 0;
+        document.addEventListener('touchstart', function () {
+            lastTouchTime = Date.now();
+        }, { passive: true });
 
-        anchors.forEach(function (el) {
+        mainMenu.querySelectorAll('.menu-item-has-children > a').forEach(function (el) {
+            var justOpened = false;
+
             el.addEventListener('touchstart', function (e) {
                 var $li  = $(el).parent();
                 var $sub = $li.children('.sub-menu');
 
                 if (!$li.hasClass('submenu-open')) {
-                    e.preventDefault();
+                    justOpened = true;
                     e.stopPropagation();
                     $li.siblings('.menu-item-has-children.submenu-open').each(function () {
                         $(this).children('.sub-menu').stop().fadeOut(200);
@@ -48,14 +50,36 @@ $(document).ready(function () {
                     });
                     $sub.stop().fadeIn(200);
                     $li.addClass('submenu-open');
-                } else if (el.getAttribute('href') === '#') {
-                    e.preventDefault();
-                    e.stopPropagation();
+                } else {
+                    justOpened = false;
+                }
+            }, { passive: true });
+
+            // Capture-phase click: intercept before the browser acts on the href.
+            // Only active for touch-derived clicks (skip desktop mouse clicks so
+            // keyboard/mouse nav of the desktop hover menu is unaffected).
+            el.addEventListener('click', function (e) {
+                if (Date.now() - lastTouchTime > 700) { return; }
+
+                e.preventDefault();
+                e.stopImmediatePropagation();
+
+                if (justOpened) {
+                    justOpened = false;
+                    return; // Submenu just opened this tap — don't navigate
+                }
+
+                var $li  = $(el).parent();
+                var $sub = $li.children('.sub-menu');
+                var href = el.getAttribute('href');
+
+                if (href === '#') {
                     $sub.stop().fadeOut(200);
                     $li.removeClass('submenu-open');
+                } else {
+                    window.location.href = href; // Second tap on real link: navigate
                 }
-                // else: already open + real link → no preventDefault, browser navigates
-            }, { passive: false });
+            }, true); // capture phase
         });
 
         // Close all open submenus on tap outside the nav
