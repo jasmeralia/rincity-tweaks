@@ -3,9 +3,9 @@ PLUGINS     := $(WP_CONTENT)/plugins
 MU_PLUGINS  := $(WP_CONTENT)/mu-plugins
 OWNER       := nobody:nogroup
 
-.PHONY: all rc_tweaks rincity-envira-exif rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-news-widget rincity-wallpaper-candidates rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds help
+.PHONY: all rc_tweaks rincity-envira-exif rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-nav-tweaks rincity-news-widget rincity-wallpaper-candidates rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds help
 
-all: rc_tweaks rincity-envira-exif rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-news-widget rincity-wallpaper-candidates rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds ## Deploy all plugins
+all: rc_tweaks rincity-envira-exif rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-nav-tweaks rincity-news-widget rincity-wallpaper-candidates rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds ## Deploy all plugins
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*##"}; {printf "  %-40s %s\n", $$1, $$2}'
@@ -27,6 +27,9 @@ rincity-gallery-favorites: ## Deploy rincity-gallery-favorites to wp-content/plu
 
 rincity-image-size-control: ## Deploy rincity-image-size-control to wp-content/plugins/rincity-image-size-control/
 	sudo rsync -av --chown=$(OWNER) rincity-image-size-control/ $(PLUGINS)/rincity-image-size-control/
+
+rincity-nav-tweaks: ## Deploy rincity-nav-tweaks to wp-content/plugins/rincity-nav-tweaks/
+	sudo rsync -av --chown=$(OWNER) --exclude='README.md' rincity-nav-tweaks/ $(PLUGINS)/rincity-nav-tweaks/
 
 rincity-news-widget: ## Deploy rincity-news-widget to wp-content/plugins/rincity-news-widget/
 	sudo rsync -av --chown=$(OWNER) --exclude='README.md' rincity-news-widget/ $(PLUGINS)/rincity-news-widget/

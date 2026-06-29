@@ -51,6 +51,14 @@ A WordPress plugin (v1.0.0) that registers a **RinCity Recent Updates** sidebar 
 
 Widget settings: title (default "Recent Updates") and item count (default 5, max 20).
 
+### [rincity-nav-tweaks](rincity-nav-tweaks/)
+
+A WordPress plugin (v1.0.0) that fixes mobile submenu expand/collapse on the Ashe Pro theme. The theme's `.sub-menu-btn` overlay is dead (covered by the anchor's `z-index: 5`), leaving the chevron icon with no handler. This plugin:
+
+- Wires `.sub-menu-btn-icon` chevron clicks to `slideToggle` the sibling `.sub-menu` and rotate the SVG at all nesting depths
+- Intercepts `href="#"` anchor taps (Members, Wallpaper) to expand their submenus instead of scrolling to top
+- Leaves real-link parents (About, Spoil Me!) navigable via their anchor; only the chevron toggles their submenus
+
 ### [rincity-wordfence-temp-allowlist](rincity-wordfence-temp-allowlist/)
 
 A WordPress must-use plugin (v1.0.0) that automatically adds Rin's current client IP to the Wordfence IP allowlist for 6 hours after she successfully logs in. Removes any prior temporary entry on each login and expires the allowlist entry via WP-Cron. Wordfence remains fully active for all other traffic.
@@ -96,6 +104,7 @@ rincity-envira-covers  →  cover manifest (JSON)
 | rincity-throwback-posts | Python 3.10+, tweepy 4.14.0+, jinja2 3.1.0+ |
 | rincity-envira-search-enhancements | WordPress 5.0+, PHP 7.0+, Envira Gallery plugin |
 | rincity-envira-zoom | WordPress 5.0+, PHP 7.0+, Envira Gallery plugin |
+| rincity-nav-tweaks | WordPress 5.0+, PHP 7.0+ |
 | rincity-news-widget | WordPress 5.0+, PHP 7.0+, Envira Gallery plugin |
 | rincity-wordfence-temp-allowlist | WordPress 5.0+, PHP 7.0+, Wordfence plugin |
 | rincity-zero-scheduled-seconds | WordPress 5.0+, PHP 5.3+ |
