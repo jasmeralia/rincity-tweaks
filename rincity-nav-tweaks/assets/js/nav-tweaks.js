@@ -11,7 +11,7 @@ $(document).ready(function () {
         $(this).find('svg').toggleClass('fa-rotate-270');
     });
 
-    $('#mobile-menu .menu-item-has-children > a[href="#"]').on('click', function (e) {
+    $('#mobile-menu .menu-item-has-children > a').on('click', function (e) {
         e.preventDefault();
         $(this).siblings('.sub-menu-btn-icon').find('svg').toggleClass('fa-rotate-270');
         $(this).siblings('.sub-menu').slideToggle();
