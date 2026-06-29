@@ -38,6 +38,7 @@ $(document).ready(function () {
             var justOpened = false;
 
             el.addEventListener('touchstart', function (e) {
+                lastTouchTime = Date.now(); // update before stopPropagation blocks document listener
                 var $li  = $(el).parent();
                 var $sub = $li.children('.sub-menu');
 
