@@ -18,21 +18,24 @@ $(document).ready(function () {
     });
 
     // ── Desktop nav (#main-menu) touch support ────────────────────────────────
-    // The theme uses mouseenter/mouseleave for submenus; these don't fire on
-    // touch. On first tap of a parent item, open the submenu instead of
-    // following the link. On second tap, follow the link (or close if href="#").
+    // The theme uses mouseenter/mouseleave only — no touch handling. On touch
+    // devices the submenus never open. Intercept clicks on touch-capable devices
+    // only (touchend + preventDefault is not reliable across browsers; click is).
+    //
+    // Behavior:
+    //   - First tap on any parent item → open submenu, don't navigate
+    //   - Second tap on href="#" items → close submenu
+    //   - Second tap on real-link items → navigate normally
 
-    (function () {
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
         var $mainMenu = $('#main-menu');
-        if (!$mainMenu.length) { return; }
 
-        $mainMenu.find('.menu-item-has-children > a').on('touchend', function (e) {
+        $mainMenu.find('.menu-item-has-children > a').on('click', function (e) {
             var $li  = $(this).parent();
             var $sub = $li.children('.sub-menu');
 
             if (!$li.hasClass('submenu-open')) {
                 e.preventDefault();
-                e.stopPropagation();
                 $li.siblings('.menu-item-has-children.submenu-open').each(function () {
                     $(this).children('.sub-menu').stop().fadeOut(200);
                     $(this).removeClass('submenu-open');
@@ -41,14 +44,13 @@ $(document).ready(function () {
                 $li.addClass('submenu-open');
             } else if ($(this).attr('href') === '#') {
                 e.preventDefault();
-                e.stopPropagation();
                 $sub.stop().fadeOut(200);
                 $li.removeClass('submenu-open');
             }
-            // else: already open + real link → second tap navigates normally
+            // else: already open + real link → click navigates
         });
 
-        $(document).on('touchend.main-nav', function (e) {
+        $(document).on('click.main-nav', function (e) {
             if (!$(e.target).closest('#main-menu .menu-item-has-children').length) {
                 $mainMenu.find('.menu-item-has-children.submenu-open').each(function () {
                     $(this).children('.sub-menu').stop().fadeOut(200);
@@ -56,6 +58,6 @@ $(document).ready(function () {
                 });
             }
         });
-    }());
+    }
 
 });
