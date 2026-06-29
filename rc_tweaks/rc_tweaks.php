@@ -28,3 +28,9 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/album-page.php';
 
 // Bridge aMember session auth into WordPress (fixes comment form login check)
 require_once plugin_dir_path( __FILE__ ) . 'includes/amember-wp-bridge.php';
+
+// Prevent browser caching of Envira gallery standalone pages
+require_once plugin_dir_path( __FILE__ ) . 'includes/envira-gallery-nocache.php';
+
+// Override Envira plugin CSS (e.g. breadcrumb background)
+require_once plugin_dir_path( __FILE__ ) . 'includes/envira-gallery-css.php';
