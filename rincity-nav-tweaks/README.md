@@ -1,21 +1,28 @@
 # rincity-nav-tweaks
 
-Fixes mobile submenu expand/collapse on the Ashe Pro theme.
+Fixes submenu expand/collapse on the Ashe Pro theme for touch devices.
 
-## Problem
+## Problems
 
-The Ashe Pro theme injects a `.sub-menu-btn` overlay as a tap target for parent menu items, but `#mobile-menu li a` has `position: relative; z-index: 5`, which renders the overlay dead. The `.sub-menu-btn-icon` chevron is visible but has no click handler. Result:
+**Mobile nav (`#mobile-menu`, active ≤979px):** The theme injects a `.sub-menu-btn`
+overlay as the tap target but `#mobile-menu li a` has `position: relative; z-index: 5`,
+rendering it dead. The `.sub-menu-btn-icon` chevron is visible but has no handler.
+Result: `href="#"` parents scroll to top on tap; real-link parents navigate away
+instead of expanding.
 
-- `href="#"` parents (Members, Wallpaper) scroll the page to top on tap instead of expanding
-- Real-link parents (About, Spoil Me!) navigate away instead of expanding their submenus
+**Desktop nav (`#main-menu`, active >979px):** The theme uses `mouseenter`/`mouseleave`
+only — no touch events. Submenus never open on touch devices.
 
 ## Solution
 
-Two JS handlers wired after theme JS runs:
+**Mobile nav:** Wire `.sub-menu-btn-icon` chevron clicks to `slideToggle` the sibling
+`.sub-menu` at all depths. Intercept `href="#"` anchor taps to expand instead of
+scroll. Real-link parents (About, Spoil Me!) are left navigable via their anchor.
 
-1. **Chevron click** (`.sub-menu-btn-icon`) — `slideToggle`s the sibling `.sub-menu` and rotates the chevron SVG. Works at all nesting depths.
-2. **`href="#"` anchor click** — `preventDefault` to stop scroll-to-top, then toggles the submenu and chevron the same way.
+**Desktop nav:** On first tap of a `menu-item-has-children` anchor, open the submenu
+(`fadeIn`) and add `.submenu-open` class instead of following the link. On second tap:
+if the link is real, navigate; if `href="#"`, close the submenu. Tapping outside the
+menu closes all open submenus. Works at all nesting depths (e.g. Wallpaper inside
+Members).
 
-Real-link parents (About, Spoil Me!) are left untouched on anchor click; only their chevron triggers expand/collapse.
-
-The `.sub-menu-btn` div injected by the theme is left in the DOM unchanged.
+The `.sub-menu-btn` div injected by the theme into `#mobile-menu` is left untouched.
