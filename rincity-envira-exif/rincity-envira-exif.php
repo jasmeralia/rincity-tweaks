@@ -2,7 +2,7 @@
 /**
  * Plugin Name: RinCity Envira EXIF
  * Description: Appends a representative camera EXIF block to Envira gallery pages.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Morgan Blackthorne
  */
 
@@ -33,6 +33,13 @@ add_filter( 'the_content', 'rincity_envira_exif_append', 20 );
  */
 function rincity_envira_exif_append( $content ) {
     if ( ! is_singular( 'envira' ) || ! in_the_loop() || ! is_main_query() ) {
+        return $content;
+    }
+
+    // Only show EXIF for galleries that belong to the main album (ID 1411).
+    $main_album = get_post_meta( 1411, '_eg_album_data', true );
+    $album_ids  = array_map( 'intval', (array) ( $main_album['galleryIDs'] ?? [] ) );
+    if ( ! in_array( get_the_ID(), $album_ids, true ) ) {
         return $content;
     }
 
