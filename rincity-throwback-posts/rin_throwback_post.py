@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import email.utils
 import html
 import json
 import mimetypes
@@ -34,11 +35,16 @@ import os
 import random
 import re
 import shutil
+import smtplib
+import ssl
 import subprocess
 import sys
 import tempfile
 import urllib.error
 import urllib.request
+from email.mime.image import MIMEImage
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -351,6 +357,115 @@ def _build_credit_context(categories: List[str]) -> Dict[str, str]:
     }
 
 
+def _load_env(env_path: Path) -> Dict[str, str]:
+    result: Dict[str, str] = {}
+    if not env_path.exists():
+        return result
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        result[key.strip()] = value.strip()
+    return result
+
+
+def _resize_for_email(image_path: Path, max_width: int = 600) -> tuple[Path, Optional[Path]]:
+    cmd = _magick_cmd()
+    if not cmd:
+        return image_path, None
+    tmp_fd, tmp_name = tempfile.mkstemp(suffix=".jpg")
+    os.close(tmp_fd)
+    tmp_path = Path(tmp_name)
+    subprocess.run(
+        [cmd, str(image_path), "-strip", "-resize", f"{max_width}x>", "-quality", "85", str(tmp_path)],
+        check=True,
+        capture_output=True,
+    )
+    return tmp_path, tmp_path
+
+
+def _build_email_html(
+    set_name: str,
+    set_url: str,
+    published: str,
+    post_text: str,
+    dry_run: bool,
+    twitter_post_id: Optional[str] = None,
+    bluesky_url: Optional[str] = None,
+) -> str:
+    esc = html.escape
+    dry_banner = (
+        '<div style="background:#dc2626;color:#fff;text-align:center;padding:8px 16px;'
+        'font-weight:700;font-size:13px;letter-spacing:1px;">DRY RUN — not posted</div>'
+        if dry_run else ""
+    )
+    mock_label = " (mock)" if dry_run else ""
+    social_links: List[str] = []
+    if twitter_post_id:
+        url = f"https://x.com/i/web/status/{twitter_post_id}"
+        social_links.append(f'<a href="{url}" style="color:#1d9bf0;text-decoration:none;font-size:13px;">View on X/Twitter{mock_label} →</a>')
+    if bluesky_url:
+        social_links.append(f'<a href="{esc(bluesky_url)}" style="color:#0085ff;text-decoration:none;font-size:13px;">View on Bluesky{mock_label} →</a>')
+    social_html = (
+        '<div style="margin-top:12px;display:flex;gap:16px;">' + " &nbsp;·&nbsp; ".join(social_links) + "</div>"
+        if social_links else ""
+    )
+    post_html = esc(post_text).replace("\n", "<br>")
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f0f0f0;font-family:system-ui,-apple-system,sans-serif;">
+{dry_banner}
+<div style="max-width:600px;margin:24px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+  <img src="cid:cover_image" alt="{esc(set_name)}" style="width:100%;height:auto;display:block;">
+  <div style="padding:24px;">
+    <h1 style="margin:0 0 4px;font-size:20px;color:#111;">{esc(set_name)}</h1>
+    <p style="margin:0 0 18px;color:#666;font-size:13px;">Published {esc(published)}</p>
+    <div style="background:#f8f8f8;border-left:3px solid #6366f1;padding:12px 16px;font-size:13px;line-height:1.6;margin-bottom:20px;">{post_html}</div>
+    <a href="{esc(set_url)}" style="display:inline-block;background:#6366f1;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">View Gallery →</a>
+    {social_html}
+  </div>
+</div>
+</body>
+</html>"""
+
+
+def _send_html_email(
+    env: Dict[str, str],
+    to_addr: str,
+    subject: str,
+    html_body: str,
+    image_path: Path,
+) -> None:
+    from_addr = env.get("FROM_EMAIL", "")
+    reply_to = env.get("REPLY_TO_EMAIL", from_addr)
+    smtp_host = env.get("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(env.get("SMTP_PORT", "465"))
+    smtp_user = env.get("SMTP_USER", from_addr)
+    smtp_pass = env.get("SMTP_PASS", "")
+
+    msg = MIMEMultipart("related")
+    msg["Subject"] = subject
+    msg["From"] = from_addr
+    msg["To"] = to_addr
+    msg["Reply-To"] = reply_to
+    msg["Date"] = email.utils.formatdate(localtime=True)
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+    with image_path.open("rb") as f:
+        img = MIMEImage(f.read())
+    img.add_header("Content-ID", "<cover_image>")
+    img.add_header("Content-Disposition", "inline", filename=image_path.name)
+    msg.attach(img)
+
+    context = ssl.create_default_context()
+    with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context) as server:
+        server.login(smtp_user, smtp_pass)
+        server.sendmail(from_addr, [to_addr], msg.as_bytes())
+    print(f"Email sent to {to_addr}")
+
+
 def _load_auth(auth_path: Path) -> Dict[str, str]:
     auth = _load_json(auth_path)
     if not isinstance(auth, dict):
@@ -552,7 +667,11 @@ def main() -> int:
         action="store_true",
         help="When used with --dry-run, record the selection in history without posting",
     )
+    p.add_argument("--email-to", default="morgan@windsofstorm.net", help="Send HTML summary email to this address")
+    p.add_argument("--no-email", action="store_true", help="Skip sending the summary email")
     args = p.parse_args()
+
+    env_cfg = _load_env(Path(__file__).parent / ".env")
 
     manifest_path = Path(args.manifest)
     images_dir = Path(args.images_dir)
@@ -655,6 +774,22 @@ def main() -> int:
             history.append(record)
             _save_json(history_path, history)
             print(f"\nRecorded dry run in history: {history_path}")
+        if not args.no_email and args.email_to:
+            email_img, email_tmp = _resize_for_email(image_path)
+            try:
+                subject = f"[rin-city.com] [DRY RUN] Throwback: {set_name} — {published}"
+                html_body = _build_email_html(
+                    set_name=set_name, set_url=set_url, published=published,
+                    post_text=post_text, dry_run=True,
+                    twitter_post_id="0000000000000000000",
+                    bluesky_url="https://bsky.app/profile/rin-city.com/post/dryrun00000000000",
+                )
+                _send_html_email(env_cfg, args.email_to, subject, html_body, email_img)
+            except Exception as e:
+                print(f"WARNING: email failed: {e}", file=sys.stderr)
+            finally:
+                if email_tmp:
+                    email_tmp.unlink(missing_ok=True)
         return 0
 
     post_to_twitter = args.platform in {"twitter", "both"}
@@ -755,6 +890,23 @@ def main() -> int:
         print(f"Bluesky URL: {bluesky_url}")
     elif bluesky_uri:
         print(f"Bluesky URI: {bluesky_uri}")
+
+    if not args.no_email and args.email_to:
+        email_img, email_tmp = _resize_for_email(image_path)
+        try:
+            subject = f"[rin-city.com] Throwback posted: {set_name} — {published}"
+            html_body = _build_email_html(
+                set_name=set_name, set_url=set_url, published=published,
+                post_text=bluesky_text or post_text, dry_run=False,
+                twitter_post_id=twitter_post_id, bluesky_url=bluesky_url,
+            )
+            _send_html_email(env_cfg, args.email_to, subject, html_body, email_img)
+        except Exception as e:
+            print(f"WARNING: email failed: {e}", file=sys.stderr)
+        finally:
+            if email_tmp:
+                email_tmp.unlink(missing_ok=True)
+
     return 0
 
 
