@@ -192,7 +192,7 @@ final class RinCWC_Rest {
             'custom_crop_y'     => $crop['y'],
         ] );
         $result = self::generate_selection_crop( $row, true );
-        return new WP_REST_Response( [ 'ok' => $result['status'] === 'ok', 'crop' => $crop, 'result' => $result ], $result['status'] === 'ok' ? 200 : 500 );
+        return new WP_REST_Response( [ 'ok' => true, 'crop' => $crop, 'result' => $result ], 200 );
     }
 
     public static function crop_offset( WP_REST_Request $req ): WP_REST_Response {
