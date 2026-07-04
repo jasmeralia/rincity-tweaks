@@ -148,11 +148,29 @@ final class RinCWC_Rest {
     }
 
     public static function crop_custom( WP_REST_Request $req ): WP_REST_Response {
-        $gid   = (int) ( $req->get_param( 'gallery_id' ) ?? 0 );
-        $aid   = (int) ( $req->get_param( 'attach_id' ) ?? 0 );
-        $scale = (float) ( $req->get_param( 'scale' ) ?? 1.0 );
-        $x     = (int) ( $req->get_param( 'x' ) ?? 0 );
-        $y     = (int) ( $req->get_param( 'y' ) ?? 0 );
+        $required = [
+            'gallery_id',
+            'attach_id',
+            'crop_scale',
+            'crop_x',
+            'crop_y',
+            'position',
+            'total',
+            'filename',
+            'gallery_slug',
+            'gallery_title',
+        ];
+        foreach ( $required as $field ) {
+            if ( $req->get_param( $field ) === null ) {
+                return new WP_REST_Response( [ 'error' => "Missing {$field}" ], 400 );
+            }
+        }
+
+        $gid   = (int) $req->get_param( 'gallery_id' );
+        $aid   = (int) $req->get_param( 'attach_id' );
+        $scale = (float) $req->get_param( 'crop_scale' );
+        $x     = (int) $req->get_param( 'crop_x' );
+        $y     = (int) $req->get_param( 'crop_y' );
 
         if ( ! $gid || ! $aid ) {
             return new WP_REST_Response( [ 'error' => 'Missing fields' ], 400 );
@@ -164,10 +182,16 @@ final class RinCWC_Rest {
         }
 
         $crop = RinCWC_Data::clamp_custom_crop( $image, $scale, $x, $y );
-        $ok   = RinCWC_Data::select_image( $gid, $aid, 'custom', $crop );
+        $ok   = RinCWC_Data::upsert_selection( (int) $image['id'], [
+            'crop_variant'      => 'custom',
+            'custom_crop_scale' => $crop['scale'],
+            'custom_crop_x'     => $crop['x'],
+            'custom_crop_y'     => $crop['y'],
+        ] );
         if ( ! $ok ) {
             return new WP_REST_Response( [ 'error' => 'Could not save crop' ], 400 );
         }
+        RinCWC_Data::set_status( (int) $image['id'], RinCWC_Data::STATUS_SELECTED );
 
         $row    = array_merge( $image, [
             'crop_variant'      => 'custom',
@@ -202,9 +226,9 @@ final class RinCWC_Rest {
             $y = $source_offset;
         }
 
-        $req->set_param( 'scale', $scale );
-        $req->set_param( 'x', $x );
-        $req->set_param( 'y', $y );
+        $req->set_param( 'crop_scale', $scale );
+        $req->set_param( 'crop_x', $x );
+        $req->set_param( 'crop_y', $y );
         return self::crop_custom( $req );
     }
 
