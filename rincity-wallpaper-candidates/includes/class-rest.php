@@ -93,14 +93,16 @@ final class RinCWC_Rest {
             return new WP_REST_Response( [ 'error' => 'Missing fields' ], 400 );
         }
 
-        return new WP_REST_Response( [ 'ok' => RinCWC_Data::select_image( $gid, $aid, $crop ) ], 200 );
+        $ok = RinCWC_Data::select_image( $gid, $aid, $crop );
+        return new WP_REST_Response( [ 'ok' => $ok, 'status' => $ok ? RinCWC_Data::STATUS_SELECTED : null ], $ok ? 200 : 404 );
     }
 
     public static function deselect( WP_REST_Request $req ): WP_REST_Response {
         $gid = (int) ( $req->get_param( 'gallery_id' ) ?? 0 );
         $aid = (int) ( $req->get_param( 'attach_id' )  ?? 0 );
         if ( ! $gid || ! $aid ) return new WP_REST_Response( [ 'error' => 'Missing fields' ], 400 );
-        return new WP_REST_Response( [ 'ok' => RinCWC_Data::deselect_image( $gid, $aid ) ], 200 );
+        $ok = RinCWC_Data::deselect_image( $gid, $aid );
+        return new WP_REST_Response( [ 'ok' => $ok, 'status' => $ok ? RinCWC_Data::STATUS_CANDIDATE : null ], $ok ? 200 : 404 );
     }
 
     public static function approve( WP_REST_Request $req ): WP_REST_Response {
@@ -171,21 +173,15 @@ final class RinCWC_Rest {
     // ── Watermark ─────────────────────────────────────────────────────────────
 
     public static function watermark( WP_REST_Request $req ): WP_REST_Response {
-        $gid    = sanitize_text_field( $req->get_param( 'gallery_id' ) ?? '' );
-        $aid    = sanitize_text_field( $req->get_param( 'attach_id' )  ?? '' );
+        $gid    = (int) ( $req->get_param( 'gallery_id' ) ?? 0 );
+        $aid    = (int) ( $req->get_param( 'attach_id' )  ?? 0 );
         $corner = sanitize_text_field( $req->get_param( 'wm_corner' )  ?? '' );
         $valid  = [ '', 'top-left', 'top-right', 'bottom-left', 'bottom-right' ];
         if ( ! $gid || ! $aid ) return new WP_REST_Response( [ 'error' => 'Missing fields' ], 400 );
         if ( ! in_array( $corner, $valid, true ) ) return new WP_REST_Response( [ 'error' => 'Invalid corner' ], 400 );
 
-        $row = RinCWC_CSV::read_selections()[ $gid ][ $aid ] ?? null;
-        if ( ! $row ) return new WP_REST_Response( [ 'error' => 'Image not selected' ], 400 );
-
-        if ( ( $row['wm_corner'] ?? '' ) !== $corner ) {
-            $row['wm_applied'] = 'false';
-        }
-        $row['wm_corner'] = $corner;
-        return new WP_REST_Response( [ 'ok' => RinCWC_CSV::upsert_selection( $row ) ], 200 );
+        $ok = RinCWC_Data::set_watermark_corner( $gid, $aid, $corner );
+        return new WP_REST_Response( [ 'ok' => $ok ], $ok ? 200 : 400 );
     }
 
     // ── Batch: generate custom crops ──────────────────────────────────────────
