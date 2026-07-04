@@ -150,6 +150,19 @@ final class RinCWC_Data {
         ];
     }
 
+    public static function crop_geometry( array $image, ?array $selection = null, string $variant = 'center' ): array {
+        $selection = $selection ?: [];
+        if ( $variant === 'custom' ) {
+            return self::clamp_custom_crop(
+                $image,
+                (float) ( $selection['custom_crop_scale'] ?? self::max_crop_scale( (int) $image['orig_w'], (int) $image['orig_h'] ) ),
+                (int) ( $selection['custom_crop_x'] ?? 0 ),
+                (int) ( $selection['custom_crop_y'] ?? 0 )
+            );
+        }
+        return self::preset_crop_box( $image, $variant ?: 'center' );
+    }
+
     public static function upsert_image( array $data ): int {
         global $wpdb;
 
@@ -230,6 +243,10 @@ final class RinCWC_Data {
         ) ?: [];
     }
 
+    public static function get_visible_images(): array {
+        return self::get_review_images( false );
+    }
+
     public static function get_candidate_rows_for_admin(): array {
         return self::get_review_images( true );
     }
@@ -261,6 +278,23 @@ final class RinCWC_Data {
             $out[ $row['status'] ] = (int) $row['cnt'];
         }
         return $out;
+    }
+
+    public static function counts(): array {
+        $statuses = self::count_by_status();
+        $rows     = self::get_review_images( false );
+        $pending  = 0;
+        foreach ( $rows as $row ) {
+            if ( $row['status'] === self::STATUS_APPROVED && empty( $row['wm_applied'] ) ) {
+                $pending++;
+            }
+        }
+        return [
+            'candidates' => count( $rows ),
+            'selected'   => $statuses[ self::STATUS_SELECTED ] + $statuses[ self::STATUS_APPROVED ],
+            'approved'   => $statuses[ self::STATUS_APPROVED ],
+            'wm_pending' => $pending,
+        ];
     }
 
     public static function upsert_selection( int $image_id, array $data ): bool {
