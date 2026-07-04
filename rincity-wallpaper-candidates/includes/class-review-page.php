@@ -25,25 +25,13 @@ final class RinCWC_Review_Page {
         if ( $hook !== self::$hook ) {
             return;
         }
-        wp_enqueue_style(
-            'rincwc-review',
-            RINCWC_PLUGIN_URL . 'assets/review.css',
-            [],
-            RINCWC_VERSION
-        );
-        wp_enqueue_script(
-            'rincwc-review',
-            RINCWC_PLUGIN_URL . 'assets/review.js',
-            [ 'wp-api-fetch' ],
-            RINCWC_VERSION,
-            true
-        );
+        wp_enqueue_style( 'rincwc-review', RINCWC_PLUGIN_URL . 'assets/review.css', [], RINCWC_VERSION );
+        wp_enqueue_script( 'rincwc-review', RINCWC_PLUGIN_URL . 'assets/review.js', [ 'wp-api-fetch' ], RINCWC_VERSION, true );
         wp_add_inline_script( 'rincwc-review', 'var rincwcCfg=' . wp_json_encode( [
             'restBase'   => rest_url( 'rincity/v1/wpc/' ),
             'nonce'      => wp_create_nonce( 'wp_rest' ),
             'userId'     => get_current_user_id(),
-            'canApprove'     => RinCWC_Data::approve_allowed(),
-            'approveAllowed' => RinCWC_Data::approve_allowed(),
+            'canApprove' => RinCWC_Data::can_current_user_approve(),
         ] ) . ';', 'before' );
     }
 
@@ -52,89 +40,101 @@ final class RinCWC_Review_Page {
             wp_die( 'No access.' );
         }
 
-        $rows   = RinCWC_Data::get_review_images( false );
-        $counts = RinCWC_Data::count_by_status();
+        $rows  = RinCWC_Data::get_review_images();
+        $stats = self::stats( $rows );
 
         echo '<div class="wrap rincwc-review">';
         echo '<h1>Wallpaper Review</h1>';
 
         if ( empty( $rows ) ) {
-            echo '<p>No candidates found. Scan Envira galleries from the Wallpaper admin page.</p></div>';
+            echo '<p>No candidates found. Scan an Envira gallery from the Wallpaper page.</p></div>';
             return;
         }
 
-        $wm_pending = 0;
-        foreach ( $rows as $row ) {
-            if ( $row['status'] === RinCWC_Data::STATUS_APPROVED && empty( $row['wm_applied'] ) ) {
-                $wm_pending++;
-            }
-        }
-
-        echo '<p class="rincwc-summary"><strong>' . esc_html( count( $rows ) ) . '</strong> candidates · ';
-        echo '<strong>' . esc_html( $counts[ RinCWC_Data::STATUS_SELECTED ] + $counts[ RinCWC_Data::STATUS_APPROVED ] ) . '</strong> selected · ';
-        echo '<strong>' . esc_html( $counts[ RinCWC_Data::STATUS_APPROVED ] ) . '</strong> approved · ';
-        echo '<strong>' . esc_html( $wm_pending ) . '</strong> approved with watermark pending</p>';
+        echo '<p class="rincwc-summary"><strong>' . esc_html( (string) $stats['candidates'] ) . '</strong> candidates &middot; ';
+        echo '<strong>' . esc_html( (string) $stats['selected'] ) . '</strong> selected &middot; ';
+        echo '<strong>' . esc_html( (string) $stats['approved'] ) . '</strong> approved &middot; ';
+        echo '<strong>' . esc_html( (string) $stats['wm_pending'] ) . '</strong> watermarks pending</p>';
 
         echo '<div class="rincwc-toolbar">';
         echo '<button class="button" id="rincwc-filter-sel">Selections only</button> ';
         echo '<button class="button" id="rincwc-generate-crops">Generate pending crops</button> ';
-        echo '<button class="button button-primary" id="rincwc-apply-wm">Apply pending watermarks</button> ';
-        echo '<button class="button" id="rincwc-sync-galleries">Publish to galleries</button>';
+        echo '<button class="button" id="rincwc-apply-wm">Apply pending watermarks</button> ';
+        echo '<button class="button button-primary" id="rincwc-sync-galleries">Publish to galleries</button>';
         echo '<span id="rincwc-batch-msg"></span>';
         echo '<span class="rincwc-expanders">';
-        echo '<a href="#" id="rincwc-expand-all">Expand all</a> · <a href="#" id="rincwc-collapse-all">Collapse all</a>';
+        echo '<a href="#" id="rincwc-expand-all">Expand all</a> &middot; <a href="#" id="rincwc-collapse-all">Collapse all</a>';
         echo '</span>';
         echo '</div>';
 
-        foreach ( self::group_rows_by_gallery( $rows ) as $gid => $gallery_rows ) {
+        foreach ( self::group_rows( $rows ) as $gid => $gallery_rows ) {
             self::render_gallery( (int) $gid, $gallery_rows );
         }
 
         echo '</div>';
     }
 
-    private static function group_rows_by_gallery( array $rows ): array {
-        $pub_dates = [];
-        $grouped   = [];
+    private static function group_rows( array $rows ): array {
+        $by_gallery = [];
         foreach ( $rows as $row ) {
-            $gid = (int) $row['gallery_id'];
-            if ( ! isset( $pub_dates[ $gid ] ) ) {
-                $post              = get_post( $gid );
-                $pub_dates[ $gid ] = $post ? $post->post_date : '0000-00-00 00:00:00';
-            }
-            $grouped[ $gid ][] = $row;
+            $by_gallery[ (int) $row['gallery_id'] ][] = $row;
         }
 
-        uksort( $grouped, static function ( $a, $b ) use ( $pub_dates ) {
-            return strcmp( $pub_dates[ $b ] ?? '', $pub_dates[ $a ] ?? '' );
+        uksort( $by_gallery, function ( $a, $b ) {
+            $pa = get_post( (int) $a );
+            $pb = get_post( (int) $b );
+            return strcmp( $pb ? $pb->post_date : '', $pa ? $pa->post_date : '' );
         } );
 
-        return $grouped;
+        foreach ( $by_gallery as &$gallery_rows ) {
+            usort( $gallery_rows, fn( $a, $b ) => (int) $a['position'] <=> (int) $b['position'] );
+        }
+        unset( $gallery_rows );
+
+        return $by_gallery;
     }
 
-    private static function render_gallery( int $gid, array $imgs ): void {
-        usort( $imgs, static fn( $a, $b ) => (int) $a['position'] <=> (int) $b['position'] );
+    private static function stats( array $rows ): array {
+        $stats = [ 'candidates' => count( $rows ), 'selected' => 0, 'approved' => 0, 'wm_pending' => 0 ];
+        foreach ( $rows as $row ) {
+            if ( $row['status'] === RinCWC_Data::STATUS_SELECTED || $row['status'] === RinCWC_Data::STATUS_APPROVED ) {
+                $stats['selected']++;
+            }
+            if ( $row['status'] === RinCWC_Data::STATUS_APPROVED ) {
+                $stats['approved']++;
+            }
+            if ( ! empty( $row['crop_variant'] ) && ! empty( $row['wm_corner'] ) && ! (int) $row['wm_applied'] ) {
+                $stats['wm_pending']++;
+            }
+        }
+        return $stats;
+    }
 
+    private static function render_gallery( int $gid, array $rows ): void {
         $post      = get_post( $gid );
-        $title     = $post ? $post->post_title : ( $imgs[0]['gallery_title'] ?? "Gallery {$gid}" );
-        $pub_date  = $post ? date( 'Y-m-d', strtotime( $post->post_date ) ) : '';
-        $date_str  = $pub_date ? " ({$pub_date})" : '';
-        $gal_slug  = $imgs[0]['gallery_slug'] ?? '';
+        $title     = $post ? $post->post_title : "Gallery {$gid}";
+        $date_str  = $post ? ' (' . date( 'Y-m-d', strtotime( $post->post_date ) ) . ')' : '';
+        $gal_slug  = $rows[0]['gallery_slug'] ?? '';
         $permalink = get_option( 'siteurl' ) . "/envira/{$gal_slug}/";
 
-        $selected = array_values( array_filter( $imgs, static fn( $r ) => ! empty( $r['crop_variant'] ) ) );
-        $others   = array_values( array_filter( $imgs, static fn( $r ) => empty( $r['crop_variant'] ) ) );
-        $best_w   = max( array_map( static fn( $r ) => (int) $r['orig_w'], $imgs ) );
-        $summary  = count( $selected )
-            ? count( $selected ) . ' selection' . ( count( $selected ) !== 1 ? 's' : '' ) . ', ' . count( $others ) . " other · best {$best_w}px"
-            : count( $imgs ) . " candidates · best {$best_w}px";
+        $selected = [];
+        $others   = [];
+        foreach ( $rows as $row ) {
+            if ( $row['status'] === RinCWC_Data::STATUS_SELECTED || $row['status'] === RinCWC_Data::STATUS_APPROVED ) {
+                $selected[] = $row;
+            } else {
+                $others[] = $row;
+            }
+        }
+
+        $best_w  = max( array_map( fn( $r ) => (int) $r['orig_w'], $rows ) );
+        $summary = count( $selected )
+            ? count( $selected ) . ' selection' . ( count( $selected ) !== 1 ? 's' : '' ) . ', ' . count( $others ) . " other; best {$best_w}px"
+            : count( $rows ) . " candidates; best {$best_w}px";
 
         echo '<div class="rincwc-gallery">';
-        echo '<div class="rincwc-gal-head">';
-        echo '<h3><a href="' . esc_url( $permalink ) . '" target="_blank">' . esc_html( $title . $date_str ) . '</a></h3>';
-        echo '</div>';
-        echo '<details class="rincwc-details" open>';
-        echo '<summary>' . esc_html( $summary ) . '</summary>';
+        echo '<div class="rincwc-gal-head"><h3><a href="' . esc_url( $permalink ) . '" target="_blank">' . esc_html( $title . $date_str ) . '</a></h3></div>';
+        echo '<details class="rincwc-details" open><summary>' . esc_html( $summary ) . '</summary>';
 
         if ( $selected ) {
             echo '<div class="rincwc-section">Selection</div><div class="rincwc-grid">';
@@ -148,7 +148,7 @@ final class RinCWC_Review_Page {
             echo '</div>';
         } else {
             echo '<div class="rincwc-grid">';
-            foreach ( $imgs as $row ) {
+            foreach ( $rows as $row ) {
                 self::render_candidate( $row );
             }
             echo '</div>';
@@ -168,45 +168,22 @@ final class RinCWC_Review_Page {
         $src_url   = (string) ( $r['src_url'] ?? '' );
         $image_key = "{$gid}:{$aid}";
 
-        $sel_crop    = (string) ( $r['crop_variant'] ?? '' );
-        $wm_corner   = (string) ( $r['wm_corner'] ?? '' );
-        $wm_applied  = ! empty( $r['wm_applied'] );
-        $status      = (string) ( $r['status'] ?? RinCWC_Data::STATUS_CANDIDATE );
-        $is_sel      = $sel_crop !== '';
+        $sel_crop   = (string) ( $r['crop_variant'] ?? '' );
+        $wm_corner  = (string) ( $r['wm_corner'] ?? '' );
+        $wm_applied = (int) ( $r['wm_applied'] ?? 0 ) === 1;
+        $status     = (string) $r['status'];
+        $is_sel     = $status === RinCWC_Data::STATUS_SELECTED || $status === RinCWC_Data::STATUS_APPROVED;
         $is_approved = $status === RinCWC_Data::STATUS_APPROVED;
-        $can_approve = RinCWC_Data::approve_allowed();
+        $max_scale  = RinCWC_Data::max_crop_scale( $orig_w, $orig_h );
 
-        $max_scale = RinCWC_Data::max_crop_scale( $orig_w, $orig_h );
-        $custom_x  = (int) ( $r['custom_crop_x'] ?? 0 );
-        $custom_y  = (int) ( $r['custom_crop_y'] ?? 0 );
-        $custom_s  = (float) ( $r['custom_crop_scale'] ?? $max_scale );
-
-        $crop_range = 0;
-        $crop_axis  = 'x';
-        if ( $orig_w && $orig_h ) {
-            if ( $orig_w / $orig_h >= 3840 / 2160 ) {
-                $crop_range = max( 0, $orig_w - (int) round( $max_scale * 3840 ) );
-                $crop_axis  = 'x';
-            } else {
-                $crop_range = max( 0, $orig_h - (int) round( $max_scale * 2160 ) );
-                $crop_axis  = 'y';
-            }
-        }
-
-        $variants = [
-            'top'           => 0,
-            'center-top'    => (int) round( $crop_range * 0.25 ),
-            'center'        => (int) round( $crop_range * 0.50 ),
-            'center-bottom' => (int) round( $crop_range * 0.75 ),
-            'bottom'        => $crop_range,
-        ];
-
+        $variants = [ 'top', 'center-top', 'center', 'center-bottom', 'bottom' ];
         $scaled_url = wp_get_attachment_image_url( $aid, 'large' ) ?: $src_url;
-        $thumb      = $src_url;
+
+        $thumb = $src_url;
         if ( $is_sel && $wm_applied ) {
             $wm_f = RINCWC_CROPS_DIR . "{$slug}_{$pos}_{$sel_crop}_1080p_wm.jpg";
             if ( file_exists( $wm_f ) ) {
-                $thumb = content_url( "uploads/" . RINCWC_CROPS_SUBDIR . "/{$slug}_{$pos}_{$sel_crop}_1080p_wm.jpg" );
+                $thumb = content_url( "uploads/wallpaper-crops/{$slug}_{$pos}_{$sel_crop}_1080p_wm.jpg" );
             }
         }
 
@@ -220,45 +197,50 @@ final class RinCWC_Review_Page {
             'total'       => $r['total'] ?? '',
             'origW'       => $orig_w,
             'origH'       => $orig_h,
-            'minScale'    => 1.0,
             'maxScale'    => $max_scale,
-            'customScale' => $custom_s,
-            'customX'     => $custom_x,
-            'customY'     => $custom_y,
-            'cropRange'   => $crop_range,
-            'cropAxis'    => $crop_axis,
             'imageKey'    => $image_key,
             'scaledUrl'   => $scaled_url,
             'selCrop'     => $sel_crop,
             'wmCorner'    => $wm_corner,
             'wmApplied'   => $wm_applied,
             'status'      => $status,
+            'customScale' => $r['custom_crop_scale'] ? (float) $r['custom_crop_scale'] : $max_scale,
+            'customX'     => (int) ( $r['custom_crop_x'] ?? 0 ),
+            'customY'     => (int) ( $r['custom_crop_y'] ?? 0 ),
             'gSlug'       => $r['gallery_slug'] ?? '',
             'gTitle'      => $r['gallery_title'] ?? '',
         ] ) );
 
-        $card_cls = 'rincwc-card status-' . strtolower( $status ) . ( $is_sel ? ' is-selected' : '' );
+        $card_cls = 'rincwc-card status-' . strtolower( $status ) . ( $is_sel ? ' is-selected' : '' ) . ( $is_approved ? ' is-approved' : '' );
         echo '<div class="' . esc_attr( $card_cls ) . '" data-c="' . $card_data . '" data-key="' . esc_attr( $image_key ) . '">';
 
         echo '<div class="rincwc-thumb-wrap">';
         echo '<img class="rincwc-thumb" src="' . esc_url( $thumb ) . '" alt="' . esc_attr( $fname ) . '" loading="lazy">';
         if ( $is_sel ) {
-            $badge = $is_approved ? 'Approved' : ( $wm_applied ? 'WM ready' : 'Selected' );
-            $cls   = $is_approved ? 'badge-approved' : ( $wm_applied ? 'badge-wm' : 'badge-sel' );
+            if ( $is_approved && ! $wm_applied ) {
+                $badge = 'Approved; WM pending';
+                $cls   = 'badge-pending';
+            } elseif ( $is_approved ) {
+                $badge = 'Approved';
+                $cls   = 'badge-approved';
+            } else {
+                $badge = $wm_applied ? 'WM applied' : 'Selected';
+                $cls   = $wm_applied ? 'badge-wm' : 'badge-sel';
+            }
             echo '<span class="rincwc-badge ' . esc_attr( $cls ) . '">' . esc_html( $badge ) . '</span>';
         }
         echo '</div>';
 
         echo '<div class="rincwc-info">';
         echo '<div class="rincwc-fname">' . esc_html( $fname ) . '</div>';
-        echo '<div class="rincwc-dims">' . esc_html( "{$orig_w}x{$orig_h} · img {$pos}/{$r['total']}" ) . '</div>';
+        echo '<div class="rincwc-dims">' . esc_html( "{$orig_w}x{$orig_h}; img {$pos}/{$r['total']}" ) . '</div>';
         echo '</div>';
 
         echo '<div class="rincwc-variants">';
-        foreach ( $variants as $vname => $voff ) {
+        foreach ( $variants as $vname ) {
             $active = $sel_crop === $vname ? ' active' : '';
-            $links  = self::crop_links_for( $slug, $aid, $vname );
-            echo '<span class="rincwc-vbtn' . esc_attr( $active ) . '" data-v="' . esc_attr( $vname ) . '" data-off="' . esc_attr( $voff ) . '" data-4k="' . esc_url( $links['4k'] ) . '" data-1440p="' . esc_url( $links['1440p'] ) . '" data-1080p="' . esc_url( $links['1080p'] ) . '">' . esc_html( self::variant_label( $vname ) ) . '</span>';
+            $links  = self::crop_links_for( $slug, (string) $aid, $vname );
+            echo '<span class="rincwc-vbtn' . esc_attr( $active ) . '" data-v="' . esc_attr( $vname ) . '" data-4k="' . esc_url( $links['4k'] ) . '" data-1440p="' . esc_url( $links['1440p'] ) . '" data-1080p="' . esc_url( $links['1080p'] ) . '">' . esc_html( self::variant_label( $vname ) ) . '</span>';
         }
         echo '<span class="rincwc-vbtn rincwc-custbtn' . esc_attr( $sel_crop === 'custom' ? ' active' : '' ) . '" data-v="custom">Custom...</span>';
         if ( $is_sel ) {
@@ -278,39 +260,40 @@ final class RinCWC_Review_Page {
         echo '<span class="rincwc-wm-status ' . esc_attr( $wm_cls ) . '">' . esc_html( $wm_txt ) . '</span>';
         echo '</div>';
 
-        echo '<div class="rincwc-approval-row">';
-        $approve_disabled = ( ! $can_approve || ! $is_sel || ! $wm_corner ) ? ' disabled' : '';
-        echo '<button class="button rincwc-approve-btn" data-approved="' . ( $is_approved ? '1' : '0' ) . '"' . ( $is_approved ? ( $can_approve ? '' : ' disabled' ) : $approve_disabled ) . '>';
-        echo esc_html( $is_approved ? 'Unapprove' : 'Approve' );
-        echo '</button>';
-        if ( $is_approved && ! $wm_applied ) {
-            echo '<span class="rincwc-approved-pending">approved, watermark pending</span>';
+        echo '<div class="rincwc-approve-row' . ( $is_sel ? '' : ' hidden' ) . '">';
+        $disabled = RinCWC_Data::can_current_user_approve() && $is_sel ? '' : ' disabled';
+        $label    = $is_approved ? 'Unapprove' : 'Approve';
+        echo '<button class="button rincwc-approve-btn" data-approved="' . esc_attr( $is_approved ? '1' : '0' ) . '"' . $disabled . '>' . esc_html( $label ) . '</button>';
+        if ( ! RinCWC_Data::can_current_user_approve() ) {
+            echo '<span class="rincwc-approve-note">Approval restricted</span>';
         }
         echo '</div>';
 
         if ( $is_sel ) {
-            echo '<div class="rincwc-crop-dl">';
-            foreach ( [ '' => '4K', '_1440p' => '1440p', '_1080p' => '1080p' ] as $sfx => $res_lbl ) {
-                $wm_f  = RINCWC_CROPS_DIR . "{$slug}_{$pos}_{$sel_crop}{$sfx}_wm.jpg";
-                $raw_f = RINCWC_CROPS_DIR . "{$slug}_{$aid}_{$sel_crop}{$sfx}.jpg";
-                if ( file_exists( $wm_f ) ) {
-                    echo '<a href="' . esc_url( content_url( "uploads/" . RINCWC_CROPS_SUBDIR . "/{$slug}_{$pos}_{$sel_crop}{$sfx}_wm.jpg" ) ) . '">' . esc_html( $res_lbl ) . ' WM</a> ';
-                } elseif ( file_exists( $raw_f ) ) {
-                    echo '<a href="' . esc_url( content_url( "uploads/" . RINCWC_CROPS_SUBDIR . "/{$slug}_{$aid}_{$sel_crop}{$sfx}.jpg" ) ) . '">' . esc_html( $res_lbl ) . '</a> ';
-                }
-            }
-            echo '</div>';
+            self::render_crop_links( $slug, $aid, $pos, $sel_crop );
         }
 
         echo '<div class="rincwc-comments" data-key="' . esc_attr( $image_key ) . '">';
-        foreach ( RinCWC_DB::get_comments( $image_key ) as $comment ) {
-            self::render_comment( $comment );
+        foreach ( RinCWC_DB::get_comments( $image_key ) as $c ) {
+            self::render_comment( $c );
         }
         echo '<div class="rincwc-add-comment">';
         echo '<textarea class="rincwc-comment-ta" placeholder="Add a comment..." rows="2"></textarea>';
         echo '<button class="button rincwc-post-btn">Post</button>';
-        echo '</div></div>';
+        echo '</div></div></div>';
+    }
 
+    private static function render_crop_links( string $slug, int $aid, int $pos, string $sel_crop ): void {
+        echo '<div class="rincwc-crop-dl">';
+        foreach ( [ '' => '4K', '_1440p' => '1440p', '_1080p' => '1080p' ] as $sfx => $res_lbl ) {
+            $wm_f  = RINCWC_CROPS_DIR . "{$slug}_{$pos}_{$sel_crop}{$sfx}_wm.jpg";
+            $raw_f = RINCWC_CROPS_DIR . "{$slug}_{$aid}_{$sel_crop}{$sfx}.jpg";
+            if ( file_exists( $wm_f ) ) {
+                echo '<a href="' . esc_url( content_url( "uploads/wallpaper-crops/{$slug}_{$pos}_{$sel_crop}{$sfx}_wm.jpg" ) ) . '">' . esc_html( $res_lbl ) . ' WM</a> ';
+            } elseif ( file_exists( $raw_f ) ) {
+                echo '<a href="' . esc_url( content_url( "uploads/wallpaper-crops/{$slug}_{$aid}_{$sel_crop}{$sfx}.jpg" ) ) . '">' . esc_html( $res_lbl ) . '</a> ';
+            }
+        }
         echo '</div>';
     }
 
@@ -319,7 +302,7 @@ final class RinCWC_Review_Page {
         $name    = $c['display_name'] ?: $c['user_login'];
         $date    = date( 'M j, Y H:i', strtotime( $c['created_at'] ) );
         echo '<div class="rincwc-comment" data-cid="' . esc_attr( $c['id'] ) . '">';
-        echo '<div class="rincwc-comment-meta"><strong>' . esc_html( $name ) . '</strong> · ' . esc_html( $date );
+        echo '<div class="rincwc-comment-meta"><strong>' . esc_html( $name ) . '</strong> &middot; ' . esc_html( $date );
         if ( $is_mine ) {
             echo ' <button class="rincwc-edit-btn button-link">Edit</button>';
             echo ' <button class="rincwc-del-btn button-link">Delete</button>';
@@ -339,12 +322,12 @@ final class RinCWC_Review_Page {
         return ucwords( str_replace( '-', ' ', $v ) );
     }
 
-    private static function crop_links_for( string $slug, int $aid, string $vname ): array {
+    private static function crop_links_for( string $slug, string $aid, string $vname ): array {
         $links = [ '4k' => '', '1440p' => '', '1080p' => '' ];
         foreach ( [ '4k' => '', '1440p' => '_1440p', '1080p' => '_1080p' ] as $res => $sfx ) {
             $f = RINCWC_CROPS_DIR . "{$slug}_{$aid}_{$vname}{$sfx}.jpg";
             if ( file_exists( $f ) ) {
-                $links[ $res ] = content_url( 'uploads/' . RINCWC_CROPS_SUBDIR . "/{$slug}_{$aid}_{$vname}{$sfx}.jpg" );
+                $links[ $res ] = content_url( "uploads/wallpaper-crops/{$slug}_{$aid}_{$vname}{$sfx}.jpg" );
             }
         }
         return $links;
