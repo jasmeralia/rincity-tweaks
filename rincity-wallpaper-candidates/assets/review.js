@@ -338,9 +338,11 @@
             card.dataset.c = JSON.stringify( cfg );
             const st = card.querySelector( '.rincwc-wm-status' );
             if ( st ) {
-                st.textContent = corner ? '⏳ pending' : '';
+                st.textContent = corner ? 'pending' : '';
                 st.className   = 'rincwc-wm-status' + ( corner ? ' wm-pending' : '' );
             }
+            const approve = card.querySelector( '.rincwc-approve-btn' );
+            if ( approve ) approve.disabled = ! ( rincwcCfg.approveAllowed || rincwcCfg.canApprove ) || ! corner;
         } ).catch( e => console.error( 'watermark failed', e ) );
     }
 
@@ -360,7 +362,7 @@
             cfg.status = nowApproved ? 'APPROVED' : 'SELECTED';
             card.dataset.c = JSON.stringify( cfg );
             updateBadge( card, nowApproved ? 'approved' : false );
-            btn.disabled = ! rincwcCfg.approveAllowed;
+            btn.disabled = ! ( rincwcCfg.approveAllowed || rincwcCfg.canApprove );
         } ).catch( e => { console.error( 'approve toggle failed', e ); btn.disabled = false; } );
     }
 
