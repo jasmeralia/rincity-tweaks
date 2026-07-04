@@ -59,6 +59,7 @@ final class RinCWC_Review_Page {
 
         echo '<div class="rincwc-toolbar">';
         echo '<button class="button" id="rincwc-filter-sel">Selections only</button> ';
+        echo '<button class="button" id="rincwc-filter-unreviewed">Not yet reviewed</button> ';
         echo '<button class="button" id="rincwc-generate-crops">Generate pending crops</button> ';
         echo '<button class="button button-primary" id="rincwc-apply-wm">Apply pending watermarks</button> ';
         echo '<button class="button button-secondary" id="rincwc-sync-galleries">Publish to galleries</button>';
@@ -100,14 +101,19 @@ final class RinCWC_Review_Page {
         $slug      = $imgs[0]['gallery_slug'] ?? '';
         $permalink = get_option( 'siteurl' ) . "/envira/{$slug}/";
 
-        $selected = array_values( array_filter( $imgs, fn( $row ) => in_array( $row['status'], [ 'SELECTED', 'APPROVED' ], true ) ) );
-        $others   = array_values( array_filter( $imgs, fn( $row ) => ! in_array( $row['status'], [ 'SELECTED', 'APPROVED' ], true ) ) );
-        $best_w   = max( array_map( fn( $row ) => (int) $row['orig_w'], $imgs ) );
-        $summary  = count( $selected )
+        $selected    = array_values( array_filter( $imgs, fn( $row ) => in_array( $row['status'], [ 'SELECTED', 'APPROVED' ], true ) ) );
+        $others      = array_values( array_filter( $imgs, fn( $row ) => ! in_array( $row['status'], [ 'SELECTED', 'APPROVED' ], true ) ) );
+        $best_w      = max( array_map( fn( $row ) => (int) $row['orig_w'], $imgs ) );
+        $has_sel     = count( $selected ) > 0;
+        $has_cutoff  = RinCWC_Data::get_cutoff( $gid ) > 0;
+        $summary     = $has_sel
             ? count( $selected ) . ' selected, ' . count( $others ) . ' other · best ' . $best_w . 'px'
             : count( $imgs ) . ' candidates · best ' . $best_w . 'px';
 
-        echo '<div class="rincwc-gallery" id="rincwc-gallery-' . esc_attr( (string) $gid ) . '">';
+        $gal_attrs = ' id="rincwc-gallery-' . esc_attr( (string) $gid ) . '"'
+            . ( $has_sel ? ' data-has-selection="1"' : '' )
+            . ( $has_cutoff ? ' data-has-cutoff="1"' : '' );
+        echo '<div class="rincwc-gallery"' . $gal_attrs . '>';
         echo '<div class="rincwc-gal-head">';
         echo '<h3><a href="' . esc_url( $permalink ) . '" target="_blank">' . esc_html( $title . ( $pub_date ? " ({$pub_date})" : '' ) ) . '</a></h3>';
         echo '<button class="button button-small rincwc-exclude-all-btn" data-gid="' . esc_attr( (string) $gid ) . '">Exclude all</button>';

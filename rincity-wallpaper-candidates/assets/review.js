@@ -623,40 +623,81 @@
         } );
     }
 
-    function applyFilter( active ) {
-        document.querySelectorAll( '.rincwc-card' ).forEach( card => {
-            card.style.display = ( active && ! card.classList.contains( 'is-selected' ) ) ? 'none' : '';
-        } );
+    let activeFilter = '';
+
+    function applyFilters() {
         document.querySelectorAll( '.rincwc-gallery' ).forEach( gal => {
-            const hasSel = !! gal.querySelector( '.rincwc-card.is-selected' );
-            gal.style.display = ( active && ! hasSel ) ? 'none' : '';
+            let show = true;
+            if ( activeFilter === 'selected' ) {
+                show = !! gal.querySelector( '.rincwc-card.is-selected' );
+            } else if ( activeFilter === 'unreviewed' ) {
+                show = ! gal.dataset.hasSelection && ! gal.dataset.hasCutoff;
+            }
+            gal.style.display = show ? '' : 'none';
+            if ( show && activeFilter === 'selected' ) {
+                gal.querySelectorAll( '.rincwc-card' ).forEach( card => {
+                    card.style.display = card.classList.contains( 'is-selected' ) ? '' : 'none';
+                } );
+            } else {
+                gal.querySelectorAll( '.rincwc-card' ).forEach( card => {
+                    card.style.display = '';
+                } );
+            }
         } );
     }
 
-    function filterUrl( active ) {
+    function filterUrl( filter ) {
         const u = new URL( window.location.href );
-        if ( active ) { u.searchParams.set( 'filter', 'selected' ); }
+        if ( filter ) { u.searchParams.set( 'filter', filter ); }
         else { u.searchParams.delete( 'filter' ); }
         return u.toString();
     }
 
+    function setFilter( filter ) {
+        activeFilter = filter;
+        applyFilters();
+        history.replaceState( null, '', filterUrl( filter ) );
+    }
+
     function initFilter() {
-        const btn = document.getElementById( 'rincwc-filter-sel' );
-        if ( ! btn ) return;
-        if ( rincwcCfg.initFilter === 'selected' ) {
-            btn.classList.add( 'is-active' );
-            applyFilter( true );
+        const btnSel = document.getElementById( 'rincwc-filter-sel' );
+        const btnUnrev = document.getElementById( 'rincwc-filter-unreviewed' );
+
+        function updateBtnStates() {
+            if ( btnSel ) btnSel.classList.toggle( 'is-active', activeFilter === 'selected' );
+            if ( btnUnrev ) btnUnrev.classList.toggle( 'is-active', activeFilter === 'unreviewed' );
         }
-        btn.addEventListener( 'click', () => {
-            const active = btn.classList.toggle( 'is-active' );
-            applyFilter( active );
-            history.replaceState( null, '', filterUrl( active ) );
+
+        if ( rincwcCfg.initFilter ) {
+            activeFilter = rincwcCfg.initFilter;
+            applyFilters();
+            updateBtnStates();
+        }
+
+        if ( btnSel ) btnSel.addEventListener( 'click', () => {
+            setFilter( activeFilter === 'selected' ? '' : 'selected' );
+            updateBtnStates();
         } );
+        if ( btnUnrev ) btnUnrev.addEventListener( 'click', () => {
+            setFilter( activeFilter === 'unreviewed' ? '' : 'unreviewed' );
+            updateBtnStates();
+        } );
+
+        // Collapse all other galleries when navigating to an anchor.
+        const hash = window.location.hash;
+        if ( hash && hash.startsWith( '#rincwc-gallery-' ) ) {
+            document.querySelectorAll( '.rincwc-gallery' ).forEach( gal => {
+                const details = gal.querySelector( '.rincwc-details' );
+                if ( ! details ) return;
+                details.open = ( '#' + gal.id === hash );
+            } );
+            const target = document.querySelector( hash );
+            if ( target ) { setTimeout( () => target.scrollIntoView( { behavior: 'smooth', block: 'start' } ), 50 ); }
+        }
     }
 
     function reloadWithFilter() {
-        const active = document.getElementById( 'rincwc-filter-sel' )?.classList.contains( 'is-active' );
-        window.location.href = filterUrl( !! active );
+        window.location.href = filterUrl( activeFilter );
     }
 
     function initCutoffButtons() {
