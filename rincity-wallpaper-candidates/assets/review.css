@@ -83,6 +83,7 @@
 }
 .badge-sel { background: #2271b1; color: #fff; }
 .badge-wm  { background: #00a32a; color: #fff; }
+.badge-approved { background: #8a5a00; color: #fff; }
 
 /* Info */
 .rincwc-info { margin-bottom: 6px; }
@@ -135,6 +136,16 @@
 .rincwc-wm-status { font-size: 12px; }
 .wm-pending { color: #996800; }
 .wm-done    { color: #00a32a; }
+
+.rincwc-approval-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+.rincwc-approval-row.hidden { display: none; }
+.rincwc-approved-pending { color: #996800; font-size: 12px; }
+.rincwc-card.is-approved { border-color: #8a5a00; background: #fff8e5; }
 
 /* ── Lightbox ─────────────────────────────────────────────────────────────── */
 
@@ -252,9 +263,19 @@
     gap: 8px;
     flex: 1;
     min-width: 180px;
+    min-height: 44px;
 }
-.rincwc-cov-range-wrap input[type=range] { flex: 1; }
-.rincwc-cov-offval { min-width: 36px; font-variant-numeric: tabular-nums; }
+.rincwc-cov-range-wrap input[type=range] {
+    flex: 1;
+    min-height: 32px;
+    height: 32px;
+}
+.rincwc-cov-scaleval,
+.rincwc-cov-xval,
+.rincwc-cov-yval {
+    min-width: 44px;
+    font-variant-numeric: tabular-nums;
+}
 
 /* ── Comments ─────────────────────────────────────────────────────────────── */
 
