@@ -148,11 +148,29 @@ final class RinCWC_Rest {
     }
 
     public static function crop_custom( WP_REST_Request $req ): WP_REST_Response {
-        $gid   = (int) ( $req->get_param( 'gallery_id' ) ?? 0 );
-        $aid   = (int) ( $req->get_param( 'attach_id' ) ?? 0 );
-        $scale = (float) ( $req->get_param( 'scale' ) ?? $req->get_param( 'crop_scale' ) ?? 1.0 );
-        $x     = (int) ( $req->get_param( 'x' ) ?? $req->get_param( 'crop_x' ) ?? 0 );
-        $y     = (int) ( $req->get_param( 'y' ) ?? $req->get_param( 'crop_y' ) ?? 0 );
+        $required = [
+            'gallery_id',
+            'attach_id',
+            'crop_scale',
+            'crop_x',
+            'crop_y',
+            'position',
+            'total',
+            'filename',
+            'gallery_slug',
+            'gallery_title',
+        ];
+        foreach ( $required as $field ) {
+            if ( $req->get_param( $field ) === null ) {
+                return new WP_REST_Response( [ 'error' => "Missing {$field}" ], 400 );
+            }
+        }
+
+        $gid   = (int) $req->get_param( 'gallery_id' );
+        $aid   = (int) $req->get_param( 'attach_id' );
+        $scale = (float) $req->get_param( 'crop_scale' );
+        $x     = (int) $req->get_param( 'crop_x' );
+        $y     = (int) $req->get_param( 'crop_y' );
 
         if ( ! $gid || ! $aid ) {
             return new WP_REST_Response( [ 'error' => 'Missing fields' ], 400 );
