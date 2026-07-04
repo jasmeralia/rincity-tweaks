@@ -114,6 +114,11 @@ final class RinCWC_Rest {
         if ( ! RinCWC_Data::approve_allowed() ) {
             return new WP_REST_Response( [ 'error' => 'Not allowed' ], 403 );
         }
+        $image = self::image_from_request( $req );
+        if ( $image ) {
+            $ok = RinCWC_Data::approve( (int) $image['gallery_id'], (int) $image['attach_id'] );
+            return new WP_REST_Response( [ 'ok' => $ok, 'status' => $ok ? RinCWC_Data::STATUS_APPROVED : null ], $ok ? 200 : 400 );
+        }
         $gid = (int) ( $req->get_param( 'gallery_id' ) ?? 0 );
         $aid = (int) ( $req->get_param( 'attach_id' ) ?? 0 );
         if ( ! $gid || ! $aid ) {
@@ -126,6 +131,11 @@ final class RinCWC_Rest {
     public static function unapprove( WP_REST_Request $req ): WP_REST_Response {
         if ( ! RinCWC_Data::approve_allowed() ) {
             return new WP_REST_Response( [ 'error' => 'Not allowed' ], 403 );
+        }
+        $image = self::image_from_request( $req );
+        if ( $image ) {
+            $ok = RinCWC_Data::unapprove( (int) $image['gallery_id'], (int) $image['attach_id'] );
+            return new WP_REST_Response( [ 'ok' => $ok, 'status' => $ok ? RinCWC_Data::STATUS_SELECTED : null ], $ok ? 200 : 400 );
         }
         $gid = (int) ( $req->get_param( 'gallery_id' ) ?? 0 );
         $aid = (int) ( $req->get_param( 'attach_id' ) ?? 0 );
@@ -372,5 +382,13 @@ final class RinCWC_Rest {
 
     private static function watermarked_crop_path( array $row, string $suffix ): string {
         return RINCWC_CROPS_DIR . "{$row['gallery_slug']}_{$row['position']}_{$row['crop_variant']}{$suffix}_wm.jpg";
+    }
+
+    private static function image_from_request( WP_REST_Request $req ): ?array {
+        $image_id = (int) ( $req->get_param( 'image_id' ) ?? 0 );
+        if ( ! $image_id ) {
+            return null;
+        }
+        return RinCWC_Data::get_image( $image_id );
     }
 }

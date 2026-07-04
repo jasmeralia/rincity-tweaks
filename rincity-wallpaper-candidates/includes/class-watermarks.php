@@ -1,16 +1,14 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
-final class RinCWC_Watermarks {
-
-    private static string $hook = '';
+final class RinCWC_Watermarks_Page {
 
     public static function register(): void {
         add_action( 'admin_menu', [ __CLASS__, 'add_menu' ] );
     }
 
     public static function add_menu(): void {
-        self::$hook = add_submenu_page(
+        add_submenu_page(
             'rincwc-wallpaper-candidates',
             'Wallpaper Watermarks',
             'Watermarks',
@@ -25,154 +23,192 @@ final class RinCWC_Watermarks {
             wp_die( esc_html__( 'You do not have permission to access this page.' ) );
         }
 
-        $notice = self::handle_posts();
-        $watermarks = RinCWC_Data::get_watermarks();
-        $gallery_wm = RinCWC_Data::get_gallery_watermarks();
-        $galleries  = RinCWC_Data::envira_galleries();
+        $notice = self::handle_post();
 
         echo '<div class="wrap rincwc-watermarks">';
-        self::render_styles();
         echo '<h1>Wallpaper Watermarks</h1>';
         if ( $notice ) {
             echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $notice ) . '</p></div>';
         }
-
-        echo '<h2>Registered Files</h2>';
-        echo '<table class="widefat striped rincwc-wm-table"><thead><tr><th>Preview</th><th>Name</th><th>Path</th><th>Default</th><th>Actions</th></tr></thead><tbody>';
-        foreach ( $watermarks as $wm ) {
-            $url = self::url_for_path( $wm['file_path'] );
-            echo '<tr>';
-            echo '<td>' . ( $url ? '<img src="' . esc_url( $url ) . '" alt="">' : '' ) . '</td>';
-            echo '<td>' . esc_html( $wm['name'] ) . '</td>';
-            echo '<td class="path">' . esc_html( $wm['file_path'] ) . '</td>';
-            echo '<td>' . ( ! empty( $wm['is_default'] ) ? '<span class="rincwc-pill">Default</span>' : '' ) . '</td>';
-            echo '<td>';
-            if ( empty( $wm['is_default'] ) ) {
-                self::post_button( 'set_default', 'Set default', [ 'wm_id' => (int) $wm['id'] ], 'secondary' );
-                if ( ! RinCWC_Data::watermark_in_use( (int) $wm['id'] ) ) {
-                    self::post_button( 'delete', 'Delete', [ 'wm_id' => (int) $wm['id'] ], 'link-delete' );
-                } else {
-                    echo '<span class="description">In use</span>';
-                }
-            }
-            echo '</td></tr>';
-        }
-        echo '</tbody></table>';
-
-        echo '<h2>Upload Watermark</h2>';
-        echo '<form method="post" enctype="multipart/form-data" class="rincwc-panel">';
-        wp_nonce_field( 'rincwc_watermarks', 'rincwc_nonce' );
-        echo '<input type="hidden" name="rincwc_action" value="upload">';
-        echo '<p><label>Name<br><input type="text" name="rincwc_wm_name" class="regular-text" required></label></p>';
-        echo '<p><input type="file" name="rincwc_wm_file" accept="image/png" required></p>';
-        echo '<p><label><input type="checkbox" name="rincwc_wm_default" value="1"> Set as default</label></p>';
-        submit_button( 'Upload watermark', 'primary', 'submit', false );
-        echo '</form>';
-
-        echo '<h2>Per-Gallery Override</h2>';
-        echo '<form method="post" class="rincwc-panel">';
-        wp_nonce_field( 'rincwc_watermarks', 'rincwc_nonce' );
-        echo '<input type="hidden" name="rincwc_action" value="gallery_overrides">';
-        echo '<table class="widefat striped"><thead><tr><th>Gallery</th><th>Watermark</th></tr></thead><tbody>';
-        foreach ( $galleries as $gallery ) {
-            echo '<tr><td>' . esc_html( sprintf( '%s (#%d)', $gallery->post_title, $gallery->ID ) ) . '</td><td>';
-            echo '<select name="gallery_wm[' . esc_attr( $gallery->ID ) . ']">';
-            echo '<option value="0">Default watermark</option>';
-            foreach ( $watermarks as $wm ) {
-                echo '<option value="' . esc_attr( $wm['id'] ) . '"' . selected( $gallery_wm[ (int) $gallery->ID ] ?? 0, (int) $wm['id'], false ) . '>'
-                    . esc_html( $wm['name'] )
-                    . '</option>';
-            }
-            echo '</select></td></tr>';
-        }
-        echo '</tbody></table>';
-        submit_button( 'Save gallery overrides', 'primary', 'submit', false );
-        echo '</form>';
-
+        self::render_styles();
+        self::render_upload_form();
+        self::render_watermark_table();
+        self::render_gallery_overrides();
         echo '</div>';
     }
 
-    private static function handle_posts(): string {
-        if ( empty( $_POST['rincwc_action'] ) || empty( $_POST['rincwc_nonce'] ) ) {
+    private static function handle_post(): string {
+        if ( empty( $_POST['rincwc_wm_action'] ) || empty( $_POST['rincwc_wm_nonce'] ) ) {
             return '';
         }
-        if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['rincwc_nonce'] ) ), 'rincwc_watermarks' ) ) {
+        if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['rincwc_wm_nonce'] ) ), 'rincwc_watermarks' ) ) {
             return '';
         }
 
-        $action = sanitize_key( wp_unslash( $_POST['rincwc_action'] ) );
-        if ( $action === 'set_default' ) {
-            return RinCWC_Data::set_default_watermark( (int) ( $_POST['wm_id'] ?? 0 ) ) ? 'Default watermark updated.' : 'Could not update default watermark.';
+        $action = sanitize_key( wp_unslash( $_POST['rincwc_wm_action'] ) );
+        if ( $action === 'upload' ) {
+            return self::handle_upload();
+        }
+        if ( $action === 'default' ) {
+            $id = (int) ( $_POST['wm_id'] ?? 0 );
+            return RinCWC_Data::set_default_watermark( $id ) ? 'Default watermark updated.' : 'Could not update default watermark.';
         }
         if ( $action === 'delete' ) {
-            return RinCWC_Data::delete_watermark( (int) ( $_POST['wm_id'] ?? 0 ) ) ? 'Watermark deleted.' : 'Watermark could not be deleted.';
+            $id = (int) ( $_POST['wm_id'] ?? 0 );
+            $wm = RinCWC_Data::get_watermark( $id );
+            if ( $wm && RinCWC_Data::delete_watermark( $id ) ) {
+                if ( str_starts_with( realpath( $wm['file_path'] ) ?: '', realpath( RINCWC_WATERMARKS_DIR ) ?: RINCWC_WATERMARKS_DIR ) && file_exists( $wm['file_path'] ) ) {
+                    wp_delete_file( $wm['file_path'] );
+                }
+                return 'Watermark deleted.';
+            }
+            return 'Watermark is default or in use and could not be deleted.';
         }
         if ( $action === 'gallery_overrides' ) {
-            $map = isset( $_POST['gallery_wm'] ) && is_array( $_POST['gallery_wm'] ) ? wp_unslash( $_POST['gallery_wm'] ) : [];
-            foreach ( $map as $gallery_id => $wm_id ) {
+            $posted = is_array( $_POST['gallery_wm'] ?? null ) ? wp_unslash( $_POST['gallery_wm'] ) : [];
+            foreach ( $posted as $gallery_id => $wm_id ) {
                 RinCWC_Data::set_gallery_watermark( (int) $gallery_id, (int) $wm_id );
             }
             return 'Gallery watermark overrides saved.';
-        }
-        if ( $action === 'upload' ) {
-            return self::handle_upload();
         }
 
         return '';
     }
 
     private static function handle_upload(): string {
-        if ( empty( $_FILES['rincwc_wm_file']['tmp_name'] ) ) {
-            return 'No file uploaded.';
-        }
-        if ( ! is_dir( RINCWC_WATERMARKS_DIR ) ) {
-            wp_mkdir_p( RINCWC_WATERMARKS_DIR );
+        if ( empty( $_FILES['watermark_file']['name'] ) ) {
+            return 'Choose a PNG file to upload.';
         }
 
-        $file = $_FILES['rincwc_wm_file'];
-        $name = sanitize_text_field( wp_unslash( $_POST['rincwc_wm_name'] ?? '' ) );
+        wp_mkdir_p( RINCWC_WATERMARKS_DIR );
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+
+        add_filter( 'upload_dir', [ __CLASS__, 'upload_dir' ] );
+        $file = wp_handle_upload( $_FILES['watermark_file'], [
+            'test_form' => false,
+            'mimes'     => [ 'png' => 'image/png' ],
+        ] );
+        remove_filter( 'upload_dir', [ __CLASS__, 'upload_dir' ] );
+
+        if ( isset( $file['error'] ) ) {
+            return 'Upload failed: ' . $file['error'];
+        }
+
+        $name = sanitize_text_field( $_POST['watermark_name'] ?? '' );
         if ( ! $name ) {
-            $name = sanitize_file_name( $file['name'] );
+            $name = basename( $file['file'] );
         }
-
-        $filename = wp_unique_filename( RINCWC_WATERMARKS_DIR, sanitize_file_name( $file['name'] ) );
-        $dest     = RINCWC_WATERMARKS_DIR . $filename;
-        if ( ! @move_uploaded_file( $file['tmp_name'], $dest ) ) {
-            return 'Upload failed.';
-        }
-
-        RinCWC_Data::add_watermark( $name, $dest, ! empty( $_POST['rincwc_wm_default'] ) );
+        RinCWC_Data::add_watermark( $name, $file['file'], false );
         return 'Watermark uploaded.';
     }
 
-    private static function post_button( string $action, string $label, array $hidden, string $class ): void {
-        echo '<form method="post" class="rincwc-inline-form">';
-        wp_nonce_field( 'rincwc_watermarks', 'rincwc_nonce' );
-        echo '<input type="hidden" name="rincwc_action" value="' . esc_attr( $action ) . '">';
-        foreach ( $hidden as $key => $value ) {
-            echo '<input type="hidden" name="' . esc_attr( $key ) . '" value="' . esc_attr( $value ) . '">';
-        }
-        submit_button( $label, $class, 'submit', false );
+    public static function upload_dir( array $dirs ): array {
+        $dirs['path']   = RINCWC_WATERMARKS_DIR;
+        $dirs['url']    = content_url( 'uploads/wallpaper-watermarks' );
+        $dirs['subdir'] = '/wallpaper-watermarks';
+        return $dirs;
+    }
+
+    private static function render_upload_form(): void {
+        echo '<h2>Add Watermark</h2>';
+        echo '<form method="post" enctype="multipart/form-data" class="rincwc-wm-box">';
+        wp_nonce_field( 'rincwc_watermarks', 'rincwc_wm_nonce' );
+        echo '<input type="hidden" name="rincwc_wm_action" value="upload">';
+        echo '<label>Name <input type="text" name="watermark_name"></label> ';
+        echo '<input type="file" name="watermark_file" accept="image/png" required> ';
+        submit_button( 'Upload watermark', 'primary', 'submit', false );
         echo '</form>';
     }
 
-    private static function url_for_path( string $path ): string {
-        $upload = wp_upload_dir();
-        if ( str_starts_with( $path, trailingslashit( $upload['basedir'] ) ) ) {
-            return trailingslashit( $upload['baseurl'] ) . ltrim( substr( $path, strlen( trailingslashit( $upload['basedir'] ) ) ), '/' );
+    private static function render_watermark_table(): void {
+        $watermarks = RinCWC_Data::get_watermarks();
+        echo '<h2>Registered Watermarks</h2>';
+        if ( empty( $watermarks ) ) {
+            echo '<p>No watermarks registered.</p>';
+            return;
+        }
+
+        echo '<table class="widefat striped rincwc-wm-table"><thead><tr><th>Preview</th><th>Name</th><th>Path</th><th>Default</th><th>Actions</th></tr></thead><tbody>';
+        foreach ( $watermarks as $wm ) {
+            $in_use = RinCWC_Data::watermark_in_use( (int) $wm['id'] );
+            echo '<tr>';
+            echo '<td>';
+            if ( file_exists( $wm['file_path'] ) ) {
+                echo '<img src="' . esc_url( self::file_url( $wm['file_path'] ) ) . '" alt="">';
+            }
+            echo '</td>';
+            echo '<td>' . esc_html( $wm['name'] ) . '</td>';
+            echo '<td class="path">' . esc_html( $wm['file_path'] ) . '</td>';
+            echo '<td>' . ( ! empty( $wm['is_default'] ) ? '<span class="rincwc-default-badge">default</span>' : '' ) . '</td>';
+            echo '<td class="actions">';
+            if ( empty( $wm['is_default'] ) ) {
+                self::action_button( 'default', (int) $wm['id'], 'Set default', 'secondary' );
+            }
+            if ( empty( $wm['is_default'] ) && ! $in_use ) {
+                self::action_button( 'delete', (int) $wm['id'], 'Delete', 'delete' );
+            } elseif ( empty( $wm['is_default'] ) ) {
+                echo '<span class="description">in use</span>';
+            }
+            echo '</td></tr>';
+        }
+        echo '</tbody></table>';
+    }
+
+    private static function render_gallery_overrides(): void {
+        $watermarks = RinCWC_Data::get_watermarks();
+        $overrides  = RinCWC_Data::get_gallery_watermarks();
+        $galleries  = RinCWC_Data::source_galleries();
+
+        echo '<h2>Per-Gallery Watermark Override</h2>';
+        if ( empty( $galleries ) ) {
+            echo '<p>No scanned source galleries yet.</p>';
+            return;
+        }
+
+        echo '<form method="post" class="rincwc-wm-box">';
+        wp_nonce_field( 'rincwc_watermarks', 'rincwc_wm_nonce' );
+        echo '<input type="hidden" name="rincwc_wm_action" value="gallery_overrides">';
+        echo '<table class="widefat striped"><thead><tr><th>Source gallery</th><th>Watermark</th></tr></thead><tbody>';
+        foreach ( $galleries as $gallery ) {
+            $gid = (int) $gallery['gallery_id'];
+            echo '<tr><td>' . esc_html( $gallery['gallery_title'] . " (#{$gid})" ) . '</td><td>';
+            echo '<select name="gallery_wm[' . esc_attr( $gid ) . ']">';
+            echo '<option value="0">Use default</option>';
+            foreach ( $watermarks as $wm ) {
+                echo '<option value="' . esc_attr( $wm['id'] ) . '"' . selected( $overrides[ $gid ] ?? 0, (int) $wm['id'], false ) . '>' . esc_html( $wm['name'] ) . '</option>';
+            }
+            echo '</select></td></tr>';
+        }
+        echo '</tbody></table>';
+        submit_button( 'Save overrides', 'primary', 'submit', false );
+        echo '</form>';
+    }
+
+    private static function action_button( string $action, int $id, string $label, string $class ): void {
+        echo '<form method="post" style="display:inline">';
+        wp_nonce_field( 'rincwc_watermarks', 'rincwc_wm_nonce' );
+        echo '<input type="hidden" name="rincwc_wm_action" value="' . esc_attr( $action ) . '">';
+        echo '<input type="hidden" name="wm_id" value="' . esc_attr( $id ) . '">';
+        submit_button( $label, $class, 'submit', false );
+        echo '</form> ';
+    }
+
+    private static function file_url( string $path ): string {
+        $content_dir = wp_normalize_path( WP_CONTENT_DIR );
+        $path_norm   = wp_normalize_path( $path );
+        if ( str_starts_with( $path_norm, $content_dir ) ) {
+            return content_url( ltrim( substr( $path_norm, strlen( $content_dir ) ), '/' ) );
         }
         return '';
     }
 
     private static function render_styles(): void {
-        ?>
-        <style>
-        .rincwc-wm-table img { max-width: 160px; max-height: 80px; background: #f0f0f1; }
-        .rincwc-wm-table .path { word-break: break-all; color: #646970; font-size: 12px; }
-        .rincwc-pill { display: inline-block; padding: 2px 7px; border-radius: 3px; background: #00a32a; color: #fff; font-size: 12px; font-weight: 600; }
-        .rincwc-panel { background: #fff; border: 1px solid #c3c4c7; padding: 12px; margin-bottom: 18px; }
-        .rincwc-inline-form { display: inline-block; margin-right: 6px; }
-        </style>
-        <?php
+        echo '<style>
+            .rincwc-wm-box{background:#fff;border:1px solid #c3c4c7;padding:12px;margin:12px 0}
+            .rincwc-wm-table img{max-width:120px;max-height:60px;background:#222;padding:4px}
+            .rincwc-wm-table .path{word-break:break-all;color:#646970;font-size:12px}
+            .rincwc-default-badge{display:inline-block;background:#2271b1;color:#fff;border-radius:3px;padding:2px 6px;font-size:11px}
+            .rincwc-wm-table .actions form{margin-right:4px}
+        </style>';
     }
 }
