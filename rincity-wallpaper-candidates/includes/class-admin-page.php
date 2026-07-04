@@ -24,8 +24,9 @@ final class RinCity_Wallpaper_Admin_Page {
             wp_die( esc_html__( 'You do not have permission to access this page.' ) );
         }
 
-        $preview = null;
-        $notice  = '';
+        $preview    = null;
+        $notice     = '';
+        $prescan_id = (int) ( $_GET['prescan'] ?? 0 );
 
         if ( isset( $_POST['rincwc_action'], $_POST['rincwc_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['rincwc_nonce'] ) ), 'rincwc_scan_gallery' ) ) {
             $gallery_id = (int) ( $_POST['rincwc_gallery_id'] ?? 0 );
@@ -51,14 +52,16 @@ final class RinCity_Wallpaper_Admin_Page {
 
         echo '<div class="rincwc-admin-panel">';
         echo '<h2>Scan Gallery</h2>';
+        echo '<input type="text" id="rincwc-gallery-search" placeholder="Filter galleries…" class="rincwc-gallery-search">';
         echo '<form method="post">';
         wp_nonce_field( 'rincwc_scan_gallery', 'rincwc_nonce' );
         echo '<input type="hidden" name="rincwc_action" value="dry_run">';
-        echo '<select name="rincwc_gallery_id" class="rincwc-gallery-select">';
+        echo '<select name="rincwc_gallery_id" id="rincwc-gallery-select" class="rincwc-gallery-select">';
         echo '<option value="">Select an Envira gallery</option>';
         foreach ( $galleries as $gallery ) {
-            $label = sprintf( '%s (%d, %s)', $gallery->post_title, $gallery->ID, date( 'Y-m-d', strtotime( $gallery->post_date ) ) );
-            echo '<option value="' . esc_attr( $gallery->ID ) . '">' . esc_html( $label ) . '</option>';
+            $label    = sprintf( '%s (%d, %s)', $gallery->post_title, $gallery->ID, date( 'Y-m-d', strtotime( $gallery->post_date ) ) );
+            $selected = selected( $prescan_id, (int) $gallery->ID, false );
+            echo '<option value="' . esc_attr( $gallery->ID ) . '"' . $selected . '>' . esc_html( $label ) . '</option>';
         }
         echo '</select> ';
         submit_button( 'Dry Run Scan', 'secondary', 'submit', false );
@@ -75,6 +78,9 @@ final class RinCity_Wallpaper_Admin_Page {
     }
 
     private static function render_summary( array $summary ): void {
+        $review_base = admin_url( 'admin.php?page=rincwc-review' );
+        $scan_base   = admin_url( 'admin.php?page=rincwc-wallpaper-candidates' );
+
         echo '<div class="rincwc-admin-panel">';
         echo '<h2>Database Summary</h2>';
         echo '<p><strong>' . esc_html( $summary['visible'] ) . '</strong> visible candidates, ';
@@ -94,6 +100,8 @@ final class RinCity_Wallpaper_Admin_Page {
             return;
         }
 
+        echo '<input type="text" id="rincwc-summary-search" placeholder="Filter galleries…" class="rincwc-gallery-search" style="margin:8px 0">';
+
         echo '<table id="rincwc-summary-table" class="widefat striped rincwc-sortable">';
         echo '<thead><tr>';
         echo '<th data-col="0" class="sortable">Gallery</th>';
@@ -103,10 +111,13 @@ final class RinCity_Wallpaper_Admin_Page {
         echo '<th data-col="4" class="sortable num">Candidates</th>';
         echo '<th data-col="5" class="sortable num">Selected</th>';
         echo '<th data-col="6" class="sortable num">Approved</th>';
+        echo '<th>Actions</th>';
         echo '</tr></thead><tbody>';
         foreach ( $summary['galleries'] as $gallery_id => $gallery ) {
-            $candidates = $gallery['images'] - $gallery['excluded'];
-            echo '<tr>';
+            $candidates  = $gallery['images'] - $gallery['excluded'];
+            $review_url  = esc_url( $review_base . '#rincwc-gallery-' . $gallery_id );
+            $rescan_url  = esc_url( $scan_base . '&prescan=' . $gallery_id );
+            echo '<tr data-title="' . esc_attr( strtolower( $gallery['title'] ) ) . '">';
             echo '<td>' . esc_html( $gallery['title'] ) . ' <span class="description">#' . esc_html( (string) $gallery_id ) . '</span></td>';
             echo '<td>' . esc_html( $gallery['pub_date'] ?? '' ) . '</td>';
             echo '<td>' . esc_html( (string) $gallery['images'] ) . '</td>';
@@ -114,6 +125,7 @@ final class RinCity_Wallpaper_Admin_Page {
             echo '<td>' . esc_html( (string) $candidates ) . '</td>';
             echo '<td>' . esc_html( (string) ( $gallery['selected'] ?? 0 ) ) . '</td>';
             echo '<td>' . esc_html( (string) ( $gallery['approved'] ?? 0 ) ) . '</td>';
+            echo '<td class="rincwc-actions"><a href="' . $review_url . '">Review</a> · <a href="' . $rescan_url . '">Rescan</a></td>';
             echo '</tr>';
         }
         echo '</tbody></table>';
@@ -177,7 +189,8 @@ final class RinCity_Wallpaper_Admin_Page {
             margin: 1em 0;
         }
         .rincwc-admin-panel h2 { margin-top: 0; }
-        .rincwc-gallery-select { min-width: 420px; max-width: 100%; }
+        .rincwc-gallery-search { width: 320px; max-width: 100%; margin-bottom: 6px; display: block; }
+        .rincwc-gallery-select { min-width: 420px; max-width: 100%; margin-top: 4px; }
         .rincwc-commit-form { margin: 0 0 1em; }
         .rincwc-scan-table .rincwc-row-candidate td { background: #f0f6fc; }
         .rincwc-scan-table .rincwc-row-excluded td { color: #996800; }
@@ -186,36 +199,74 @@ final class RinCity_Wallpaper_Admin_Page {
         .rincwc-sortable th.sortable::after { content: ' ↕'; opacity: 0.4; font-size: 11px; }
         .rincwc-sortable th.sort-asc::after { content: ' ↑'; opacity: 1; }
         .rincwc-sortable th.sort-desc::after { content: ' ↓'; opacity: 1; }
+        #rincwc-summary-table .rincwc-actions { white-space: nowrap; }
         </style>
         <script>
         document.addEventListener('DOMContentLoaded', function() {
-            var tbl = document.getElementById('rincwc-summary-table');
-            if (!tbl) return;
-            var sortCol = -1, sortDir = 1;
-            tbl.querySelectorAll('th.sortable').forEach(function(th) {
-                th.addEventListener('click', function() {
-                    var col = parseInt(th.dataset.col, 10);
-                    var isNum = th.classList.contains('num');
-                    if (sortCol === col) { sortDir *= -1; } else { sortCol = col; sortDir = 1; }
-                    tbl.querySelectorAll('th.sortable').forEach(function(h) {
-                        h.classList.remove('sort-asc', 'sort-desc');
-                    });
-                    th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
-                    var tbody = tbl.tBodies[0];
-                    var rows = Array.from(tbody.rows);
-                    rows.sort(function(a, b) {
-                        var av = a.cells[col] ? a.cells[col].textContent.trim() : '';
-                        var bv = b.cells[col] ? b.cells[col].textContent.trim() : '';
-                        if (isNum) {
-                            av = parseFloat(av) || 0;
-                            bv = parseFloat(bv) || 0;
-                            return (av - bv) * sortDir;
-                        }
-                        return av.localeCompare(bv) * sortDir;
-                    });
-                    rows.forEach(function(r) { tbody.appendChild(r); });
+
+            // --- Scan gallery dropdown search ---
+            var galSearch = document.getElementById('rincwc-gallery-search');
+            var galSelect = document.getElementById('rincwc-gallery-select');
+            if (galSearch && galSelect) {
+                var allOptions = Array.from(galSelect.options).map(function(o) {
+                    return { value: o.value, text: o.text };
                 });
-            });
+                galSearch.addEventListener('input', function() {
+                    var q = galSearch.value.toLowerCase();
+                    var cur = galSelect.value;
+                    while (galSelect.options.length) galSelect.remove(0);
+                    allOptions.forEach(function(o) {
+                        if (!q || !o.value || o.text.toLowerCase().indexOf(q) !== -1) {
+                            var opt = document.createElement('option');
+                            opt.value = o.value;
+                            opt.text = o.text;
+                            if (o.value === cur) opt.selected = true;
+                            galSelect.add(opt);
+                        }
+                    });
+                });
+            }
+
+            // --- Summary table search ---
+            var sumSearch = document.getElementById('rincwc-summary-search');
+            var tbl = document.getElementById('rincwc-summary-table');
+            if (sumSearch && tbl) {
+                sumSearch.addEventListener('input', function() {
+                    var q = sumSearch.value.toLowerCase();
+                    Array.from(tbl.tBodies[0].rows).forEach(function(row) {
+                        row.style.display = (!q || row.dataset.title.indexOf(q) !== -1) ? '' : 'none';
+                    });
+                });
+            }
+
+            // --- Summary table column sort ---
+            if (tbl) {
+                var sortCol = -1, sortDir = 1;
+                tbl.querySelectorAll('th.sortable').forEach(function(th) {
+                    th.addEventListener('click', function() {
+                        var col = parseInt(th.dataset.col, 10);
+                        var isNum = th.classList.contains('num');
+                        if (sortCol === col) { sortDir *= -1; } else { sortCol = col; sortDir = 1; }
+                        tbl.querySelectorAll('th.sortable').forEach(function(h) {
+                            h.classList.remove('sort-asc', 'sort-desc');
+                        });
+                        th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+                        var tbody = tbl.tBodies[0];
+                        var rows = Array.from(tbody.rows);
+                        rows.sort(function(a, b) {
+                            var av = a.cells[col] ? a.cells[col].textContent.trim() : '';
+                            var bv = b.cells[col] ? b.cells[col].textContent.trim() : '';
+                            if (isNum) {
+                                av = parseFloat(av) || 0;
+                                bv = parseFloat(bv) || 0;
+                                return (av - bv) * sortDir;
+                            }
+                            return av.localeCompare(bv) * sortDir;
+                        });
+                        rows.forEach(function(r) { tbody.appendChild(r); });
+                    });
+                });
+            }
         });
         </script>
         <?php

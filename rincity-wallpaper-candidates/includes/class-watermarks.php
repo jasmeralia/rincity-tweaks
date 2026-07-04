@@ -165,13 +165,14 @@ final class RinCWC_Watermarks {
             return;
         }
 
+        echo '<input type="text" id="rincwc-wm-gal-search" placeholder="Filter galleries…" style="width:320px;margin-bottom:6px;display:block">';
         echo '<form method="post" class="rincwc-wm-box">';
         wp_nonce_field( 'rincwc_watermarks', 'rincwc_wm_nonce' );
         echo '<input type="hidden" name="rincwc_wm_action" value="gallery_overrides">';
-        echo '<table class="widefat striped"><thead><tr><th>Source gallery</th><th>Watermark</th></tr></thead><tbody>';
+        echo '<table id="rincwc-wm-gal-table" class="widefat striped"><thead><tr><th>Source gallery</th><th>Watermark</th></tr></thead><tbody>';
         foreach ( $galleries as $gallery ) {
             $gid = (int) $gallery['gallery_id'];
-            echo '<tr><td>' . esc_html( $gallery['gallery_title'] . " (#{$gid})" ) . '</td><td>';
+            echo '<tr data-title="' . esc_attr( strtolower( $gallery['gallery_title'] ) ) . '"><td>' . esc_html( $gallery['gallery_title'] . " (#{$gid})" ) . '</td><td>';
             echo '<select name="gallery_wm[' . esc_attr( $gid ) . ']">';
             echo '<option value="0">Use default</option>';
             foreach ( $watermarks as $wm ) {
@@ -182,6 +183,19 @@ final class RinCWC_Watermarks {
         echo '</tbody></table>';
         submit_button( 'Save overrides', 'primary', 'submit', false );
         echo '</form>';
+        echo '<script>
+        (function(){
+            var s = document.getElementById("rincwc-wm-gal-search");
+            var t = document.getElementById("rincwc-wm-gal-table");
+            if (!s || !t) return;
+            s.addEventListener("input", function() {
+                var q = s.value.toLowerCase();
+                Array.from(t.tBodies[0].rows).forEach(function(r) {
+                    r.style.display = (!q || r.dataset.title.indexOf(q) !== -1) ? "" : "none";
+                });
+            });
+        })();
+        </script>';
     }
 
     private static function action_button( string $action, int $id, string $label, string $class ): void {

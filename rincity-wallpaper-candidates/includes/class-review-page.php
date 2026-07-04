@@ -106,7 +106,7 @@ final class RinCWC_Review_Page {
             ? count( $selected ) . ' selected, ' . count( $others ) . ' other · best ' . $best_w . 'px'
             : count( $imgs ) . ' candidates · best ' . $best_w . 'px';
 
-        echo '<div class="rincwc-gallery">';
+        echo '<div class="rincwc-gallery" id="rincwc-gallery-' . esc_attr( (string) $gid ) . '">';
         echo '<div class="rincwc-gal-head"><h3><a href="' . esc_url( $permalink ) . '" target="_blank">' . esc_html( $title . ( $pub_date ? " ({$pub_date})" : '' ) ) . '</a></h3></div>';
         echo '<details class="rincwc-details" open><summary>' . esc_html( $summary ) . '</summary>';
 
