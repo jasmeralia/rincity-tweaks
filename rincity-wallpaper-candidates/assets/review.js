@@ -18,7 +18,30 @@
         document.querySelectorAll( '.rincwc-card' ).forEach( initCard );
         initBatchButtons();
         initExpandCollapse();
+        initFilter();
     } );
+
+    // ── Selections filter ─────────────────────────────────────────────────────
+
+    function initFilter() {
+        const btn = document.getElementById( 'rincwc-filter-sel' );
+        if ( ! btn ) return;
+        btn.addEventListener( 'click', () => {
+            const active = btn.classList.toggle( 'is-active' );
+            applyFilter( active );
+        } );
+    }
+
+    function applyFilter( selectionsOnly ) {
+        document.querySelectorAll( '.rincwc-card' ).forEach( card => {
+            card.style.display = ( selectionsOnly && ! card.classList.contains( 'is-selected' ) ) ? 'none' : '';
+        } );
+        // Hide gallery blocks that have no selected cards when filtering.
+        document.querySelectorAll( '.rincwc-gallery' ).forEach( gal => {
+            const hasSel = !! gal.querySelector( '.rincwc-card.is-selected' );
+            gal.style.display = ( selectionsOnly && ! hasSel ) ? 'none' : '';
+        } );
+    }
 
     // ── Expand/collapse all ───────────────────────────────────────────────────
 
@@ -159,11 +182,19 @@
         const open = tool.style.display !== 'none';
         tool.style.display = open ? 'none' : '';
         if ( ! open ) {
-            // Lazy-load preview image.
             const img = tool.querySelector( '.rincwc-preview-img' );
-            if ( img && ! img.src ) img.src = img.dataset.src;
-            img.onload = () => updateCropBox( tool, cfg, parseInt( tool.querySelector( '.rincwc-slider' )?.value || cfg.customOff ) );
-            updateCropBox( tool, cfg, parseInt( tool.querySelector( '.rincwc-slider' )?.value || cfg.customOff ) );
+            const off = () => parseInt( tool.querySelector( '.rincwc-slider' )?.value || cfg.customOff );
+            const doUpdate = () => requestAnimationFrame( () => updateCropBox( tool, cfg, off() ) );
+            if ( img ) {
+                if ( ! img.src || img.src === window.location.href ) {
+                    img.onload = doUpdate;
+                    img.src = img.dataset.src;
+                } else if ( img.complete && img.naturalWidth ) {
+                    doUpdate();
+                } else {
+                    img.onload = doUpdate;
+                }
+            }
         }
     }
 
@@ -203,8 +234,7 @@
 
         // Drag on the crop box.
         const cropBox = tool.querySelector( '.rincwc-crop-box' );
-        const preview = tool.querySelector( '.rincwc-crop-preview' );
-        if ( cropBox && preview && slider ) {
+        if ( cropBox && slider ) {
             let dragging = false, startX = 0, startY = 0, startOff = 0;
             cropBox.addEventListener( 'mousedown', e => {
                 dragging = true; startX = e.clientX; startY = e.clientY;
@@ -213,16 +243,15 @@
             } );
             document.addEventListener( 'mousemove', e => {
                 if ( ! dragging ) return;
+                const img = tool.querySelector( '.rincwc-preview-img' );
                 const dx = e.clientX - startX;
                 const dy = e.clientY - startY;
-                const rect = preview.getBoundingClientRect();
                 let newOff;
+                // Convert display-pixel drag into resized-image-pixel offset.
                 if ( cfg.cropAxis === 'x' ) {
-                    const scale = cfg.cropRange / rect.width;
-                    newOff = Math.round( startOff + dx * scale );
+                    newOff = Math.round( startOff + dx * 2160 / ( img.clientHeight || 1 ) );
                 } else {
-                    const scale = cfg.cropRange / rect.height;
-                    newOff = Math.round( startOff + dy * scale );
+                    newOff = Math.round( startOff + dy * 3840 / ( img.clientWidth || 1 ) );
                 }
                 newOff = Math.max( 0, Math.min( cfg.cropRange, newOff ) );
                 slider.value  = newOff;
@@ -237,27 +266,27 @@
         const img     = tool.querySelector( '.rincwc-preview-img' );
         const cropBox = tool.querySelector( '.rincwc-crop-box' );
         if ( ! img || ! cropBox ) return;
-        const dispW = img.clientWidth  || img.naturalWidth;
-        const dispH = img.clientHeight || img.naturalHeight;
+        const dispW = img.clientWidth;
+        const dispH = img.clientHeight;
         if ( ! dispW || ! dispH ) return;
 
         const targetAR = 3840 / 2160;
         if ( cfg.cropAxis === 'x' ) {
-            // Image is wider than 16:9 when resized to height; crop box spans full height.
+            // Resized to height 2160; offset is horizontal in resized-image px.
             const boxW = Math.round( dispH * targetAR );
-            const boxX = Math.round( offset * dispW / cfg.cropRange );
+            const boxX = Math.round( offset * dispH / 2160 );
             cropBox.style.width  = boxW + 'px';
             cropBox.style.height = dispH + 'px';
-            cropBox.style.left   = boxX + 'px';
+            cropBox.style.left   = Math.min( boxX, Math.max( 0, dispW - boxW ) ) + 'px';
             cropBox.style.top    = '0';
         } else {
-            // Image is taller; crop box spans full width.
+            // Resized to width 3840; offset is vertical in resized-image px.
             const boxH = Math.round( dispW / targetAR );
-            const boxY = Math.round( offset * dispH / cfg.cropRange );
+            const boxY = Math.round( offset * dispW / 3840 );
             cropBox.style.width  = dispW + 'px';
             cropBox.style.height = boxH + 'px';
             cropBox.style.left   = '0';
-            cropBox.style.top    = boxY + 'px';
+            cropBox.style.top    = Math.min( boxY, Math.max( 0, dispH - boxH ) ) + 'px';
         }
     }
 

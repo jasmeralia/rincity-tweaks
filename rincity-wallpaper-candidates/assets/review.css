@@ -12,6 +12,7 @@
     flex-wrap: wrap;
 }
 .rincwc-toolbar #rincwc-batch-msg { color: #2271b1; font-size: 13px; }
+#rincwc-filter-sel.is-active { background: #2271b1; color: #fff; border-color: #135e96; }
 .rincwc-expanders { margin-left: auto; font-size: 13px; }
 .rincwc-expanders a { color: #2271b1; text-decoration: none; }
 

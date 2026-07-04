@@ -95,6 +95,7 @@ final class RinCWC_Review_Page {
         echo '<strong>' . esc_html( $wm_pending ) . '</strong> watermarks pending</p>';
 
         echo '<div class="rincwc-toolbar">';
+        echo '<button class="button" id="rincwc-filter-sel">Selections only</button> ';
         echo '<button class="button" id="rincwc-generate-crops">Generate pending crops</button> ';
         echo '<button class="button button-primary" id="rincwc-apply-wm">Apply pending watermarks</button>';
         echo '<span id="rincwc-batch-msg"></span>';
