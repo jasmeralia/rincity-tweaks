@@ -68,11 +68,11 @@ final class RinCity_Wallpaper_Admin_Page {
         echo '</form>';
         echo '</div>';
 
-        self::render_summary( $summary );
-
         if ( $preview ) {
             self::render_preview( $preview );
         }
+
+        self::render_summary( $summary );
 
         echo '</div>';
     }
