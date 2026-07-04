@@ -28,10 +28,11 @@ final class RinCWC_Review_Page {
         wp_enqueue_style( 'rincwc-review', RINCWC_PLUGIN_URL . 'assets/review.css', [], RINCWC_VERSION );
         wp_enqueue_script( 'rincwc-review', RINCWC_PLUGIN_URL . 'assets/review.js', [ 'wp-api-fetch' ], RINCWC_VERSION, true );
         wp_add_inline_script( 'rincwc-review', 'var rincwcCfg=' . wp_json_encode( [
-            'restBase'     => rest_url( 'rincity/v1/wpc/' ),
-            'nonce'        => wp_create_nonce( 'wp_rest' ),
-            'userId'       => get_current_user_id(),
+            'restBase'       => rest_url( 'rincity/v1/wpc/' ),
+            'nonce'          => wp_create_nonce( 'wp_rest' ),
+            'userId'         => get_current_user_id(),
             'approveAllowed' => RinCWC_Data::can_current_user_approve(),
+            'initFilter'     => isset( $_GET['filter'] ) ? sanitize_key( wp_unslash( $_GET['filter'] ) ) : '',
         ] ) . ';', 'before' );
     }
 
@@ -107,7 +108,10 @@ final class RinCWC_Review_Page {
             : count( $imgs ) . ' candidates · best ' . $best_w . 'px';
 
         echo '<div class="rincwc-gallery" id="rincwc-gallery-' . esc_attr( (string) $gid ) . '">';
-        echo '<div class="rincwc-gal-head"><h3><a href="' . esc_url( $permalink ) . '" target="_blank">' . esc_html( $title . ( $pub_date ? " ({$pub_date})" : '' ) ) . '</a></h3></div>';
+        echo '<div class="rincwc-gal-head">';
+        echo '<h3><a href="' . esc_url( $permalink ) . '" target="_blank">' . esc_html( $title . ( $pub_date ? " ({$pub_date})" : '' ) ) . '</a></h3>';
+        echo '<button class="button button-small rincwc-exclude-all-btn" data-gid="' . esc_attr( (string) $gid ) . '">Exclude all</button>';
+        echo '</div>';
         echo '<details class="rincwc-details" open><summary>' . esc_html( $summary ) . '</summary>';
 
         if ( $selected ) {
@@ -193,6 +197,7 @@ final class RinCWC_Review_Page {
         echo '<div class="rincwc-info">';
         echo '<div class="rincwc-fname">' . esc_html( $fname ) . '</div>';
         echo '<div class="rincwc-dims">' . esc_html( "{$orig_w}x{$orig_h} · img {$pos}/{$row['total']}" ) . '</div>';
+        echo '<button class="button button-small rincwc-cutoff-btn" data-gid="' . esc_attr( (string) $gid ) . '" data-pos="' . esc_attr( (string) $pos ) . '" title="Exclude this image and all after it">Set cutoff here</button>';
         echo '</div>';
 
         echo '<div class="rincwc-variants">';

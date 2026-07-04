@@ -25,10 +25,15 @@
     background: #f6f7f7;
     border-bottom: 1px solid #ddd;
     border-radius: 4px 4px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
-.rincwc-gal-head h3 { margin: 0; font-size: 15px; }
+.rincwc-gal-head h3 { margin: 0; font-size: 15px; flex: 1; }
 .rincwc-gal-head a { color: #2271b1; text-decoration: none; }
 .rincwc-gal-head a:hover { text-decoration: underline; }
+.rincwc-exclude-all-btn { color: #b32d2e !important; border-color: #b32d2e !important; flex-shrink: 0; }
+.rincwc-cutoff-btn { font-size: 10px !important; padding: 1px 5px !important; margin-top: 4px; color: #8c5a00 !important; border-color: #c98b0a !important; }
 
 .rincwc-details { padding: 10px 12px; }
 .rincwc-details > summary { cursor: pointer; font-size: 13px; color: #555; }

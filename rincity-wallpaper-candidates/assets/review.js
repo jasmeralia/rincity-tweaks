@@ -28,6 +28,7 @@
         initBatchButtons();
         initExpandCollapse();
         initFilter();
+        initCutoffButtons();
 
         document.addEventListener( 'click', e => {
             const a = e.target.closest( '.rincwc-crop-dl a' );
@@ -622,18 +623,64 @@
         } );
     }
 
+    function applyFilter( active ) {
+        document.querySelectorAll( '.rincwc-card' ).forEach( card => {
+            card.style.display = ( active && ! card.classList.contains( 'is-selected' ) ) ? 'none' : '';
+        } );
+        document.querySelectorAll( '.rincwc-gallery' ).forEach( gal => {
+            const hasSel = !! gal.querySelector( '.rincwc-card.is-selected' );
+            gal.style.display = ( active && ! hasSel ) ? 'none' : '';
+        } );
+    }
+
+    function filterUrl( active ) {
+        const u = new URL( window.location.href );
+        if ( active ) { u.searchParams.set( 'filter', 'selected' ); }
+        else { u.searchParams.delete( 'filter' ); }
+        return u.toString();
+    }
+
     function initFilter() {
         const btn = document.getElementById( 'rincwc-filter-sel' );
         if ( ! btn ) return;
+        if ( rincwcCfg.initFilter === 'selected' ) {
+            btn.classList.add( 'is-active' );
+            applyFilter( true );
+        }
         btn.addEventListener( 'click', () => {
             const active = btn.classList.toggle( 'is-active' );
-            document.querySelectorAll( '.rincwc-card' ).forEach( card => {
-                card.style.display = ( active && ! card.classList.contains( 'is-selected' ) ) ? 'none' : '';
-            } );
-            document.querySelectorAll( '.rincwc-gallery' ).forEach( gal => {
-                const hasSel = !! gal.querySelector( '.rincwc-card.is-selected' );
-                gal.style.display = ( active && ! hasSel ) ? 'none' : '';
-            } );
+            applyFilter( active );
+            history.replaceState( null, '', filterUrl( active ) );
+        } );
+    }
+
+    function reloadWithFilter() {
+        const active = document.getElementById( 'rincwc-filter-sel' )?.classList.contains( 'is-active' );
+        window.location.href = filterUrl( !! active );
+    }
+
+    function initCutoffButtons() {
+        document.addEventListener( 'click', e => {
+            const cutBtn = e.target.closest( '.rincwc-cutoff-btn' );
+            if ( cutBtn ) {
+                const gid = parseInt( cutBtn.dataset.gid, 10 );
+                const pos = parseInt( cutBtn.dataset.pos, 10 );
+                if ( ! confirm( `Exclude image #${pos} and everything after it in this gallery?` ) ) return;
+                cutBtn.disabled = true;
+                api( 'set-gallery-cutoff', 'POST', { gallery_id: gid, position: pos } )
+                    .then( () => reloadWithFilter() )
+                    .catch( err => { alert( 'Error: ' + err.message ); cutBtn.disabled = false; } );
+            }
+
+            const exclBtn = e.target.closest( '.rincwc-exclude-all-btn' );
+            if ( exclBtn ) {
+                const gid = parseInt( exclBtn.dataset.gid, 10 );
+                if ( ! confirm( 'Exclude ALL images in this gallery?' ) ) return;
+                exclBtn.disabled = true;
+                api( 'set-gallery-cutoff', 'POST', { gallery_id: gid, position: 0 } )
+                    .then( () => reloadWithFilter() )
+                    .catch( err => { alert( 'Error: ' + err.message ); exclBtn.disabled = false; } );
+            }
         } );
     }
 

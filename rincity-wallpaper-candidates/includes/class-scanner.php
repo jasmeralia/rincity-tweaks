@@ -17,7 +17,6 @@ final class RinCity_Wallpaper_Scanner {
             return self::error_result( 'Gallery has no Envira image data.' );
         }
 
-        $cutoff = RinCWC_Data::get_cutoff( $gallery_id );
         $images = $gallery_data['gallery'];
         $total  = count( $images );
         $rows   = [];
@@ -60,7 +59,6 @@ final class RinCity_Wallpaper_Scanner {
                 continue;
             }
 
-            $excluded    = $cutoff > 0 && $position > $cutoff;
             $scaled_path = get_attached_file( $att_id );
             $src_url     = '';
             if ( is_array( $item ) && ! empty( $item['src'] ) ) {
@@ -82,7 +80,7 @@ final class RinCity_Wallpaper_Scanner {
                 'src_url'       => $src_url,
                 'orig_w'        => $orig_w,
                 'orig_h'        => $orig_h,
-                'excluded'      => $excluded ? 1 : 0,
+                'excluded'      => 0,
                 'status'        => RinCWC_Data::STATUS_CANDIDATE,
             ];
 
@@ -92,11 +90,11 @@ final class RinCity_Wallpaper_Scanner {
 
             $rows[] = [
                 'row'      => $row,
-                'excluded' => $excluded,
-                'status'   => $excluded ? 'excluded' : 'candidate',
-                'reason'   => $excluded ? "Past cutoff position {$cutoff}." : 'Candidate.',
+                'excluded' => false,
+                'status'   => 'candidate',
+                'reason'   => 'Candidate.',
             ];
-            $counts[ $excluded ? 'excluded' : 'candidates' ]++;
+            $counts['candidates']++;
         }
 
         if ( $commit ) {
@@ -111,7 +109,6 @@ final class RinCity_Wallpaper_Scanner {
             'gallery_title' => $post->post_title,
             'gallery_slug'  => $post->post_name,
             'total'         => $total,
-            'cutoff'        => $cutoff,
             'rows'          => $rows,
             'counts'        => $counts,
             'written'       => $written,

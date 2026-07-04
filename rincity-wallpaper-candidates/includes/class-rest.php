@@ -44,6 +44,7 @@ final class RinCWC_Rest {
             [ 'methods' => 'DELETE', 'callback' => [ __CLASS__, 'watermarks_delete' ], 'permission_callback' => $admin ],
         ] );
         register_rest_route( self::NS, '/wpc/gallery-wm', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'gallery_wm' ], 'permission_callback' => $admin ] );
+        register_rest_route( self::NS, '/wpc/set-gallery-cutoff', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'set_gallery_cutoff' ], 'permission_callback' => $admin ] );
     }
 
     public static function is_admin(): bool {
@@ -382,6 +383,16 @@ final class RinCWC_Rest {
 
     private static function watermarked_crop_path( array $row, string $suffix ): string {
         return RINCWC_CROPS_DIR . "{$row['gallery_slug']}_{$row['position']}_{$row['crop_variant']}{$suffix}_wm.jpg";
+    }
+
+    public static function set_gallery_cutoff( WP_REST_Request $req ): WP_REST_Response {
+        $gallery_id = (int) ( $req->get_param( 'gallery_id' ) ?? 0 );
+        $position   = (int) ( $req->get_param( 'position' ) ?? -1 );
+        if ( ! $gallery_id ) {
+            return new WP_REST_Response( [ 'error' => 'gallery_id required' ], 400 );
+        }
+        RinCWC_Data::set_gallery_cutoff( $gallery_id, $position );
+        return new WP_REST_Response( [ 'ok' => true, 'gallery_id' => $gallery_id, 'position' => $position ], 200 );
     }
 
     private static function image_from_request( WP_REST_Request $req ): ?array {

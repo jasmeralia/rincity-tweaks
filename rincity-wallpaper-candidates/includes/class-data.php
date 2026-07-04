@@ -158,6 +158,31 @@ final class RinCWC_Data {
         return $updated;
     }
 
+    public static function set_gallery_cutoff( int $gallery_id, int $position ): void {
+        global $wpdb;
+        $table = RinCWC_DB::images_table();
+
+        if ( $position <= 0 ) {
+            // Exclude entire gallery.
+            $wpdb->update( $table, [ 'excluded' => 1 ], [ 'gallery_id' => $gallery_id ] );
+            $settings = self::get_settings();
+            unset( $settings['excluded_after'][ $gallery_id ] );
+            update_option( 'rincwc_settings', $settings, false );
+        } else {
+            // Exclude from $position onward (position >= $position → excluded).
+            $wpdb->query(
+                $wpdb->prepare(
+                    "UPDATE {$table} SET excluded = CASE WHEN position >= %d THEN 1 ELSE 0 END WHERE gallery_id = %d",
+                    $position, $gallery_id
+                )
+            );
+            // Store as last-included position for scanner compat.
+            $settings = self::get_settings();
+            $settings['excluded_after'][ $gallery_id ] = $position - 1;
+            update_option( 'rincwc_settings', $settings, false );
+        }
+    }
+
     public static function get_cutoff( int $gallery_id ): int {
         $settings = self::get_settings();
         return max( 0, (int) ( $settings['excluded_after'][ $gallery_id ] ?? 0 ) );
@@ -265,6 +290,8 @@ final class RinCWC_Data {
 
         $existing = self::get_image_by_gallery_attach( $gallery_id, $attach_id );
         if ( $existing ) {
+            // Preserve the manually-managed excluded flag on rescan.
+            unset( $row['excluded'] );
             $wpdb->update( RinCWC_DB::images_table(), $row, [ 'id' => (int) $existing['id'] ] );
             return (int) $existing['id'];
         }
