@@ -68,6 +68,37 @@ final class RinCWC_Data {
         return in_array( $user->user_login, [ 'rincity', 'rincity_member' ], true );
     }
 
+    public static function can_current_user_approve(): bool {
+        return self::approve_allowed();
+    }
+
+    public static function envira_galleries(): array {
+        return get_posts( [
+            'post_type'      => 'envira',
+            'post_status'    => [ 'publish', 'future', 'draft', 'private' ],
+            'posts_per_page' => -1,
+            'orderby'        => 'date',
+            'order'          => 'DESC',
+        ] );
+    }
+
+    public static function get_cutoff( int $gallery_id ): int {
+        $settings = self::get_settings();
+        return max( 0, (int) ( $settings['excluded_after'][ $gallery_id ] ?? 0 ) );
+    }
+
+    public static function set_cutoffs( array $cutoffs ): void {
+        $clean = [];
+        foreach ( $cutoffs as $gallery_id => $position ) {
+            $gallery_id = (int) $gallery_id;
+            $position   = (int) $position;
+            if ( $gallery_id > 0 && $position > 0 ) {
+                $clean[ $gallery_id ] = $position;
+            }
+        }
+        self::update_settings( [ 'excluded_after' => $clean ] );
+    }
+
     public static function max_crop_scale( int $orig_w, int $orig_h ): float {
         $orig_w = max( 1, $orig_w );
         $orig_h = max( 1, $orig_h );
@@ -196,6 +227,10 @@ final class RinCWC_Data {
              ORDER BY i.gallery_id DESC, i.position ASC",
             ARRAY_A
         ) ?: [];
+    }
+
+    public static function get_candidate_rows_for_admin(): array {
+        return self::get_review_images( true );
     }
 
     public static function get_gallery_images( int $gallery_id, bool $include_excluded = true ): array {
