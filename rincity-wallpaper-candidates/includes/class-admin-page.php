@@ -100,15 +100,18 @@ final class RinCity_Wallpaper_Admin_Page {
         echo '<th data-col="1" class="sortable">Pub date</th>';
         echo '<th data-col="2" class="sortable num">Images</th>';
         echo '<th data-col="3" class="sortable num">Excluded</th>';
-        echo '<th data-col="4" class="sortable num">Selected</th>';
-        echo '<th data-col="5" class="sortable num">Approved</th>';
+        echo '<th data-col="4" class="sortable num">Candidates</th>';
+        echo '<th data-col="5" class="sortable num">Selected</th>';
+        echo '<th data-col="6" class="sortable num">Approved</th>';
         echo '</tr></thead><tbody>';
         foreach ( $summary['galleries'] as $gallery_id => $gallery ) {
+            $candidates = $gallery['images'] - $gallery['excluded'];
             echo '<tr>';
             echo '<td>' . esc_html( $gallery['title'] ) . ' <span class="description">#' . esc_html( (string) $gallery_id ) . '</span></td>';
             echo '<td>' . esc_html( $gallery['pub_date'] ?? '' ) . '</td>';
             echo '<td>' . esc_html( (string) $gallery['images'] ) . '</td>';
             echo '<td>' . esc_html( (string) $gallery['excluded'] ) . '</td>';
+            echo '<td>' . esc_html( (string) $candidates ) . '</td>';
             echo '<td>' . esc_html( (string) ( $gallery['selected'] ?? 0 ) ) . '</td>';
             echo '<td>' . esc_html( (string) ( $gallery['approved'] ?? 0 ) ) . '</td>';
             echo '</tr>';
