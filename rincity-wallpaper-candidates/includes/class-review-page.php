@@ -110,6 +110,11 @@ final class RinCWC_Review_Page {
             ? count( $selected ) . ' selected, ' . count( $others ) . ' other · best ' . $best_w . 'px'
             : count( $imgs ) . ' candidates · best ' . $best_w . 'px';
 
+        // Cutoff button only appears after the last selected/approved image.
+        $max_sel_pos = $has_sel
+            ? max( array_map( fn( $row ) => (int) $row['position'], $selected ) )
+            : 0;
+
         $gal_attrs = ' id="rincwc-gallery-' . esc_attr( (string) $gid ) . '"'
             . ( $has_sel ? ' data-has-selection="1"' : '' )
             . ( $has_cutoff ? ' data-has-cutoff="1"' : '' );
@@ -123,24 +128,24 @@ final class RinCWC_Review_Page {
         if ( $selected ) {
             echo '<div class="rincwc-section">Selection</div><div class="rincwc-grid">';
             foreach ( $selected as $row ) {
-                self::render_candidate( $row );
+                self::render_candidate( $row, $max_sel_pos );
             }
             echo '</div><div class="rincwc-section">Other Candidates</div><div class="rincwc-grid">';
             foreach ( $others as $row ) {
-                self::render_candidate( $row );
+                self::render_candidate( $row, $max_sel_pos );
             }
             echo '</div>';
         } else {
             echo '<div class="rincwc-grid">';
             foreach ( $imgs as $row ) {
-                self::render_candidate( $row );
+                self::render_candidate( $row, $max_sel_pos );
             }
             echo '</div>';
         }
         echo '</details></div>';
     }
 
-    private static function render_candidate( array $row ): void {
+    private static function render_candidate( array $row, int $max_sel_pos = 0 ): void {
         $image_id = (int) $row['id'];
         $gid      = (int) $row['gallery_id'];
         $aid      = (int) $row['attach_id'];
@@ -200,10 +205,13 @@ final class RinCWC_Review_Page {
         self::render_badge( $status, $is_sel, $wm_corner, $wm_applied );
         echo '</div>';
 
+        $show_cutoff = ! $is_sel && $pos > $max_sel_pos;
         echo '<div class="rincwc-info">';
         echo '<div class="rincwc-fname">' . esc_html( $fname ) . '</div>';
         echo '<div class="rincwc-dims">' . esc_html( "{$orig_w}x{$orig_h} · img {$pos}/{$row['total']}" ) . '</div>';
-        echo '<button class="button button-small rincwc-cutoff-btn" data-gid="' . esc_attr( (string) $gid ) . '" data-pos="' . esc_attr( (string) $pos ) . '" title="Exclude this image and all after it">Set cutoff here</button>';
+        if ( $show_cutoff ) {
+            echo '<button class="button button-small rincwc-cutoff-btn" data-gid="' . esc_attr( (string) $gid ) . '" data-pos="' . esc_attr( (string) $pos ) . '" title="Exclude this image and all after it">Set cutoff here</button>';
+        }
         echo '</div>';
 
         echo '<div class="rincwc-variants">';

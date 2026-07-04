@@ -114,7 +114,7 @@ final class RinCity_Wallpaper_Admin_Page {
         echo '<th>Actions</th>';
         echo '</tr></thead><tbody>';
         foreach ( $summary['galleries'] as $gallery_id => $gallery ) {
-            $candidates  = $gallery['images'] - $gallery['excluded'];
+            $candidates  = $gallery['images'] - $gallery['excluded'] - ( $gallery['selected'] ?? 0 ) - ( $gallery['approved'] ?? 0 );
             $review_url  = esc_url( $review_base . '#rincwc-gallery-' . $gallery_id );
             $rescan_url  = esc_url( $scan_base . '&prescan=' . $gallery_id );
             echo '<tr data-title="' . esc_attr( strtolower( $gallery['title'] ) ) . '">';
