@@ -5,6 +5,7 @@
     wp.apiFetch.use( wp.apiFetch.createNonceMiddleware( rincwcCfg.nonce ) );
 
     const base = rincwcCfg.restBase;
+    const approveAllowed = !! ( rincwcCfg.approveAllowed || rincwcCfg.canApprove );
 
     function api( path, method, data ) {
         const opts = { url: base + path, method: method || 'GET' };
@@ -12,14 +13,12 @@
         return wp.apiFetch( opts );
     }
 
-    // Shared state for the crop overlay.
     let activeCropCard = null;
-    let activeCropCfg  = null;
-    let cropOverlayEl  = null;
-    let lightboxEl     = null;
-    let lightboxImg    = null;
-
-    // ── Init ──────────────────────────────────────────────────────────────────
+    let activeCropCfg = null;
+    let activeCrop = null;
+    let cropOverlayEl = null;
+    let lightboxEl = null;
+    let lightboxImg = null;
 
     document.addEventListener( 'DOMContentLoaded', () => {
         buildLightbox();
@@ -29,7 +28,6 @@
         initExpandCollapse();
         initFilter();
 
-        // Lightbox all crop download links.
         document.addEventListener( 'click', e => {
             const a = e.target.closest( '.rincwc-crop-dl a' );
             if ( ! a ) return;
@@ -38,13 +36,11 @@
         } );
     } );
 
-    // ── Lightbox ──────────────────────────────────────────────────────────────
-
     function buildLightbox() {
         const lb = document.createElement( 'div' );
         lb.id = 'rincwc-lb';
         lb.innerHTML = '<button class="rincwc-lb-close" aria-label="Close">&#x2715;</button>'
-                     + '<img class="rincwc-lb-img" src="" alt="">';
+            + '<img class="rincwc-lb-img" src="" alt="">';
         document.body.appendChild( lb );
         lightboxEl = lb;
         lightboxImg = lb.querySelector( '.rincwc-lb-img' );
@@ -58,13 +54,10 @@
     }
 
     function openLightbox( url, alt ) {
-        if ( ! lightboxEl ) return;
         lightboxImg.src = url;
         lightboxImg.alt = alt || '';
         lightboxEl.hidden = false;
     }
-
-    // ── Crop overlay ──────────────────────────────────────────────────────────
 
     function buildCropOverlay() {
         const ov = document.createElement( 'div' );
@@ -81,87 +74,143 @@
           +   '</div>'
           + '</div>'
           + '<div class="rincwc-cov-ctrl">'
-          +   '<label class="rincwc-cov-range-wrap">Offset'
-          +     '<input type="range" class="rincwc-cov-slider" min="0" max="0" value="0">'
-          +   '</label>'
-          +   '<span class="rincwc-cov-offval">0</span>px'
+          +   '<label class="rincwc-cov-range-wrap">Zoom <input type="range" class="rincwc-cov-scale" min="1" max="1" step="0.01" value="1"></label>'
+          +   '<span class="rincwc-cov-scaleval">1.00x</span>'
+          +   '<label class="rincwc-cov-range-wrap">X <input type="range" class="rincwc-cov-x" min="0" max="0" step="1" value="0"></label>'
+          +   '<span class="rincwc-cov-xval">0</span>'
+          +   '<label class="rincwc-cov-range-wrap">Y <input type="range" class="rincwc-cov-y" min="0" max="0" step="1" value="0"></label>'
+          +   '<span class="rincwc-cov-yval">0</span>'
           +   '<button class="button button-primary rincwc-cov-save">Save crop</button>'
+          +   '<button class="button rincwc-cov-reset">Reset</button>'
           + '</div>';
         document.body.appendChild( ov );
         cropOverlayEl = ov;
 
-        const img    = ov.querySelector( '.rincwc-cov-img' );
-        const box    = ov.querySelector( '.rincwc-cov-box' );
-        const wrap   = ov.querySelector( '.rincwc-cov-wrap' );
-        const slider = ov.querySelector( '.rincwc-cov-slider' );
-        const offVal = ov.querySelector( '.rincwc-cov-offval' );
+        const img = ov.querySelector( '.rincwc-cov-img' );
+        const box = ov.querySelector( '.rincwc-cov-box' );
+        const wrap = ov.querySelector( '.rincwc-cov-wrap' );
+        const preview = ov.querySelector( '.rincwc-cov-preview' );
+        const scale = ov.querySelector( '.rincwc-cov-scale' );
+        const x = ov.querySelector( '.rincwc-cov-x' );
+        const y = ov.querySelector( '.rincwc-cov-y' );
 
-        slider.addEventListener( 'input', () => {
-            offVal.textContent = slider.value;
-            updateCropBox( img, box, activeCropCfg, parseInt( slider.value ) );
+        scale.addEventListener( 'input', () => {
+            const center = cropCenter();
+            setCrop( { scale: parseFloat( scale.value ) }, center );
         } );
+        x.addEventListener( 'input', () => setCrop( { x: parseInt( x.value, 10 ) || 0 } ) );
+        y.addEventListener( 'input', () => setCrop( { y: parseInt( y.value, 10 ) || 0 } ) );
 
-        // Drag on crop box.
-        let dragging = false, startX = 0, startY = 0, startOff = 0;
-        box.addEventListener( 'mousedown', e => {
+        let dragging = false;
+        let touchId = null;
+        let start = null;
+
+        const startPan = ( clientX, clientY, id ) => {
             if ( ! activeCropCfg ) return;
-            dragging = true; startX = e.clientX; startY = e.clientY;
-            startOff = parseInt( slider.value );
+            dragging = true;
+            touchId = id;
+            start = { clientX, clientY, x: activeCrop.x, y: activeCrop.y };
+        };
+        const movePan = ( clientX, clientY ) => {
+            if ( ! dragging || ! start ) return;
+            const sx = img.clientWidth / activeCropCfg.origW;
+            const sy = img.clientHeight / activeCropCfg.origH;
+            setCrop( {
+                x: Math.round( start.x + ( clientX - start.clientX ) / sx ),
+                y: Math.round( start.y + ( clientY - start.clientY ) / sy ),
+            } );
+        };
+
+        box.addEventListener( 'mousedown', e => {
+            startPan( e.clientX, e.clientY, null );
             e.preventDefault();
         } );
-        document.addEventListener( 'mousemove', e => {
-            if ( ! dragging || ! activeCropCfg ) return;
-            const cfg = activeCropCfg;
-            const dx  = e.clientX - startX;
-            const dy  = e.clientY - startY;
-            let newOff;
-            if ( cfg.cropAxis === 'x' ) {
-                newOff = Math.round( startOff + dx * 2160 / ( img.clientHeight || 1 ) );
-            } else {
-                newOff = Math.round( startOff + dy * 3840 / ( img.clientWidth || 1 ) );
-            }
-            newOff = Math.max( 0, Math.min( cfg.cropRange, newOff ) );
-            slider.value = newOff;
-            offVal.textContent = newOff;
-            updateCropBox( img, box, cfg, newOff );
-        } );
-        document.addEventListener( 'mouseup', () => { dragging = false; } );
+        document.addEventListener( 'mousemove', e => movePan( e.clientX, e.clientY ) );
+        document.addEventListener( 'mouseup', () => { dragging = false; start = null; touchId = null; } );
 
-        // Save.
+        preview.addEventListener( 'wheel', e => {
+            if ( ! activeCropCfg ) return;
+            e.preventDefault();
+            const rect = img.getBoundingClientRect();
+            const cursorX = e.clientX - rect.left;
+            const cursorY = e.clientY - rect.top;
+            const sx = img.clientWidth / activeCropCfg.origW;
+            const sy = img.clientHeight / activeCropCfg.origH;
+            const oldBoxW = activeCrop.scale * 3840;
+            const oldBoxH = activeCrop.scale * 2160;
+            const fx = ( cursorX / sx - activeCrop.x ) / oldBoxW;
+            const fy = ( cursorY / sy - activeCrop.y ) / oldBoxH;
+            const nextScale = activeCrop.scale + ( e.deltaY > 0 ? 0.08 : -0.08 );
+            const nextBoxW = nextScale * 3840;
+            const nextBoxH = nextScale * 2160;
+            setCrop( {
+                scale: nextScale,
+                x: Math.round( cursorX / sx - fx * nextBoxW ),
+                y: Math.round( cursorY / sy - fy * nextBoxH ),
+            } );
+        }, { passive: false } );
+
+        preview.addEventListener( 'touchstart', e => {
+            if ( e.touches.length !== 1 ) return;
+            const t = e.touches[0];
+            startPan( t.clientX, t.clientY, t.identifier );
+        }, { passive: true } );
+        preview.addEventListener( 'touchmove', e => {
+            if ( touchId === null ) return;
+            const t = Array.from( e.touches ).find( item => item.identifier === touchId );
+            if ( ! t ) return;
+            e.preventDefault();
+            movePan( t.clientX, t.clientY );
+        }, { passive: false } );
+        preview.addEventListener( 'touchend', () => { dragging = false; start = null; touchId = null; } );
+
+        ov.querySelector( '.rincwc-cov-reset' ).addEventListener( 'click', () => {
+            const scaleValue = activeCropCfg.maxScale || 1;
+            const bounds = cropBounds( scaleValue );
+            setCrop( {
+                scale: scaleValue,
+                x: Math.round( bounds.maxX / 2 ),
+                y: Math.round( bounds.maxY / 2 ),
+            } );
+        } );
+
         ov.querySelector( '.rincwc-cov-save' ).addEventListener( 'click', () => {
             if ( ! activeCropCfg || ! activeCropCard ) return;
-            const offset  = parseInt( slider.value );
-            const cfg     = activeCropCfg;
-            const card    = activeCropCard;
+            const cfg = activeCropCfg;
             const saveBtn = ov.querySelector( '.rincwc-cov-save' );
             saveBtn.disabled = true;
-            api( 'crop-offset', 'POST', {
-                gallery_id: cfg.gid,  attach_id:     cfg.aid,    offset,
-                gallery_slug: cfg.gSlug, gallery_title: cfg.gTitle,
-                position:   cfg.pos,  total:         cfg.total,  filename: cfg.fname,
+            api( 'crop-custom', 'POST', {
+                gallery_id: cfg.gid,
+                attach_id: cfg.aid,
+                scale: activeCrop.scale,
+                x: activeCrop.x,
+                y: activeCrop.y,
             } ).then( () => {
-                cfg.customOff = offset;
-                cfg.selCrop   = 'custom';
-                card.dataset.c = JSON.stringify( cfg );
-                card.querySelectorAll( '.rincwc-vbtn' ).forEach( b => b.classList.toggle( 'active', b.dataset.v === 'custom' ) );
-                card.classList.add( 'is-selected' );
-                showWmRow( card, true );
-                updateBadge( card, false );
+                cfg.customScale = activeCrop.scale;
+                cfg.customX = activeCrop.x;
+                cfg.customY = activeCrop.y;
+                cfg.selCrop = 'custom';
+                cfg.status = 'SELECTED';
+                activeCropCard.dataset.c = JSON.stringify( cfg );
+                activeCropCard.querySelectorAll( '.rincwc-vbtn' ).forEach( b => b.classList.toggle( 'active', b.dataset.v === 'custom' ) );
+                activeCropCard.classList.add( 'is-selected' );
+                showWmRow( activeCropCard, true );
+                showApprovalRow( activeCropCard, true );
+                updateBadge( activeCropCard, false );
+                updateCropLinks( activeCropCard, cfg );
+                ensureDeselect( activeCropCard, cfg );
                 saveBtn.disabled = false;
                 closeCropOverlay();
-            } ).catch( e => { console.error( 'crop-offset failed', e ); saveBtn.disabled = false; } );
+            } ).catch( e => { console.error( 'crop-custom failed', e ); saveBtn.disabled = false; } );
         } );
 
-        // Close / Escape.
         ov.querySelector( '.rincwc-cov-close' ).addEventListener( 'click', closeCropOverlay );
         document.addEventListener( 'keydown', e => { if ( e.key === 'Escape' && ! ov.hidden ) closeCropOverlay(); } );
-
-        // Resize: recalculate wrap + box.
         window.addEventListener( 'resize', () => {
             if ( ov.hidden || ! activeCropCfg ) return;
             requestAnimationFrame( () => {
                 sizeWrap( img, wrap );
-                updateCropBox( img, box, activeCropCfg, parseInt( slider.value ) );
+                renderCropBox();
             } );
         } );
 
@@ -169,27 +218,25 @@
     }
 
     function openCropOverlay( card, cfg ) {
-        if ( ! cropOverlayEl ) return;
         activeCropCard = card;
-        activeCropCfg  = cfg;
+        activeCropCfg = cfg;
+        activeCrop = {
+            scale: parseFloat( cfg.customScale || cfg.maxScale || 1 ),
+            x: parseInt( cfg.customX || 0, 10 ),
+            y: parseInt( cfg.customY || 0, 10 ),
+        };
+        activeCrop = clampCrop( activeCrop );
 
-        const img    = cropOverlayEl.querySelector( '.rincwc-cov-img' );
-        const box    = cropOverlayEl.querySelector( '.rincwc-cov-box' );
-        const wrap   = cropOverlayEl.querySelector( '.rincwc-cov-wrap' );
-        const slider = cropOverlayEl.querySelector( '.rincwc-cov-slider' );
-        const offVal = cropOverlayEl.querySelector( '.rincwc-cov-offval' );
-
+        const img = cropOverlayEl.querySelector( '.rincwc-cov-img' );
+        const wrap = cropOverlayEl.querySelector( '.rincwc-cov-wrap' );
         cropOverlayEl.querySelector( '.rincwc-cov-title' ).textContent = cfg.title || cfg.fname;
-        slider.max   = cfg.cropRange;
-        slider.value = cfg.customOff || 0;
-        offVal.textContent = slider.value;
-
         cropOverlayEl.hidden = false;
         document.body.style.overflow = 'hidden';
 
         const doUpdate = () => requestAnimationFrame( () => {
             sizeWrap( img, wrap );
-            updateCropBox( img, box, cfg, parseInt( slider.value ) );
+            syncSliders();
+            renderCropBox();
         } );
 
         if ( img.dataset.src !== cfg.scaledUrl ) {
@@ -203,66 +250,106 @@
     }
 
     function closeCropOverlay() {
-        if ( cropOverlayEl ) cropOverlayEl.hidden = true;
+        cropOverlayEl.hidden = true;
         document.body.style.overflow = '';
         activeCropCard = null;
-        activeCropCfg  = null;
+        activeCropCfg = null;
+        activeCrop = null;
     }
 
-    // Size the wrap to fill available space while preserving image aspect ratio.
     function sizeWrap( img, wrap ) {
         if ( ! img.naturalWidth ) return;
         const preview = wrap.parentElement;
-        const maxW    = preview.clientWidth;
-        const maxH    = preview.clientHeight;
-        if ( ! maxW || ! maxH ) return;
-        const ar      = img.naturalWidth / img.naturalHeight;
+        const maxW = preview.clientWidth;
+        const maxH = preview.clientHeight;
+        const ar = img.naturalWidth / img.naturalHeight;
         let w, h;
         if ( ar >= maxW / maxH ) {
             w = maxW; h = Math.round( maxW / ar );
         } else {
             h = maxH; w = Math.round( maxH * ar );
         }
-        wrap.style.width  = w + 'px';
+        wrap.style.width = w + 'px';
         wrap.style.height = h + 'px';
     }
 
-    // ── Crop box math ─────────────────────────────────────────────────────────
-
-    function updateCropBox( img, box, cfg, offset ) {
-        if ( ! img || ! box || ! cfg ) return;
-        const dispW = img.clientWidth;
-        const dispH = img.clientHeight;
-        if ( ! dispW || ! dispH ) return;
-
-        const ar = 3840 / 2160;
-        if ( cfg.cropAxis === 'x' ) {
-            const boxW = Math.round( dispH * ar );
-            const boxX = Math.round( offset * dispH / 2160 );
-            box.style.width  = boxW + 'px';
-            box.style.height = dispH + 'px';
-            box.style.left   = Math.min( boxX, Math.max( 0, dispW - boxW ) ) + 'px';
-            box.style.top    = '0';
-        } else {
-            const boxH = Math.round( dispW / ar );
-            const boxY = Math.round( offset * dispW / 3840 );
-            box.style.width  = dispW + 'px';
-            box.style.height = boxH + 'px';
-            box.style.left   = '0';
-            box.style.top    = Math.min( boxY, Math.max( 0, dispH - boxH ) ) + 'px';
-        }
+    function cropBounds( scale ) {
+        const boxW = Math.round( scale * 3840 );
+        const boxH = Math.round( scale * 2160 );
+        return {
+            boxW,
+            boxH,
+            maxX: Math.max( 0, activeCropCfg.origW - boxW ),
+            maxY: Math.max( 0, activeCropCfg.origH - boxH ),
+        };
     }
 
-    // ── Per-card init ─────────────────────────────────────────────────────────
+    function clampCrop( crop ) {
+        const min = parseFloat( activeCropCfg.minScale || 1 );
+        const max = Math.max( min, parseFloat( activeCropCfg.maxScale || min ) );
+        const scale = Math.max( min, Math.min( max, parseFloat( crop.scale || min ) ) );
+        const bounds = cropBounds( scale );
+        return {
+            scale,
+            x: Math.max( 0, Math.min( bounds.maxX, parseInt( crop.x || 0, 10 ) ) ),
+            y: Math.max( 0, Math.min( bounds.maxY, parseInt( crop.y || 0, 10 ) ) ),
+        };
+    }
+
+    function cropCenter() {
+        if ( ! activeCrop ) return null;
+        const bounds = cropBounds( activeCrop.scale );
+        return {
+            x: activeCrop.x + bounds.boxW / 2,
+            y: activeCrop.y + bounds.boxH / 2,
+        };
+    }
+
+    function setCrop( next, center ) {
+        const merged = Object.assign( {}, activeCrop, next );
+        if ( center && next.scale !== undefined && next.x === undefined && next.y === undefined ) {
+            const bounds = cropBounds( parseFloat( next.scale ) );
+            merged.x = Math.round( center.x - bounds.boxW / 2 );
+            merged.y = Math.round( center.y - bounds.boxH / 2 );
+        }
+        activeCrop = clampCrop( merged );
+        syncSliders();
+        renderCropBox();
+    }
+
+    function syncSliders() {
+        const scale = cropOverlayEl.querySelector( '.rincwc-cov-scale' );
+        const x = cropOverlayEl.querySelector( '.rincwc-cov-x' );
+        const y = cropOverlayEl.querySelector( '.rincwc-cov-y' );
+        const bounds = cropBounds( activeCrop.scale );
+        scale.min = activeCropCfg.minScale || 1;
+        scale.max = activeCropCfg.maxScale || 1;
+        scale.value = activeCrop.scale;
+        x.max = bounds.maxX; x.value = activeCrop.x; x.disabled = bounds.maxX === 0;
+        y.max = bounds.maxY; y.value = activeCrop.y; y.disabled = bounds.maxY === 0;
+        cropOverlayEl.querySelector( '.rincwc-cov-scaleval' ).textContent = activeCrop.scale.toFixed( 2 ) + 'x';
+        cropOverlayEl.querySelector( '.rincwc-cov-xval' ).textContent = activeCrop.x;
+        cropOverlayEl.querySelector( '.rincwc-cov-yval' ).textContent = activeCrop.y;
+    }
+
+    function renderCropBox() {
+        const img = cropOverlayEl.querySelector( '.rincwc-cov-img' );
+        const box = cropOverlayEl.querySelector( '.rincwc-cov-box' );
+        if ( ! img.clientWidth || ! activeCrop ) return;
+        const sx = img.clientWidth / activeCropCfg.origW;
+        const sy = img.clientHeight / activeCropCfg.origH;
+        const bounds = cropBounds( activeCrop.scale );
+        box.style.width = Math.round( bounds.boxW * sx ) + 'px';
+        box.style.height = Math.round( bounds.boxH * sy ) + 'px';
+        box.style.left = Math.round( activeCrop.x * sx ) + 'px';
+        box.style.top = Math.round( activeCrop.y * sy ) + 'px';
+    }
 
     function initCard( card ) {
         const cfg = JSON.parse( card.dataset.c || '{}' );
-
-        // Thumbnail → lightbox.
         const thumb = card.querySelector( '.rincwc-thumb' );
         if ( thumb ) thumb.addEventListener( 'click', () => openLightbox( cfg.scaledUrl || thumb.src, cfg.title || cfg.fname ) );
 
-        // Variant buttons.
         card.querySelectorAll( '.rincwc-vbtn' ).forEach( btn => {
             if ( btn.classList.contains( 'rincwc-custbtn' ) ) {
                 btn.addEventListener( 'click', () => openCropOverlay( card, cfg ) );
@@ -271,54 +358,44 @@
             }
         } );
 
-        // Deselect.
         const deselBtn = card.querySelector( '.rincwc-desel' );
         if ( deselBtn ) deselBtn.addEventListener( 'click', () => deselect( card, cfg ) );
 
-        // Watermark corner dropdown.
         const wmSel = card.querySelector( '.rincwc-wm-sel' );
         if ( wmSel ) wmSel.addEventListener( 'change', () => setWatermark( card, cfg, wmSel.value ) );
 
         const approveBtn = card.querySelector( '.rincwc-approve-btn' );
         if ( approveBtn ) approveBtn.addEventListener( 'click', () => toggleApprove( card, cfg, approveBtn ) );
 
-        // Comments.
         initComments( card );
     }
 
-    // ── Variant select ────────────────────────────────────────────────────────
-
     function selectVariant( card, cfg, btn ) {
         const variant = btn.dataset.v;
-        const data = {
-            gallery_id: cfg.gid, gallery_slug: cfg.gSlug, gallery_title: cfg.gTitle,
-            attach_id: cfg.aid, position: cfg.pos, total: cfg.total,
-            filename: cfg.fname, selected_crop: variant,
-        };
-        api( 'select', 'POST', data ).then( () => {
+        api( 'select', 'POST', {
+            gallery_id: cfg.gid,
+            attach_id: cfg.aid,
+            selected_crop: variant,
+        } ).then( () => {
             card.classList.add( 'is-selected' );
             card.querySelectorAll( '.rincwc-vbtn' ).forEach( b => b.classList.toggle( 'active', b.dataset.v === variant ) );
             cfg.selCrop = variant;
+            cfg.status = 'SELECTED';
             card.dataset.c = JSON.stringify( cfg );
             showWmRow( card, true );
             showApprovalRow( card, true );
             updateBadge( card, false );
             updateCropLinks( card, cfg );
-
-            if ( ! card.querySelector( '.rincwc-desel' ) ) {
-                const desel = document.createElement( 'span' );
-                desel.className = 'rincwc-desel'; desel.title = 'Remove selection'; desel.textContent = '✕';
-                desel.addEventListener( 'click', () => deselect( card, cfg ) );
-                card.querySelector( '.rincwc-variants' ).appendChild( desel );
-            }
+            ensureDeselect( card, cfg );
         } ).catch( e => console.error( 'select failed', e ) );
     }
 
     function deselect( card, cfg ) {
         api( 'deselect', 'POST', { gallery_id: cfg.gid, attach_id: cfg.aid } ).then( () => {
-            card.classList.remove( 'is-selected' );
+            card.classList.remove( 'is-selected', 'is-approved' );
             card.querySelectorAll( '.rincwc-vbtn' ).forEach( b => b.classList.remove( 'active' ) );
             cfg.selCrop = '';
+            cfg.status = 'CANDIDATE';
             card.dataset.c = JSON.stringify( cfg );
             showWmRow( card, false );
             showApprovalRow( card, false );
@@ -330,19 +407,20 @@
         } ).catch( e => console.error( 'deselect failed', e ) );
     }
 
-    // ── Watermark ─────────────────────────────────────────────────────────────
-
     function setWatermark( card, cfg, corner ) {
         api( 'watermark', 'POST', { gallery_id: cfg.gid, attach_id: cfg.aid, wm_corner: corner } ).then( () => {
             cfg.wmCorner = corner;
+            cfg.wmApplied = false;
             card.dataset.c = JSON.stringify( cfg );
             const st = card.querySelector( '.rincwc-wm-status' );
             if ( st ) {
                 st.textContent = corner ? 'pending' : '';
-                st.className   = 'rincwc-wm-status' + ( corner ? ' wm-pending' : '' );
+                st.className = 'rincwc-wm-status' + ( corner ? ' wm-pending' : '' );
             }
-            const approve = card.querySelector( '.rincwc-approve-btn' );
-            if ( approve ) approve.disabled = ! ( rincwcCfg.approveAllowed || rincwcCfg.canApprove ) || ! corner;
+            const approveBtn = card.querySelector( '.rincwc-approve-btn' );
+            if ( approveBtn && approveBtn.dataset.approved !== '1' ) {
+                approveBtn.disabled = ! ( approveAllowed && cfg.selCrop && corner );
+            }
         } ).catch( e => console.error( 'watermark failed', e ) );
     }
 
@@ -351,10 +429,7 @@
         const approved = btn.dataset.approved === '1';
         btn.disabled = true;
         api( approved ? 'unapprove' : 'approve', 'POST', { gallery_id: cfg.gid, attach_id: cfg.aid } ).then( r => {
-            if ( ! r.ok ) {
-                btn.disabled = false;
-                return;
-            }
+            if ( ! r.ok ) { btn.disabled = false; return; }
             const nowApproved = ! approved;
             btn.dataset.approved = nowApproved ? '1' : '0';
             btn.textContent = nowApproved ? 'Unapprove' : 'Approve';
@@ -362,11 +437,19 @@
             cfg.status = nowApproved ? 'APPROVED' : 'SELECTED';
             card.dataset.c = JSON.stringify( cfg );
             updateBadge( card, nowApproved ? 'approved' : false );
-            btn.disabled = ! ( rincwcCfg.approveAllowed || rincwcCfg.canApprove );
+            btn.disabled = ! approveAllowed;
         } ).catch( e => { console.error( 'approve toggle failed', e ); btn.disabled = false; } );
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    function ensureDeselect( card, cfg ) {
+        if ( card.querySelector( '.rincwc-desel' ) ) return;
+        const desel = document.createElement( 'span' );
+        desel.className = 'rincwc-desel';
+        desel.title = 'Remove selection';
+        desel.textContent = 'x';
+        desel.addEventListener( 'click', () => deselect( card, cfg ) );
+        card.querySelector( '.rincwc-variants' ).appendChild( desel );
+    }
 
     function showWmRow( card, visible ) {
         const row = card.querySelector( '.rincwc-wm-row' );
@@ -391,26 +474,25 @@
             return;
         }
         badge.className = 'rincwc-badge ' + ( wmApplied ? 'badge-wm' : 'badge-sel' );
-        badge.textContent = wmApplied ? 'WM applied' : 'Selected';
+        badge.textContent = wmApplied ? 'WM ready' : 'Selected';
     }
 
     function updateCropLinks( card, cfg ) {
         let dl = card.querySelector( '.rincwc-crop-dl' );
         if ( ! dl ) { dl = document.createElement( 'div' ); dl.className = 'rincwc-crop-dl'; card.appendChild( dl ); }
-        dl.innerHTML = cfg.selCrop === 'custom' ? '<em>Custom crop pending — click Generate crops.</em>' : '';
+        dl.innerHTML = cfg.selCrop === 'custom' ? '<em>Custom crop generated. Reapply watermark if needed.</em>' : '';
     }
 
-    // ── Batch buttons ─────────────────────────────────────────────────────────
-
     function initBatchButtons() {
-        const gc  = document.getElementById( 'rincwc-generate-crops' );
+        const gc = document.getElementById( 'rincwc-generate-crops' );
         const awm = document.getElementById( 'rincwc-apply-wm' );
+        const sync = document.getElementById( 'rincwc-sync-galleries' );
         const msg = document.getElementById( 'rincwc-batch-msg' );
 
         if ( gc ) gc.addEventListener( 'click', () => {
-            gc.disabled = true; msg.textContent = 'Generating crops…';
+            gc.disabled = true; msg.textContent = 'Generating crops...';
             api( 'generate-crops', 'POST' ).then( r => {
-                const ok  = r.results.filter( x => x.status === 'ok' ).length;
+                const ok = r.results.filter( x => x.status === 'ok' ).length;
                 const err = r.results.filter( x => x.status === 'error' ).length;
                 msg.textContent = `Done: ${ok} ok, ${err} errors.`;
                 gc.disabled = false;
@@ -418,27 +500,31 @@
         } );
 
         if ( awm ) awm.addEventListener( 'click', () => {
-            awm.disabled = true; msg.textContent = 'Applying watermarks…';
+            awm.disabled = true; msg.textContent = 'Applying watermarks...';
             api( 'apply-watermarks', 'POST' ).then( r => {
                 const ok = r.results.filter( x => x.status === 'ok' ).length;
                 msg.textContent = `Done: ${ok} watermarks applied.`;
                 awm.disabled = false;
                 document.querySelectorAll( '.rincwc-wm-status.wm-pending' ).forEach( el => {
-                    el.textContent = '✓ applied'; el.classList.replace( 'wm-pending', 'wm-done' );
+                    el.textContent = 'applied'; el.classList.replace( 'wm-pending', 'wm-done' );
                 } );
             } ).catch( e => { msg.textContent = 'Error: ' + e.message; awm.disabled = false; } );
         } );
-    }
 
-    // ── Selections filter ─────────────────────────────────────────────────────
+        if ( sync ) sync.addEventListener( 'click', () => {
+            sync.disabled = true; msg.textContent = 'Publishing galleries...';
+            api( 'sync-galleries', 'POST' ).then( r => {
+                const counts = r.results || {};
+                msg.textContent = `Published: ${counts.added || 0} added, ${counts.skipped || 0} skipped, ${counts.errors || 0} errors.`;
+                sync.disabled = false;
+            } ).catch( e => { msg.textContent = 'Error: ' + e.message; sync.disabled = false; } );
+        } );
+    }
 
     function initFilter() {
         const btn = document.getElementById( 'rincwc-filter-sel' );
         if ( ! btn ) return;
-        btn.addEventListener( 'click', () => {
-            const active = btn.classList.toggle( 'is-active' );
-            applyFilter( active );
-        } );
+        btn.addEventListener( 'click', () => applyFilter( btn.classList.toggle( 'is-active' ) ) );
     }
 
     function applyFilter( selectionsOnly ) {
@@ -451,8 +537,6 @@
         } );
     }
 
-    // ── Expand/collapse all ───────────────────────────────────────────────────
-
     function initExpandCollapse() {
         const ea = document.getElementById( 'rincwc-expand-all' );
         const ca = document.getElementById( 'rincwc-collapse-all' );
@@ -460,13 +544,11 @@
         if ( ca ) ca.addEventListener( 'click', e => { e.preventDefault(); document.querySelectorAll( '.rincwc-details' ).forEach( d => d.open = false ); } );
     }
 
-    // ── Comments ──────────────────────────────────────────────────────────────
-
     function initComments( card ) {
-        const box     = card.querySelector( '.rincwc-comments' );
+        const box = card.querySelector( '.rincwc-comments' );
         if ( ! box ) return;
-        const key     = box.dataset.key;
-        const ta      = box.querySelector( '.rincwc-comment-ta' );
+        const key = box.dataset.key;
+        const ta = box.querySelector( '.rincwc-comment-ta' );
         const postBtn = box.querySelector( '.rincwc-post-btn' );
 
         if ( postBtn ) {
@@ -483,25 +565,25 @@
         }
 
         box.addEventListener( 'click', e => {
-            const el   = e.target;
+            const el = e.target;
             const cDiv = el.closest( '.rincwc-comment' );
             if ( ! cDiv ) return;
-            const cid  = cDiv.dataset.cid;
+            const cid = cDiv.dataset.cid;
 
             if ( el.classList.contains( 'rincwc-del-btn' ) ) {
                 if ( ! confirm( 'Delete this comment?' ) ) return;
                 api( 'comments/' + cid, 'DELETE' ).then( r => { if ( r.ok ) cDiv.remove(); } )
-                    .catch( e => console.error( 'delete failed', e ) );
+                    .catch( err => console.error( 'delete failed', err ) );
             }
             if ( el.classList.contains( 'rincwc-edit-btn' ) ) {
                 cDiv.querySelector( '.rincwc-comment-body' ).hidden = true;
-                cDiv.querySelector( '.rincwc-edit-form' ).hidden    = false;
+                cDiv.querySelector( '.rincwc-edit-form' ).hidden = false;
                 el.hidden = true;
             }
             if ( el.classList.contains( 'rincwc-cancel-edit-btn' ) ) {
                 cDiv.querySelector( '.rincwc-comment-body' ).hidden = false;
-                cDiv.querySelector( '.rincwc-edit-form' ).hidden    = true;
-                cDiv.querySelector( '.rincwc-edit-btn' ).hidden     = false;
+                cDiv.querySelector( '.rincwc-edit-form' ).hidden = true;
+                cDiv.querySelector( '.rincwc-edit-btn' ).hidden = false;
             }
             if ( el.classList.contains( 'rincwc-save-edit-btn' ) ) {
                 const newBody = cDiv.querySelector( '.rincwc-edit-ta' ).value.trim();
@@ -514,16 +596,16 @@
                         cDiv.querySelector( '.rincwc-edit-ta' ).value = newBody;
                         bodyEl.hidden = false;
                         cDiv.querySelector( '.rincwc-edit-form' ).hidden = true;
-                        cDiv.querySelector( '.rincwc-edit-btn' ).hidden  = false;
+                        cDiv.querySelector( '.rincwc-edit-btn' ).hidden = false;
                     }
                     el.disabled = false;
-                } ).catch( e => { console.error( 'edit failed', e ); el.disabled = false; } );
+                } ).catch( err => { console.error( 'edit failed', err ); el.disabled = false; } );
             }
         } );
     }
 
     function buildComment( c ) {
-        const uid  = parseInt( rincwcCfg.userId );
+        const uid = parseInt( rincwcCfg.userId, 10 );
         const isMe = c.user_id === uid || c.user_id === String( uid );
         const name = c.display_name || c.user_login || 'Unknown';
         const date = new Date( c.created_at ).toLocaleString( undefined, {
@@ -532,7 +614,7 @@
         const div = document.createElement( 'div' );
         div.className = 'rincwc-comment'; div.dataset.cid = c.id;
         div.innerHTML =
-            '<div class="rincwc-comment-meta"><strong>' + esc( name ) + '</strong> · ' + esc( date )
+            '<div class="rincwc-comment-meta"><strong>' + esc( name ) + '</strong> - ' + esc( date )
             + ( isMe ? ' <button class="rincwc-edit-btn button-link">Edit</button>'
                      + ' <button class="rincwc-del-btn button-link">Delete</button>' : '' )
             + '</div>'
@@ -551,5 +633,4 @@
         return String( s ).replace( /&/g, '&amp;' ).replace( /</g, '&lt;' ).replace( />/g, '&gt;' ).replace( /"/g, '&quot;' );
     }
     function escNl( s ) { return esc( s ).replace( /\n/g, '<br>' ); }
-
 })();
