@@ -103,13 +103,33 @@ final class RinCWC_Rest {
     // ── Crop offset ───────────────────────────────────────────────────────────
 
     public static function crop_offset( WP_REST_Request $req ): WP_REST_Response {
-        $gid    = sanitize_text_field( $req->get_param( 'gallery_id' ) ?? '' );
-        $aid    = sanitize_text_field( $req->get_param( 'attach_id' )  ?? '' );
+        $gid    = sanitize_text_field( $req->get_param( 'gallery_id' )    ?? '' );
+        $aid    = sanitize_text_field( $req->get_param( 'attach_id' )     ?? '' );
         $offset = (int) ( $req->get_param( 'offset' ) ?? 0 );
         if ( ! $gid || ! $aid ) return new WP_REST_Response( [ 'error' => 'Missing fields' ], 400 );
 
         $row = RinCWC_CSV::read_selections()[ $gid ][ $aid ] ?? null;
-        if ( ! $row ) return new WP_REST_Response( [ 'error' => 'Image not selected' ], 400 );
+
+        if ( ! $row ) {
+            // New selection via custom crop — build row from posted metadata.
+            $required = [ 'gallery_slug', 'gallery_title', 'position', 'total', 'filename' ];
+            foreach ( $required as $f ) {
+                if ( $req->get_param( $f ) === null ) {
+                    return new WP_REST_Response( [ 'error' => "Missing $f" ], 400 );
+                }
+            }
+            $row = [
+                'gallery_id'    => $gid,
+                'gallery_slug'  => sanitize_text_field( $req->get_param( 'gallery_slug' ) ),
+                'gallery_title' => sanitize_text_field( $req->get_param( 'gallery_title' ) ),
+                'attach_id'     => $aid,
+                'position'      => sanitize_text_field( $req->get_param( 'position' ) ),
+                'total'         => sanitize_text_field( $req->get_param( 'total' ) ),
+                'filename'      => sanitize_text_field( $req->get_param( 'filename' ) ),
+                'wm_corner'     => '',
+                'wm_applied'    => 'false',
+            ];
+        }
 
         $row['selected_crop']      = 'custom';
         $row['custom_crop_offset'] = (string) $offset;

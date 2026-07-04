@@ -217,7 +217,12 @@
             saveBtn.addEventListener( 'click', () => {
                 const offset = parseInt( slider?.value ?? cfg.customOff );
                 saveBtn.disabled = true;
-                api( 'crop-offset', 'POST', { gallery_id: cfg.gid, attach_id: cfg.aid, offset } ).then( () => {
+                const payload = {
+                    gallery_id: cfg.gid, attach_id: cfg.aid, offset,
+                    gallery_slug: cfg.gSlug, gallery_title: cfg.gTitle,
+                    position: cfg.pos, total: cfg.total, filename: cfg.fname,
+                };
+                api( 'crop-offset', 'POST', payload ).then( () => {
                     cfg.customOff = offset;
                     cfg.selCrop   = 'custom';
                     card.dataset.c = JSON.stringify( cfg );
