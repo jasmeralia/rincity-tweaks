@@ -479,7 +479,7 @@
     }
 
     function approve( card, cfg ) {
-        api( 'approve', 'POST', { image_id: cfg.imageId } ).then( () => {
+        api( 'approve', 'POST', { gallery_id: cfg.gid, attach_id: cfg.aid } ).then( () => {
             cfg.status = 'APPROVED';
             card.dataset.c = JSON.stringify( cfg );
             card.classList.remove( 'status-selected', 'status-candidate' );
@@ -490,7 +490,7 @@
     }
 
     function unapprove( card, cfg ) {
-        api( 'unapprove', 'POST', { image_id: cfg.imageId } ).then( () => {
+        api( 'unapprove', 'POST', { gallery_id: cfg.gid, attach_id: cfg.aid } ).then( () => {
             cfg.status = 'SELECTED';
             card.dataset.c = JSON.stringify( cfg );
             card.classList.remove( 'status-approved', 'status-candidate' );

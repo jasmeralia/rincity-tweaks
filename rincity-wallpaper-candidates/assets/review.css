@@ -61,6 +61,8 @@
     font-size: 13px;
 }
 .rincwc-card.is-selected { border-color: #2271b1; background: #f0f6fc; }
+.rincwc-card.status-approved { border-color: #00a32a; background: #edf8ef; }
+.rincwc-card.status-approved .rincwc-vbtn.active { background: #008a20; border-color: #008a20; }
 
 /* Thumbnail uses full image, height flexes with natural aspect ratio */
 .rincwc-thumb-wrap { position: relative; margin-bottom: 6px; }
@@ -83,7 +85,7 @@
 }
 .badge-sel { background: #2271b1; color: #fff; }
 .badge-wm  { background: #00a32a; color: #fff; }
-.badge-approved { background: #8a5a00; color: #fff; }
+.badge-approved { background: #00a32a; color: #fff; }
 .badge-pending { background: #996800; color: #fff; }
 
 /* Info */
