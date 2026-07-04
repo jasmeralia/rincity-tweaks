@@ -24,6 +24,9 @@ require_once RINCWC_PLUGIN_DIR . 'includes/class-data.php';
 require_once RINCWC_PLUGIN_DIR . 'includes/class-db.php';
 require_once RINCWC_PLUGIN_DIR . 'includes/class-scanner.php';
 require_once RINCWC_PLUGIN_DIR . 'includes/class-rest.php';
+require_once RINCWC_PLUGIN_DIR . 'includes/class-watermarks.php';
+require_once RINCWC_PLUGIN_DIR . 'includes/class-settings-page.php';
+require_once RINCWC_PLUGIN_DIR . 'includes/class-gallery-sync.php';
 require_once RINCWC_PLUGIN_DIR . 'includes/class-admin-page.php';
 require_once RINCWC_PLUGIN_DIR . 'includes/class-review-page.php';
 
@@ -34,4 +37,6 @@ add_action( 'rest_api_init',  [ 'RinCWC_Rest', 'register' ] );
 if ( is_admin() ) {
     RinCity_Wallpaper_Admin_Page::register();
     RinCWC_Review_Page::register();
+    RinCWC_Watermarks::register();
+    RinCWC_Settings_Page::register();
 }
