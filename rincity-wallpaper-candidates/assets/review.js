@@ -279,6 +279,9 @@
         const wmSel = card.querySelector( '.rincwc-wm-sel' );
         if ( wmSel ) wmSel.addEventListener( 'change', () => setWatermark( card, cfg, wmSel.value ) );
 
+        const approveBtn = card.querySelector( '.rincwc-approve-btn' );
+        if ( approveBtn ) approveBtn.addEventListener( 'click', () => toggleApprove( card, cfg, approveBtn ) );
+
         // Comments.
         initComments( card );
     }
@@ -298,6 +301,7 @@
             cfg.selCrop = variant;
             card.dataset.c = JSON.stringify( cfg );
             showWmRow( card, true );
+            showApprovalRow( card, true );
             updateBadge( card, false );
             updateCropLinks( card, cfg );
 
@@ -317,6 +321,7 @@
             cfg.selCrop = '';
             card.dataset.c = JSON.stringify( cfg );
             showWmRow( card, false );
+            showApprovalRow( card, false );
             updateBadge( card, null );
             const desel = card.querySelector( '.rincwc-desel' );
             if ( desel ) desel.remove();
@@ -339,10 +344,35 @@
         } ).catch( e => console.error( 'watermark failed', e ) );
     }
 
+    function toggleApprove( card, cfg, btn ) {
+        if ( btn.disabled ) return;
+        const approved = btn.dataset.approved === '1';
+        btn.disabled = true;
+        api( approved ? 'unapprove' : 'approve', 'POST', { gallery_id: cfg.gid, attach_id: cfg.aid } ).then( r => {
+            if ( ! r.ok ) {
+                btn.disabled = false;
+                return;
+            }
+            const nowApproved = ! approved;
+            btn.dataset.approved = nowApproved ? '1' : '0';
+            btn.textContent = nowApproved ? 'Unapprove' : 'Approve';
+            card.classList.toggle( 'is-approved', nowApproved );
+            cfg.status = nowApproved ? 'APPROVED' : 'SELECTED';
+            card.dataset.c = JSON.stringify( cfg );
+            updateBadge( card, nowApproved ? 'approved' : false );
+            btn.disabled = ! rincwcCfg.approveAllowed;
+        } ).catch( e => { console.error( 'approve toggle failed', e ); btn.disabled = false; } );
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     function showWmRow( card, visible ) {
         const row = card.querySelector( '.rincwc-wm-row' );
+        if ( row ) row.classList.toggle( 'hidden', ! visible );
+    }
+
+    function showApprovalRow( card, visible ) {
+        const row = card.querySelector( '.rincwc-approval-row' );
         if ( row ) row.classList.toggle( 'hidden', ! visible );
     }
 
@@ -353,8 +383,13 @@
             badge = document.createElement( 'span' );
             card.querySelector( '.rincwc-thumb-wrap' ).appendChild( badge );
         }
+        if ( wmApplied === 'approved' ) {
+            badge.className = 'rincwc-badge badge-approved';
+            badge.textContent = 'Approved';
+            return;
+        }
         badge.className = 'rincwc-badge ' + ( wmApplied ? 'badge-wm' : 'badge-sel' );
-        badge.textContent = wmApplied ? 'WM ✓' : 'Selected';
+        badge.textContent = wmApplied ? 'WM applied' : 'Selected';
     }
 
     function updateCropLinks( card, cfg ) {

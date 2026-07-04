@@ -3,51 +3,45 @@ defined( 'ABSPATH' ) || exit;
 
 final class RinCWC_Rest {
 
-    const NS = 'rincity/v1';
+    public const NS = 'rincity/v1';
 
     public static function register(): void {
         $admin = [ __CLASS__, 'is_admin' ];
 
-        // Comments.
         register_rest_route( self::NS, '/wpc/comments', [
-            [ 'methods' => 'GET',  'callback' => [ __CLASS__, 'get_comments'  ], 'permission_callback' => $admin ],
-            [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'post_comment'  ], 'permission_callback' => $admin ],
+            [ 'methods' => 'GET', 'callback' => [ __CLASS__, 'get_comments' ], 'permission_callback' => $admin ],
+            [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'post_comment' ], 'permission_callback' => $admin ],
         ] );
         register_rest_route( self::NS, '/wpc/comments/(?P<id>\d+)', [
-            [ 'methods' => 'PUT',    'callback' => [ __CLASS__, 'put_comment'    ], 'permission_callback' => $admin ],
+            [ 'methods' => 'PUT', 'callback' => [ __CLASS__, 'put_comment' ], 'permission_callback' => $admin ],
             [ 'methods' => 'DELETE', 'callback' => [ __CLASS__, 'delete_comment' ], 'permission_callback' => $admin ],
         ] );
 
-        // Selections.
-        register_rest_route( self::NS, '/wpc/select',   [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'select'      ], 'permission_callback' => $admin ] );
-        register_rest_route( self::NS, '/wpc/deselect', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'deselect'    ], 'permission_callback' => $admin ] );
-        register_rest_route( self::NS, '/wpc/approve',  [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'approve'     ], 'permission_callback' => $admin ] );
-        register_rest_route( self::NS, '/wpc/unapprove', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'unapprove'  ], 'permission_callback' => $admin ] );
+        register_rest_route( self::NS, '/wpc/select', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'select' ], 'permission_callback' => $admin ] );
+        register_rest_route( self::NS, '/wpc/deselect', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'deselect' ], 'permission_callback' => $admin ] );
+        register_rest_route( self::NS, '/wpc/watermark', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'watermark' ], 'permission_callback' => $admin ] );
+        register_rest_route( self::NS, '/wpc/approve', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'approve' ], 'permission_callback' => $admin ] );
+        register_rest_route( self::NS, '/wpc/unapprove', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'unapprove' ], 'permission_callback' => $admin ] );
 
-        // Crop offset + watermark.
+        register_rest_route( self::NS, '/wpc/crop-custom', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'crop_custom' ], 'permission_callback' => $admin ] );
         register_rest_route( self::NS, '/wpc/crop-offset', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'crop_offset' ], 'permission_callback' => $admin ] );
-        register_rest_route( self::NS, '/wpc/watermark',   [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'watermark'   ], 'permission_callback' => $admin ] );
+        register_rest_route( self::NS, '/wpc/generate-crops', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'generate_crops' ], 'permission_callback' => $admin ] );
+        register_rest_route( self::NS, '/wpc/apply-watermarks', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'apply_watermarks' ], 'permission_callback' => $admin ] );
 
-        // Batch operations.
-        register_rest_route( self::NS, '/wpc/generate-crops',   [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'generate_crops'   ], 'permission_callback' => $admin ] );
-        register_rest_route( self::NS, '/wpc/apply-watermarks', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'apply_watermarks'  ], 'permission_callback' => $admin ] );
+        register_rest_route( self::NS, '/wpc/watermarks', [
+            [ 'methods' => 'GET', 'callback' => [ __CLASS__, 'watermarks' ], 'permission_callback' => $admin ],
+            [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'add_watermark' ], 'permission_callback' => $admin ],
+        ] );
+        register_rest_route( self::NS, '/wpc/watermarks/(?P<id>\d+)', [
+            [ 'methods' => 'DELETE', 'callback' => [ __CLASS__, 'delete_watermark' ], 'permission_callback' => $admin ],
+        ] );
+        register_rest_route( self::NS, '/wpc/gallery-wm', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'gallery_wm' ], 'permission_callback' => $admin ] );
+        register_rest_route( self::NS, '/wpc/sync-galleries', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'sync_galleries' ], 'permission_callback' => $admin ] );
     }
 
     public static function is_admin(): bool {
         return current_user_can( 'manage_options' );
     }
-
-    private static function can_approve_actions(): bool {
-        $user = get_userdata( get_current_user_id() );
-        if ( $user && in_array( $user->user_login, [ 'rincity', 'rincity_member' ], true ) ) {
-            return true;
-        }
-
-        $settings = get_option( 'rincwc_settings', [] );
-        return is_array( $settings ) && ( $settings['allow_test_approve'] ?? false ) === true;
-    }
-
-    // ── Comments ──────────────────────────────────────────────────────────────
 
     public static function get_comments( WP_REST_Request $req ): WP_REST_Response {
         $key = sanitize_text_field( $req->get_param( 'image_key' ) ?? '' );
@@ -57,7 +51,9 @@ final class RinCWC_Rest {
     public static function post_comment( WP_REST_Request $req ): WP_REST_Response {
         $key  = sanitize_text_field( $req->get_param( 'image_key' ) ?? '' );
         $body = sanitize_textarea_field( $req->get_param( 'body' ) ?? '' );
-        if ( ! $key || ! $body ) return new WP_REST_Response( [ 'error' => 'Missing fields' ], 400 );
+        if ( ! $key || ! $body ) {
+            return new WP_REST_Response( [ 'error' => 'Missing fields' ], 400 );
+        }
         $id   = RinCWC_DB::add( $key, get_current_user_id(), $body );
         $user = wp_get_current_user();
         return new WP_REST_Response( [
@@ -73,8 +69,10 @@ final class RinCWC_Rest {
     public static function put_comment( WP_REST_Request $req ): WP_REST_Response {
         $id   = (int) $req['id'];
         $body = sanitize_textarea_field( $req->get_param( 'body' ) ?? '' );
-        if ( ! $body ) return new WP_REST_Response( [ 'error' => 'Empty body' ], 400 );
-        $ok   = RinCWC_DB::update( $id, get_current_user_id(), $body );
+        if ( ! $body ) {
+            return new WP_REST_Response( [ 'error' => 'Empty body' ], 400 );
+        }
+        $ok = RinCWC_DB::update( $id, get_current_user_id(), $body );
         return new WP_REST_Response( [ 'ok' => $ok ], $ok ? 200 : 403 );
     }
 
@@ -83,231 +81,270 @@ final class RinCWC_Rest {
         return new WP_REST_Response( [ 'ok' => $ok ], $ok ? 200 : 403 );
     }
 
-    // ── Selections ────────────────────────────────────────────────────────────
-
     public static function select( WP_REST_Request $req ): WP_REST_Response {
-        $gid  = (int) ( $req->get_param( 'gallery_id' ) ?? 0 );
-        $aid  = (int) ( $req->get_param( 'attach_id' ) ?? 0 );
-        $crop = sanitize_key( $req->get_param( 'selected_crop' ) ?? '' );
-        if ( ! $gid || ! $aid || ! $crop ) {
+        $gid     = (int) ( $req->get_param( 'gallery_id' ) ?? 0 );
+        $aid     = (int) ( $req->get_param( 'attach_id' ) ?? 0 );
+        $variant = sanitize_key( $req->get_param( 'selected_crop' ) ?? '' );
+        if ( ! $gid || ! $aid || ! $variant ) {
             return new WP_REST_Response( [ 'error' => 'Missing fields' ], 400 );
         }
-
-        $ok = RinCWC_Data::select_image( $gid, $aid, $crop );
-        return new WP_REST_Response( [ 'ok' => $ok, 'status' => $ok ? RinCWC_Data::STATUS_SELECTED : null ], $ok ? 200 : 404 );
+        $ok = RinCWC_Data::select_image( $gid, $aid, $variant );
+        return new WP_REST_Response( [ 'ok' => $ok ], $ok ? 200 : 404 );
     }
 
     public static function deselect( WP_REST_Request $req ): WP_REST_Response {
         $gid = (int) ( $req->get_param( 'gallery_id' ) ?? 0 );
-        $aid = (int) ( $req->get_param( 'attach_id' )  ?? 0 );
-        if ( ! $gid || ! $aid ) return new WP_REST_Response( [ 'error' => 'Missing fields' ], 400 );
+        $aid = (int) ( $req->get_param( 'attach_id' ) ?? 0 );
+        if ( ! $gid || ! $aid ) {
+            return new WP_REST_Response( [ 'error' => 'Missing fields' ], 400 );
+        }
         $ok = RinCWC_Data::deselect_image( $gid, $aid );
-        return new WP_REST_Response( [ 'ok' => $ok, 'status' => $ok ? RinCWC_Data::STATUS_CANDIDATE : null ], $ok ? 200 : 404 );
+        return new WP_REST_Response( [ 'ok' => $ok ], $ok ? 200 : 404 );
     }
-
-    public static function approve( WP_REST_Request $req ): WP_REST_Response {
-        if ( ! self::can_approve_actions() ) {
-            return new WP_REST_Response( [ 'error' => 'Not allowed' ], 403 );
-        }
-
-        $gid = (int) ( $req->get_param( 'gallery_id' ) ?? 0 );
-        $aid = (int) ( $req->get_param( 'attach_id' ) ?? 0 );
-        if ( ! $gid || ! $aid ) {
-            return new WP_REST_Response( [ 'error' => 'Missing fields' ], 400 );
-        }
-
-        return new WP_REST_Response( [ 'ok' => RinCWC_Data::approve( $gid, $aid ) ], 200 );
-    }
-
-    public static function unapprove( WP_REST_Request $req ): WP_REST_Response {
-        if ( ! self::can_approve_actions() ) {
-            return new WP_REST_Response( [ 'error' => 'Not allowed' ], 403 );
-        }
-
-        $gid = (int) ( $req->get_param( 'gallery_id' ) ?? 0 );
-        $aid = (int) ( $req->get_param( 'attach_id' ) ?? 0 );
-        if ( ! $gid || ! $aid ) {
-            return new WP_REST_Response( [ 'error' => 'Missing fields' ], 400 );
-        }
-
-        return new WP_REST_Response( [ 'ok' => RinCWC_Data::unapprove( $gid, $aid ) ], 200 );
-    }
-
-    // ── Crop offset ───────────────────────────────────────────────────────────
-
-    public static function crop_offset( WP_REST_Request $req ): WP_REST_Response {
-        $gid    = sanitize_text_field( $req->get_param( 'gallery_id' )    ?? '' );
-        $aid    = sanitize_text_field( $req->get_param( 'attach_id' )     ?? '' );
-        $offset = (int) ( $req->get_param( 'offset' ) ?? 0 );
-        if ( ! $gid || ! $aid ) return new WP_REST_Response( [ 'error' => 'Missing fields' ], 400 );
-
-        $row = RinCWC_CSV::read_selections()[ $gid ][ $aid ] ?? null;
-
-        if ( ! $row ) {
-            // New selection via custom crop — build row from posted metadata.
-            $required = [ 'gallery_slug', 'gallery_title', 'position', 'total', 'filename' ];
-            foreach ( $required as $f ) {
-                if ( $req->get_param( $f ) === null ) {
-                    return new WP_REST_Response( [ 'error' => "Missing $f" ], 400 );
-                }
-            }
-            $row = [
-                'gallery_id'    => $gid,
-                'gallery_slug'  => sanitize_text_field( $req->get_param( 'gallery_slug' ) ),
-                'gallery_title' => sanitize_text_field( $req->get_param( 'gallery_title' ) ),
-                'attach_id'     => $aid,
-                'position'      => sanitize_text_field( $req->get_param( 'position' ) ),
-                'total'         => sanitize_text_field( $req->get_param( 'total' ) ),
-                'filename'      => sanitize_text_field( $req->get_param( 'filename' ) ),
-                'wm_corner'     => '',
-                'wm_applied'    => 'false',
-            ];
-        }
-
-        $row['selected_crop']      = 'custom';
-        $row['custom_crop_offset'] = (string) $offset;
-        $row['wm_applied']         = 'false';
-        return new WP_REST_Response( [ 'ok' => RinCWC_CSV::upsert_selection( $row ) ], 200 );
-    }
-
-    // ── Watermark ─────────────────────────────────────────────────────────────
 
     public static function watermark( WP_REST_Request $req ): WP_REST_Response {
         $gid    = (int) ( $req->get_param( 'gallery_id' ) ?? 0 );
-        $aid    = (int) ( $req->get_param( 'attach_id' )  ?? 0 );
-        $corner = sanitize_text_field( $req->get_param( 'wm_corner' )  ?? '' );
-        $valid  = [ '', 'top-left', 'top-right', 'bottom-left', 'bottom-right' ];
-        if ( ! $gid || ! $aid ) return new WP_REST_Response( [ 'error' => 'Missing fields' ], 400 );
-        if ( ! in_array( $corner, $valid, true ) ) return new WP_REST_Response( [ 'error' => 'Invalid corner' ], 400 );
-
+        $aid    = (int) ( $req->get_param( 'attach_id' ) ?? 0 );
+        $corner = sanitize_text_field( $req->get_param( 'wm_corner' ) ?? '' );
+        if ( ! $gid || ! $aid ) {
+            return new WP_REST_Response( [ 'error' => 'Missing fields' ], 400 );
+        }
         $ok = RinCWC_Data::set_watermark_corner( $gid, $aid, $corner );
         return new WP_REST_Response( [ 'ok' => $ok ], $ok ? 200 : 400 );
     }
 
-    // ── Batch: generate custom crops ──────────────────────────────────────────
+    public static function approve( WP_REST_Request $req ): WP_REST_Response {
+        if ( ! RinCWC_Data::approve_allowed() ) {
+            return new WP_REST_Response( [ 'error' => 'Approval is restricted.' ], 403 );
+        }
+        $ok = RinCWC_Data::approve( (int) ( $req->get_param( 'gallery_id' ) ?? 0 ), (int) ( $req->get_param( 'attach_id' ) ?? 0 ) );
+        return new WP_REST_Response( [ 'ok' => $ok ], $ok ? 200 : 400 );
+    }
+
+    public static function unapprove( WP_REST_Request $req ): WP_REST_Response {
+        if ( ! RinCWC_Data::approve_allowed() ) {
+            return new WP_REST_Response( [ 'error' => 'Approval is restricted.' ], 403 );
+        }
+        $ok = RinCWC_Data::unapprove( (int) ( $req->get_param( 'gallery_id' ) ?? 0 ), (int) ( $req->get_param( 'attach_id' ) ?? 0 ) );
+        return new WP_REST_Response( [ 'ok' => $ok ], $ok ? 200 : 400 );
+    }
+
+    public static function crop_offset( WP_REST_Request $req ): WP_REST_Response {
+        $gid    = (int) ( $req->get_param( 'gallery_id' ) ?? 0 );
+        $aid    = (int) ( $req->get_param( 'attach_id' ) ?? 0 );
+        $offset = (int) ( $req->get_param( 'offset' ) ?? 0 );
+        $image  = RinCWC_Data::get_image_by_gallery_attach( $gid, $aid );
+        if ( ! $image ) {
+            return new WP_REST_Response( [ 'error' => 'Image not found' ], 404 );
+        }
+
+        $scale  = RinCWC_Data::max_crop_scale( (int) $image['orig_w'], (int) $image['orig_h'] );
+        $source = (int) round( $offset * $scale );
+        $x      = ( (int) $image['orig_w'] / max( 1, (int) $image['orig_h'] ) >= 16 / 9 ) ? $source : 0;
+        $y      = $x ? 0 : $source;
+        $crop   = RinCWC_Data::clamp_custom_crop( $image, $scale, $x, $y );
+
+        return self::save_custom_crop( $image, $crop );
+    }
+
+    public static function crop_custom( WP_REST_Request $req ): WP_REST_Response {
+        $gid   = (int) ( $req->get_param( 'gallery_id' ) ?? 0 );
+        $aid   = (int) ( $req->get_param( 'attach_id' ) ?? 0 );
+        $image = RinCWC_Data::get_image_by_gallery_attach( $gid, $aid );
+        if ( ! $image ) {
+            return new WP_REST_Response( [ 'error' => 'Image not found' ], 404 );
+        }
+
+        $crop = RinCWC_Data::clamp_custom_crop(
+            $image,
+            (float) ( $req->get_param( 'scale' ) ?? 1.0 ),
+            (int) ( $req->get_param( 'x' ) ?? 0 ),
+            (int) ( $req->get_param( 'y' ) ?? 0 )
+        );
+
+        return self::save_custom_crop( $image, $crop );
+    }
 
     public static function generate_crops( WP_REST_Request $req ): WP_REST_Response {
-        $db  = RinCWC_CSV::read_db();
-        $sel = RinCWC_CSV::read_selections();
+        unset( $req );
         $out = [];
-
-        foreach ( $sel as $gid => $aids ) {
-            foreach ( $aids as $aid => $row ) {
-                if ( $row['selected_crop'] !== 'custom' ) continue;
-                $db_row = $db[ $gid ][ $aid ] ?? null;
-                if ( ! $db_row ) { $out[] = [ 'aid' => $aid, 'status' => 'error', 'msg' => 'Not in DB' ]; continue; }
-                $out[] = self::generate_custom_crop( $db_row, (int) ( $row['custom_crop_offset'] ?? 0 ) );
+        foreach ( RinCWC_Data::get_review_images() as $row ) {
+            if ( empty( $row['crop_variant'] ) ) {
+                continue;
             }
+            $out[] = self::generate_crop_for_row( $row, false );
         }
         return new WP_REST_Response( [ 'results' => $out ], 200 );
     }
 
-    private static function generate_custom_crop( array $db_row, int $offset ): array {
-        $src = $db_row['original_path'] ?? '';
-        if ( ! $src || ! file_exists( $src ) ) {
-            return [ 'aid' => $db_row['attach_id'], 'status' => 'error', 'msg' => 'Source missing' ];
-        }
-
-        $orig_w = (int) $db_row['width'];
-        $orig_h = (int) $db_row['height'];
-        $slug   = $db_row['gallery_slug'];
-        $aid    = $db_row['attach_id'];
-
-        $tw = 3840; $th = 2160;
-        if ( $orig_w / $orig_h >= $tw / $th ) {
-            $resize = "x{$th}";
-            $slack  = (int) floor( $orig_w * $th / $orig_h ) - $tw;
-            $x_off  = min( max( 0, $offset ), $slack );
-            $y_off  = 0;
-        } else {
-            $resize = "{$tw}x";
-            $slack  = (int) floor( $orig_h * $tw / $orig_w ) - $th;
-            $x_off  = 0;
-            $y_off  = min( max( 0, $offset ), $slack );
-        }
-
-        $base_out = RINCWC_CROPS_DIR . "{$slug}_{$aid}_custom.jpg";
-        if ( ! file_exists( $base_out ) ) {
-            $cmd = 'convert ' . escapeshellarg( $src )
-                 . ' -resize ' . escapeshellarg( $resize )
-                 . ' -crop ' . escapeshellarg( "{$tw}x{$th}+{$x_off}+{$y_off}" )
-                 . ' +repage -quality 88 ' . escapeshellarg( $base_out ) . ' 2>&1';
-            $result = shell_exec( $cmd );
-            if ( ! file_exists( $base_out ) ) {
-                return [ 'aid' => $aid, 'status' => 'error', 'msg' => $result ];
-            }
-        }
-
-        $n = 1;
-        foreach ( [ [ 2560, 1440, '_1440p' ], [ 1920, 1080, '_1080p' ] ] as [ $dw, $dh, $sfx ] ) {
-            $dst = RINCWC_CROPS_DIR . "{$slug}_{$aid}_custom{$sfx}.jpg";
-            if ( ! file_exists( $dst ) ) {
-                $cmd = 'convert ' . escapeshellarg( $base_out )
-                     . ' -resize ' . escapeshellarg( "{$dw}x{$dh}" )
-                     . ' -quality 88 ' . escapeshellarg( $dst ) . ' 2>&1';
-                shell_exec( $cmd );
-            }
-            if ( file_exists( $dst ) ) $n++;
-        }
-        return [ 'aid' => $aid, 'status' => 'ok', 'files' => $n ];
-    }
-
-    // ── Batch: apply watermarks ───────────────────────────────────────────────
-
     public static function apply_watermarks( WP_REST_Request $req ): WP_REST_Response {
-        if ( ! file_exists( RINCWC_WM_FILE ) ) {
-            return new WP_REST_Response( [ 'error' => 'Watermark file missing' ], 500 );
-        }
-        $db  = RinCWC_CSV::read_db();
-        $sel = RinCWC_CSV::read_selections();
+        unset( $req );
+        $out         = [];
         $gravity_map = [
             'top-left'     => 'NorthWest',
             'top-right'    => 'NorthEast',
             'bottom-left'  => 'SouthWest',
             'bottom-right' => 'SouthEast',
         ];
-        $out = [];
 
-        foreach ( $sel as $gid => $aids ) {
-            foreach ( $aids as $aid => $row ) {
-                if ( ( $row['wm_applied'] ?? '' ) === 'true' ) continue;
-                $crop    = $row['selected_crop'] ?? '';
-                $corner  = $row['wm_corner']     ?? '';
-                $gravity = $gravity_map[ $corner ] ?? null;
-                if ( ! $crop || ! $gravity ) continue;
+        foreach ( RinCWC_Data::get_review_images() as $row ) {
+            if ( empty( $row['crop_variant'] ) || empty( $row['wm_corner'] ) || ! empty( $row['wm_applied'] ) ) {
+                continue;
+            }
+            $wm = RinCWC_Data::get_effective_watermark( (int) $row['gallery_id'] );
+            if ( ! $wm || empty( $wm['file_path'] ) || ! file_exists( $wm['file_path'] ) ) {
+                $out[] = [ 'aid' => (int) $row['attach_id'], 'status' => 'error', 'msg' => 'Watermark missing' ];
+                continue;
+            }
+            $gravity = $gravity_map[ $row['wm_corner'] ] ?? '';
+            if ( ! $gravity ) {
+                continue;
+            }
 
-                $db_row = $db[ $gid ][ $aid ] ?? null;
-                if ( ! $db_row ) continue;
+            $crop_result = self::generate_crop_for_row( $row, false );
+            if ( $crop_result['status'] === 'error' ) {
+                $out[] = $crop_result;
+                continue;
+            }
 
-                $slug = $db_row['gallery_slug'];
-                $pos  = $row['position'];
-                $all_ok = true;
-
-                foreach ( [ '' => '', '_1440p' => '_1440p', '_1080p' => '_1080p' ] as $sfx => $_ ) {
-                    $src = RINCWC_CROPS_DIR . "{$slug}_{$aid}_{$crop}{$sfx}.jpg";
-                    $dst = RINCWC_CROPS_DIR . "{$slug}_{$pos}_{$crop}{$sfx}_wm.jpg";
-                    if ( ! file_exists( $src ) ) { $all_ok = false; continue; }
-                    if ( file_exists( $dst ) )   { continue; }
-
-                    $wm_w = trim( (string) shell_exec( 'identify -format "%[fx:w*0.10]" ' . escapeshellarg( $src ) ) );
-                    $cmd  = 'convert ' . escapeshellarg( $src )
-                          . ' \( ' . escapeshellarg( RINCWC_WM_FILE ) . ' -resize ' . escapeshellarg( $wm_w . 'x' ) . ' \)'
-                          . ' -gravity ' . escapeshellarg( $gravity )
-                          . ' -geometry +10+10 -composite -quality 95'
-                          . ' ' . escapeshellarg( $dst ) . ' 2>&1';
-                    shell_exec( $cmd );
-                    if ( ! file_exists( $dst ) ) $all_ok = false;
+            $ok = true;
+            foreach ( self::resolution_suffixes() as $suffix ) {
+                $src = self::raw_crop_path( $row, $suffix );
+                $dst = self::watermarked_crop_path( $row, $suffix );
+                if ( ! file_exists( $src ) ) {
+                    $ok = false;
+                    continue;
                 }
-
-                if ( $all_ok ) {
-                    $row['wm_applied'] = 'true';
-                    RinCWC_CSV::upsert_selection( $row );
-                    $out[] = [ 'aid' => $aid, 'status' => 'ok' ];
-                } else {
-                    $out[] = [ 'aid' => $aid, 'status' => 'partial' ];
+                $wm_w = max( 1, (int) trim( (string) shell_exec( 'identify -format "%[fx:w*0.10]" ' . escapeshellarg( $src ) . ' 2>/dev/null' ) ) );
+                $cmd  = 'convert ' . escapeshellarg( $src )
+                    . ' \( ' . escapeshellarg( $wm['file_path'] ) . ' -resize ' . escapeshellarg( $wm_w . 'x' ) . ' \)'
+                    . ' -gravity ' . escapeshellarg( $gravity )
+                    . ' -geometry +10+10 -composite -quality 95 '
+                    . escapeshellarg( $dst ) . ' 2>&1';
+                shell_exec( $cmd );
+                if ( ! file_exists( $dst ) ) {
+                    $ok = false;
                 }
             }
+
+            if ( $ok ) {
+                RinCWC_Data::mark_watermark_applied( (int) $row['id'], (int) $wm['id'] );
+                $out[] = [ 'aid' => (int) $row['attach_id'], 'status' => 'ok' ];
+            } else {
+                $out[] = [ 'aid' => (int) $row['attach_id'], 'status' => 'partial' ];
+            }
         }
+
         return new WP_REST_Response( [ 'results' => $out ], 200 );
+    }
+
+    public static function watermarks( WP_REST_Request $req ): WP_REST_Response {
+        unset( $req );
+        return new WP_REST_Response( [ 'watermarks' => RinCWC_Data::get_watermarks() ], 200 );
+    }
+
+    public static function add_watermark( WP_REST_Request $req ): WP_REST_Response {
+        $name = sanitize_text_field( $req->get_param( 'name' ) ?? '' );
+        $path = (string) ( $req->get_param( 'file_path' ) ?? '' );
+        if ( ! $name || ! $path || ! file_exists( $path ) ) {
+            return new WP_REST_Response( [ 'error' => 'Missing or invalid watermark file.' ], 400 );
+        }
+        $id = RinCWC_Data::add_watermark( $name, $path, ! empty( $req->get_param( 'is_default' ) ) );
+        return new WP_REST_Response( [ 'id' => $id ], 201 );
+    }
+
+    public static function delete_watermark( WP_REST_Request $req ): WP_REST_Response {
+        $ok = RinCWC_Data::delete_watermark( (int) $req['id'] );
+        return new WP_REST_Response( [ 'ok' => $ok ], $ok ? 200 : 400 );
+    }
+
+    public static function gallery_wm( WP_REST_Request $req ): WP_REST_Response {
+        $ok = RinCWC_Data::set_gallery_watermark(
+            (int) ( $req->get_param( 'gallery_id' ) ?? 0 ),
+            (int) ( $req->get_param( 'wm_file_id' ) ?? 0 )
+        );
+        return new WP_REST_Response( [ 'ok' => $ok ], $ok ? 200 : 400 );
+    }
+
+    public static function sync_galleries( WP_REST_Request $req ): WP_REST_Response {
+        unset( $req );
+        if ( ! class_exists( 'RinCWC_Gallery_Sync' ) ) {
+            return new WP_REST_Response( [ 'error' => 'Gallery sync is unavailable.' ], 500 );
+        }
+        return new WP_REST_Response( RinCWC_Gallery_Sync::sync(), 200 );
+    }
+
+    private static function save_custom_crop( array $image, array $crop ): WP_REST_Response {
+        $ok = RinCWC_Data::select_image( (int) $image['gallery_id'], (int) $image['attach_id'], 'custom', $crop );
+        if ( ! $ok ) {
+            return new WP_REST_Response( [ 'error' => 'Could not save custom crop.' ], 400 );
+        }
+
+        $row = array_merge( $image, [
+            'crop_variant'      => 'custom',
+            'custom_crop_scale' => $crop['scale'],
+            'custom_crop_x'     => $crop['x'],
+            'custom_crop_y'     => $crop['y'],
+        ] );
+
+        return new WP_REST_Response( [
+            'ok'     => true,
+            'crop'   => $crop,
+            'result' => self::generate_crop_for_row( $row, true ),
+        ], 200 );
+    }
+
+    private static function generate_crop_for_row( array $row, bool $force ): array {
+        $variant = (string) ( $row['crop_variant'] ?? '' );
+        if ( ! $variant ) {
+            return [ 'aid' => (int) $row['attach_id'], 'status' => 'skip' ];
+        }
+        $src = (string) ( $row['original_path'] ?? '' );
+        if ( ! $src || ! file_exists( $src ) ) {
+            return [ 'aid' => (int) $row['attach_id'], 'status' => 'error', 'msg' => 'Source missing' ];
+        }
+        if ( ! is_dir( RINCWC_CROPS_DIR ) ) {
+            wp_mkdir_p( RINCWC_CROPS_DIR );
+        }
+
+        $crop = $variant === 'custom'
+            ? RinCWC_Data::clamp_custom_crop( $row, (float) $row['custom_crop_scale'], (int) $row['custom_crop_x'], (int) $row['custom_crop_y'] )
+            : RinCWC_Data::preset_crop_box( $row, $variant );
+
+        $done = 0;
+        foreach ( [
+            ''       => [ 3840, 2160 ],
+            '_1440p' => [ 2560, 1440 ],
+            '_1080p' => [ 1920, 1080 ],
+        ] as $suffix => [ $dw, $dh ] ) {
+            $dst = self::raw_crop_path( $row, $suffix );
+            if ( file_exists( $dst ) && ! $force ) {
+                $done++;
+                continue;
+            }
+            $cmd = 'convert ' . escapeshellarg( $src )
+                . ' -crop ' . escapeshellarg( $crop['box_w'] . 'x' . $crop['box_h'] . '+' . $crop['x'] . '+' . $crop['y'] )
+                . ' +repage -resize ' . escapeshellarg( "{$dw}x{$dh}" )
+                . ' -quality 88 ' . escapeshellarg( $dst ) . ' 2>&1';
+            $result = shell_exec( $cmd );
+            if ( ! file_exists( $dst ) ) {
+                return [ 'aid' => (int) $row['attach_id'], 'status' => 'error', 'msg' => $result ?: 'convert failed' ];
+            }
+            $done++;
+        }
+
+        return [ 'aid' => (int) $row['attach_id'], 'status' => 'ok', 'files' => $done ];
+    }
+
+    private static function raw_crop_path( array $row, string $suffix ): string {
+        return RINCWC_CROPS_DIR . sanitize_title( $row['gallery_slug'] ) . '_' . (int) $row['attach_id'] . '_' . sanitize_key( $row['crop_variant'] ) . $suffix . '.jpg';
+    }
+
+    private static function watermarked_crop_path( array $row, string $suffix ): string {
+        return RINCWC_CROPS_DIR . sanitize_title( $row['gallery_slug'] ) . '_' . (int) $row['position'] . '_' . sanitize_key( $row['crop_variant'] ) . $suffix . '_wm.jpg';
+    }
+
+    private static function resolution_suffixes(): array {
+        return [ '', '_1440p', '_1080p' ];
     }
 }
