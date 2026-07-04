@@ -209,12 +209,20 @@ final class RinCity_Wallpaper_Scanner {
     }
 
     private static function identify_dimensions( string $path ): ?array {
-        $cmd = 'identify -format ' . escapeshellarg( '%w %h' ) . ' ' . escapeshellarg( $path ) . ' 2>/dev/null';
-        $out = trim( (string) shell_exec( $cmd ) );
-        if ( preg_match( '/^(\d+)\s+(\d+)$/', $out, $m ) ) {
-            return [ (int) $m[1], (int) $m[2] ];
+        if ( class_exists( 'Imagick' ) ) {
+            try {
+                $im = new Imagick();
+                $im->pingImage( $path );
+                $w = $im->getImageWidth();
+                $h = $im->getImageHeight();
+                $im->destroy();
+                if ( $w > 0 && $h > 0 ) {
+                    return [ $w, $h ];
+                }
+            } catch ( Exception $e ) {
+                // fall through to getimagesize
+            }
         }
-
         $size = @getimagesize( $path );
         if ( ! $size ) {
             return null;

@@ -108,13 +108,15 @@ final class RinCity_Wallpaper_Admin_Page {
         echo '<th data-col="1" class="sortable">Pub date</th>';
         echo '<th data-col="2" class="sortable num">Images</th>';
         echo '<th data-col="3" class="sortable num">Excluded</th>';
-        echo '<th data-col="4" class="sortable num">Candidates</th>';
-        echo '<th data-col="5" class="sortable num">Selected</th>';
-        echo '<th data-col="6" class="sortable num">Approved</th>';
+        echo '<th data-col="4" class="sortable num">Selected</th>';
+        echo '<th data-col="5" class="sortable num">Approved</th>';
+        echo '<th data-col="6" class="sortable num">Candidates</th>';
         echo '<th>Actions</th>';
         echo '</tr></thead><tbody>';
         foreach ( $summary['galleries'] as $gallery_id => $gallery ) {
-            $candidates  = $gallery['images'] - $gallery['excluded'] - ( $gallery['selected'] ?? 0 ) - ( $gallery['approved'] ?? 0 );
+            $selected    = (int) ( $gallery['selected'] ?? 0 );
+            $approved    = (int) ( $gallery['approved'] ?? 0 );
+            $candidates  = $gallery['images'] - $gallery['excluded'] - $selected - $approved;
             $review_url  = esc_url( $review_base . '#rincwc-gallery-' . $gallery_id );
             $rescan_url  = esc_url( $scan_base . '&prescan=' . $gallery_id );
             echo '<tr data-title="' . esc_attr( strtolower( $gallery['title'] ) ) . '">';
@@ -122,9 +124,9 @@ final class RinCity_Wallpaper_Admin_Page {
             echo '<td>' . esc_html( $gallery['pub_date'] ?? '' ) . '</td>';
             echo '<td>' . esc_html( (string) $gallery['images'] ) . '</td>';
             echo '<td>' . esc_html( (string) $gallery['excluded'] ) . '</td>';
+            echo '<td>' . esc_html( (string) $selected ) . '</td>';
+            echo '<td>' . esc_html( (string) $approved ) . '</td>';
             echo '<td>' . esc_html( (string) $candidates ) . '</td>';
-            echo '<td>' . esc_html( (string) ( $gallery['selected'] ?? 0 ) ) . '</td>';
-            echo '<td>' . esc_html( (string) ( $gallery['approved'] ?? 0 ) ) . '</td>';
             echo '<td class="rincwc-actions"><a href="' . $review_url . '">Review</a> · <a href="' . $rescan_url . '">Rescan</a></td>';
             echo '</tr>';
         }
@@ -177,7 +179,7 @@ final class RinCity_Wallpaper_Admin_Page {
             echo '<form method="post" class="rincwc-commit-form">';
             wp_nonce_field( 'rincwc_scan_gallery', 'rincwc_nonce' );
             echo '<input type="hidden" name="rincwc_action" value="commit_scan">';
-            echo '<input type="hidden" name="rincwc_gallery_id" value="' . esc_attr( (string) ( $gallery['id'] ?? 0 ) ) . '">';
+            echo '<input type="hidden" name="rincwc_gallery_id" value="' . esc_attr( (string) ( $preview['gallery_id'] ?? 0 ) ) . '">';
             submit_button( 'Commit These Results to DB', 'primary', 'submit', false );
             echo '</form>';
         }
