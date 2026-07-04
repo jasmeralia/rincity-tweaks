@@ -37,7 +37,7 @@ final class RinCity_Wallpaper_Admin_Page {
         }
 
         $summary   = RinCity_Wallpaper_Scanner::database_summary();
-        $galleries = RinCity_Wallpaper_Scanner::envira_galleries();
+        $galleries = RinCWC_Data::envira_galleries();
 
         echo '<div class="wrap rincwc-admin">';
         self::render_inline_styles();
