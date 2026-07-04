@@ -222,7 +222,7 @@ final class RinCWC_Review_Page {
         echo '<span class="rincwc-wm-status ' . esc_attr( $wm_cls ) . '">' . esc_html( $wm_txt ) . '</span>';
         echo '</div>';
 
-        self::render_approval_row( $status, $is_sel, $wm_corner );
+        self::render_approval_row( $status, $is_sel, $wm_corner, $wm_applied );
         self::render_crop_links( $row, $is_sel, $sel_crop, $wm_applied );
         self::render_comments( $image_key );
         echo '</div>';
@@ -242,7 +242,11 @@ final class RinCWC_Review_Page {
         }
     }
 
-    private static function render_approval_row( string $status, bool $is_sel, string $wm_corner ): void {
+    private static function render_approval_row( string $status, bool $is_sel, string $wm_corner, bool $wm_applied = false ): void {
+        if ( ! $wm_applied && $status !== 'APPROVED' ) {
+            echo '<div class="rincwc-approve-row hidden"></div>';
+            return;
+        }
         $can_approve = RinCWC_Data::can_current_user_approve();
         $disabled = ! $can_approve || ! $is_sel || ! $wm_corner;
         echo '<div class="rincwc-approve-row">';

@@ -82,6 +82,62 @@ final class RinCWC_Data {
         ] );
     }
 
+    public static function scan_target_galleries(): array {
+        $settings       = self::get_settings();
+        $excluded_ids   = array_filter( array_map( 'intval', (array) ( $settings['publish_galleries'] ?? [] ) ) );
+        return array_filter(
+            self::envira_galleries(),
+            static function ( $post ) use ( $excluded_ids ): bool {
+                if ( in_array( (int) $post->ID, $excluded_ids, true ) ) {
+                    return false;
+                }
+                if ( $post->post_name === 'envira-default-gallery' ) {
+                    return false;
+                }
+                return true;
+            }
+        );
+    }
+
+    public static function migrate_cutoffs_from_csv(): string {
+        $csv = WP_CONTENT_DIR . '/uploads/wallpaper-candidates/wallpaper_db.csv';
+        if ( ! file_exists( $csv ) ) {
+            return 'CSV not found: ' . $csv;
+        }
+        $fh = fopen( $csv, 'r' );
+        if ( ! $fh ) {
+            return 'Could not open CSV.';
+        }
+        $header = fgetcsv( $fh );
+        if ( ! $header ) {
+            fclose( $fh );
+            return 'Empty CSV.';
+        }
+        $col = array_flip( $header );
+        $totals = [];
+        while ( ( $row = fgetcsv( $fh ) ) !== false ) {
+            $gid   = isset( $col['gallery_id'] ) ? (int) $row[ $col['gallery_id'] ] : 0;
+            $total = isset( $col['total'] ) ? (int) $row[ $col['total'] ] : 0;
+            if ( $gid && $total ) {
+                $totals[ $gid ] = $total;
+            }
+        }
+        fclose( $fh );
+        if ( empty( $totals ) ) {
+            return 'No rows found in CSV.';
+        }
+        $cutoffs = [];
+        foreach ( $totals as $gid => $total ) {
+            $cutoffs[ $gid ] = (int) floor( $total / 3 );
+        }
+        self::set_cutoffs( $cutoffs );
+        $lines = [];
+        foreach ( $cutoffs as $gid => $cut ) {
+            $lines[] = "Gallery {$gid}: cutoff {$cut} (of {$totals[$gid]})";
+        }
+        return 'Cutoffs set: ' . implode( ', ', $lines );
+    }
+
     public static function get_cutoff( int $gallery_id ): int {
         $settings = self::get_settings();
         return max( 0, (int) ( $settings['excluded_after'][ $gallery_id ] ?? 0 ) );

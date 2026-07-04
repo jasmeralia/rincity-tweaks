@@ -120,7 +120,7 @@ final class RinCity_Wallpaper_Scanner {
 
     public static function scan_all( bool $commit = false ): array {
         $results = [];
-        foreach ( RinCWC_Data::envira_galleries() as $post ) {
+        foreach ( RinCWC_Data::scan_target_galleries() as $post ) {
             $results[] = self::scan_gallery( (int) $post->ID, $commit );
         }
         if ( $commit ) {
@@ -162,10 +162,15 @@ final class RinCity_Wallpaper_Scanner {
         foreach ( $rows as $row ) {
             $gid = (int) $row['gallery_id'];
             if ( ! isset( $out['galleries'][ $gid ] ) ) {
+                $post     = get_post( $gid );
+                $pub_date = $post ? $post->post_date : '';
                 $out['galleries'][ $gid ] = [
                     'title'    => $row['gallery_title'],
+                    'pub_date' => $pub_date ? gmdate( 'Y-m-d', strtotime( $pub_date ) ) : '',
                     'images'   => 0,
                     'excluded' => 0,
+                    'selected' => 0,
+                    'approved' => 0,
                 ];
             }
             $out['galleries'][ $gid ]['images']++;
@@ -179,8 +184,10 @@ final class RinCity_Wallpaper_Scanner {
 
             if ( $row['status'] === RinCWC_Data::STATUS_SELECTED ) {
                 $out['selected']++;
+                $out['galleries'][ $gid ]['selected']++;
             } elseif ( $row['status'] === RinCWC_Data::STATUS_APPROVED ) {
                 $out['approved']++;
+                $out['galleries'][ $gid ]['approved']++;
             }
         }
 

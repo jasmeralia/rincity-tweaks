@@ -540,6 +540,12 @@
     function updateApprovalRow( card, cfg ) {
         const row = card.querySelector( '.rincwc-approve-row' );
         if ( ! row ) return;
+        if ( ! cfg.wmApplied && cfg.status !== 'APPROVED' ) {
+            row.innerHTML = '';
+            row.classList.add( 'hidden' );
+            return;
+        }
+        row.classList.remove( 'hidden' );
         const disabled = ! rincwcCfg.approveAllowed || ! cfg.selCrop || ! cfg.wmCorner;
         row.innerHTML = cfg.status === 'APPROVED'
             ? '<button class="button rincwc-unapprove-btn"' + ( disabled ? ' disabled' : '' ) + '>Unapprove</button>'
@@ -589,6 +595,16 @@
                 document.querySelectorAll( '.rincwc-wm-status.wm-pending' ).forEach( el => {
                     el.textContent = 'applied';
                     el.classList.replace( 'wm-pending', 'wm-done' );
+                    const card = el.closest( '.rincwc-card' );
+                    if ( card ) {
+                        try {
+                            const cfg = JSON.parse( card.dataset.c || '{}' );
+                            cfg.wmApplied = true;
+                            card.dataset.c = JSON.stringify( cfg );
+                            updateBadge( card, cfg );
+                            updateApprovalRow( card, cfg );
+                        } catch ( _ ) {}
+                    }
                 } );
             } ).catch( e => { msg.textContent = 'Error: ' + e.message; awm.disabled = false; } );
         } );
