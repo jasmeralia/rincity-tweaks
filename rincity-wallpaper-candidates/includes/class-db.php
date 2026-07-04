@@ -194,8 +194,8 @@ final class RinCWC_DB {
         } elseif ( $old_exists && $new_exists ) {
             $count_new = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$new}" );
             if ( $count_new === 0 ) {
-                $wpdb->query( "INSERT INTO {$new} (id, image_key, user_id, body, created_at, updated_at)
-                    SELECT id, image_key, user_id, body, created_at, updated_at FROM {$old}" );
+                $wpdb->query( "DROP TABLE {$new}" );
+                $wpdb->query( "RENAME TABLE {$old} TO {$new}" );
             }
         }
     }
