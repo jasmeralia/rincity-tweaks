@@ -102,7 +102,8 @@ final class RinCWC_Data {
     public static function max_crop_scale( int $orig_w, int $orig_h ): float {
         $orig_w = max( 1, $orig_w );
         $orig_h = max( 1, $orig_h );
-        return ( $orig_w / $orig_h >= 16 / 9 ) ? $orig_h / 2160 : $orig_w / 3840;
+        $scale  = ( $orig_w / $orig_h >= 16 / 9 ) ? $orig_h / 2160 : $orig_w / 3840;
+        return max( 1.0, $scale );
     }
 
     public static function clamp_custom_crop( array $image, float $scale, int $x, int $y ): array {
