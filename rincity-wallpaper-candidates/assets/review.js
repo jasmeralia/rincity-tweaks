@@ -7,7 +7,7 @@
     const base = rincwcCfg.restBase;
 
     function api( path, method, data ) {
-        const opts = { path: base + path, method: method || 'GET' };
+        const opts = { url: base + path, method: method || 'GET' };
         if ( data ) { opts.data = data; }
         return wp.apiFetch( opts );
     }
