@@ -1,7 +1,7 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
-final class RinCWC_Watermarks_Page {
+final class RinCWC_Watermarks {
 
     public static function register(): void {
         add_action( 'admin_menu', [ __CLASS__, 'add_menu' ] );
