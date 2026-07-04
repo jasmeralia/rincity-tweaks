@@ -131,11 +131,31 @@ final class RinCWC_Data {
             $cutoffs[ $gid ] = (int) floor( $total / 3 );
         }
         self::set_cutoffs( $cutoffs );
+        $updated = self::apply_cutoffs_to_db( $cutoffs );
         $lines = [];
         foreach ( $cutoffs as $gid => $cut ) {
             $lines[] = "Gallery {$gid}: cutoff {$cut} (of {$totals[$gid]})";
         }
-        return 'Cutoffs set: ' . implode( ', ', $lines );
+        return "Cutoffs set and {$updated} rows updated. " . implode( ', ', $lines );
+    }
+
+    public static function apply_cutoffs_to_db( array $cutoffs ): int {
+        global $wpdb;
+        $table   = RinCWC_DB::images_table();
+        $updated = 0;
+        foreach ( $cutoffs as $gid => $cutoff ) {
+            $gid    = (int) $gid;
+            $cutoff = (int) $cutoff;
+            if ( $cutoff > 0 ) {
+                $updated += (int) $wpdb->query(
+                    $wpdb->prepare(
+                        "UPDATE {$table} SET excluded = CASE WHEN position > %d THEN 1 ELSE 0 END WHERE gallery_id = %d",
+                        $cutoff, $gid
+                    )
+                );
+            }
+        }
+        return $updated;
     }
 
     public static function get_cutoff( int $gallery_id ): int {
