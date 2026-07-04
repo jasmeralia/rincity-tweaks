@@ -13,21 +13,31 @@ final class RinCity_Wallpaper_Scanner {
         '1080p' => [ 'width' => 1920, 'height' => 1080, 'label' => '1080p' ],
     ];
 
-    private const TIER_ORDER = [ '1080p' => 0, '1440p' => 1, '4k' => 2 ];
-
     public static function get_results( bool $force = false ): array {
         if ( ! $force ) {
             $cached = wp_cache_get( self::CACHE_KEY, self::CACHE_GROUP );
             if ( is_array( $cached ) ) {
                 return $cached;
             }
+            $results = self::rows_to_admin_results( RinCWC_Data::get_candidate_rows_for_admin() );
+            wp_cache_set( self::CACHE_KEY, $results, self::CACHE_GROUP, 0 );
+            return $results;
         }
-        return self::run_scan();
+
+        $results = self::scan_all( true );
+        wp_cache_set( self::CACHE_KEY, $results, self::CACHE_GROUP, 0 );
+        wp_cache_set( self::STAMP_KEY, current_time( 'mysql' ), self::CACHE_GROUP, 0 );
+        update_option( 'rincwc_last_scan', current_time( 'mysql' ), false );
+        return $results;
     }
 
     public static function get_timestamp(): ?string {
         $ts = wp_cache_get( self::STAMP_KEY, self::CACHE_GROUP );
-        return $ts ?: null;
+        if ( $ts ) {
+            return $ts;
+        }
+        $stored = get_option( 'rincwc_last_scan', '' );
+        return $stored ?: null;
     }
 
     public static function clear_cache(): void {
@@ -35,180 +45,233 @@ final class RinCity_Wallpaper_Scanner {
         wp_cache_delete( self::STAMP_KEY, self::CACHE_GROUP );
     }
 
-    private static function run_scan(): array {
-        $tail_pct  = (int) get_option( 'rincwc_tail_exclude_pct', 33 );
-        $min_tier  = (string) get_option( 'rincwc_min_tier', '1080p' );
-        $min_order = self::TIER_ORDER[ $min_tier ] ?? 0;
+    public static function scan_all( bool $commit = false ): array {
+        $rows = [];
+        foreach ( RinCWC_Data::envira_galleries() as $post ) {
+            $rows = array_merge( $rows, self::scan_gallery( (int) $post->ID, $commit ) );
+        }
+        if ( $commit ) {
+            update_option( 'rincwc_last_scan', current_time( 'mysql' ), false );
+        }
+        return self::rows_to_admin_results( $rows );
+    }
 
-        $galleries = get_posts( [
-            'post_type'      => 'envira',
-            'post_status'    => 'publish',
-            'posts_per_page' => -1,
-            'orderby'        => 'date',
-            'order'          => 'DESC',
-        ] );
+    public static function scan_gallery( int $gallery_id, bool $commit = false ): array {
+        $post = get_post( $gallery_id );
+        if ( ! $post || $post->post_type !== 'envira' ) {
+            return [];
+        }
 
-        $results                    = [];
-        $gallery_ids_with_candidates = [];
+        $gallery_data = get_post_meta( $gallery_id, '_eg_gallery_data', true );
+        if ( ! is_array( $gallery_data ) || empty( $gallery_data['gallery'] ) || ! is_array( $gallery_data['gallery'] ) ) {
+            return [];
+        }
 
-        foreach ( $galleries as $post ) {
-            $gallery_data = get_post_meta( $post->ID, '_eg_gallery_data', true );
-            if ( ! is_array( $gallery_data ) || empty( $gallery_data['gallery'] ) ) {
+        $images = $gallery_data['gallery'];
+        $total  = count( $images );
+        $cutoff = RinCWC_Data::get_cutoff( $gallery_id );
+        $rows   = [];
+        $idx    = 0;
+
+        foreach ( $images as $att_id => $entry ) {
+            $idx++;
+            $att_id = (int) $att_id;
+            if ( ! $att_id ) {
                 continue;
             }
 
-            $images    = $gallery_data['gallery'];
-            $total     = count( $images );
-            $cutoff    = (int) floor( $total * ( 1.0 - $tail_pct / 100.0 ) );
-            $att_ids   = array_keys( $images );
-            $candidates = [];
+            $paths = self::attachment_paths( $att_id );
+            if ( ! $paths['original_path'] ) {
+                continue;
+            }
 
-            foreach ( $att_ids as $idx => $att_id ) {
-                if ( $idx >= $cutoff ) {
-                    break;
-                }
+            $dims = self::identify_dimensions( $paths['original_path'] );
+            if ( ! $dims ) {
+                continue;
+            }
 
-                $att_id = (int) $att_id;
-                $meta   = wp_get_attachment_metadata( $att_id );
-                if ( ! $meta || empty( $meta['width'] ) || empty( $meta['height'] ) ) {
-                    continue;
-                }
+            $orig_w = (int) $dims['w'];
+            $orig_h = (int) $dims['h'];
+            if ( $orig_w <= $orig_h || $orig_w < 3840 ) {
+                continue;
+            }
 
-                // Quick landscape check on cached metadata — avoids disk I/O for portraits.
-                if ( (int) $meta['width'] <= (int) $meta['height'] ) {
-                    continue;
-                }
+            $src_url = '';
+            if ( is_array( $entry ) && ! empty( $entry['src'] ) ) {
+                $src_url = (string) $entry['src'];
+            }
+            if ( ! $src_url ) {
+                $src_url = (string) wp_get_attachment_url( $att_id );
+            }
 
-                // Get true original dimensions via getimagesize() on the source file.
-                $original_path = wp_get_original_image_path( $att_id );
-                if ( ! $original_path || ! file_exists( $original_path ) ) {
-                    $original_path = get_attached_file( $att_id );
-                }
-                if ( ! $original_path || ! file_exists( $original_path ) ) {
-                    continue;
-                }
+            $row = [
+                'gallery_id'    => $gallery_id,
+                'gallery_slug'  => $post->post_name,
+                'gallery_title' => $post->post_title,
+                'attach_id'     => $att_id,
+                'position'      => $idx,
+                'total'         => $total,
+                'original_path' => $paths['original_path'],
+                'scaled_path'   => $paths['scaled_path'],
+                'src_url'       => $src_url,
+                'orig_w'        => $orig_w,
+                'orig_h'        => $orig_h,
+                'excluded'      => $cutoff > 0 && $idx > $cutoff ? 1 : 0,
+                'status'        => RinCWC_Data::STATUS_CANDIDATE,
+            ];
 
-                $size = @getimagesize( $original_path );
-                if ( ! $size ) {
-                    continue;
-                }
+            if ( $commit ) {
+                RinCWC_Data::upsert_image( $row );
+            }
 
-                $orig_w = (int) $size[0];
-                $orig_h = (int) $size[1];
+            $rows[] = $row;
+        }
 
-                if ( $orig_w <= $orig_h ) {
-                    continue;
-                }
+        if ( $commit ) {
+            self::clear_cache();
+        }
 
-                $tiers     = self::cropping_info( $orig_w, $orig_h );
-                $qualifies = false;
-                foreach ( $tiers as $key => $tier_data ) {
-                    if ( ( self::TIER_ORDER[ $key ] ?? 0 ) >= $min_order && $tier_data['qualifies'] ) {
-                        $qualifies = true;
-                        break;
-                    }
-                }
+        return $rows;
+    }
 
-                if ( ! $qualifies ) {
-                    continue;
-                }
+    private static function attachment_paths( int $att_id ): array {
+        $original_path = wp_get_original_image_path( $att_id );
+        if ( ! $original_path || ! file_exists( $original_path ) ) {
+            $original_path = get_attached_file( $att_id );
+        }
+        if ( ! $original_path || ! file_exists( $original_path ) ) {
+            $original_path = '';
+        }
 
-                $file_size = @filesize( $original_path );
-                $thumb_url = $images[ $att_id ]['src'] ?? wp_get_attachment_url( $att_id );
+        $scaled_path = get_attached_file( $att_id );
+        if ( ! $scaled_path || ! file_exists( $scaled_path ) ) {
+            $scaled_path = $original_path;
+        }
 
-                $candidates[] = [
-                    'attachment_id' => $att_id,
-                    'position'      => $idx + 1,
-                    'set_total'     => $total,
-                    'thumbnail_url' => (string) $thumb_url,
-                    'width'         => $orig_w,
-                    'height'        => $orig_h,
-                    'filesize'      => $file_size !== false ? (int) $file_size : 0,
-                    'aspect_ratio'  => round( $orig_w / $orig_h, 2 ),
-                    'tiers'         => $tiers,
+        return [
+            'original_path' => $original_path,
+            'scaled_path'   => $scaled_path,
+        ];
+    }
+
+    private static function identify_dimensions( string $path ): ?array {
+        $cmd = 'identify -format ' . escapeshellarg( '%w %h' ) . ' ' . escapeshellarg( $path ) . ' 2>/dev/null';
+        $out = trim( (string) shell_exec( $cmd ) );
+        if ( preg_match( '/^(\d+)\s+(\d+)$/', $out, $m ) ) {
+            return [ 'w' => (int) $m[1], 'h' => (int) $m[2] ];
+        }
+
+        $size = @getimagesize( $path );
+        if ( ! $size ) {
+            return null;
+        }
+        return [ 'w' => (int) $size[0], 'h' => (int) $size[1] ];
+    }
+
+    private static function rows_to_admin_results( array $rows ): array {
+        $by_gallery = [];
+        foreach ( $rows as $row ) {
+            $gid = (int) $row['gallery_id'];
+            if ( ! isset( $by_gallery[ $gid ] ) ) {
+                $post = get_post( $gid );
+                $by_gallery[ $gid ] = [
+                    'gallery_id'      => $gid,
+                    'title'           => $post ? $post->post_title : (string) ( $row['gallery_title'] ?? '' ),
+                    'url'             => $post ? get_permalink( $post ) : '',
+                    'published_at'    => $post ? $post->post_date : '0000-00-00 00:00:00',
+                    'categories'      => self::categories_for_gallery( $gid ),
+                    'favorites_count' => 0,
+                    'comment_count'   => $post ? (int) $post->comment_count : 0,
+                    'candidates'      => [],
                 ];
             }
 
-            if ( empty( $candidates ) ) {
-                continue;
-            }
-
-            $terms      = get_the_terms( $post->ID, 'envira-category' );
-            $categories = [];
-            if ( $terms && ! is_wp_error( $terms ) ) {
-                foreach ( $terms as $term ) {
-                    $link         = get_term_link( $term );
-                    $categories[] = [
-                        'name' => $term->name,
-                        'url'  => is_wp_error( $link ) ? null : (string) $link,
-                    ];
-                }
-            }
-
-            $gallery_ids_with_candidates[] = $post->ID;
-            $results[] = [
-                'gallery_id'      => $post->ID,
-                'title'           => $post->post_title,
-                'url'             => get_permalink( $post->ID ),
-                'published_at'    => $post->post_date,
-                'categories'      => $categories,
-                'favorites_count' => 0,
-                'comment_count'   => (int) $post->comment_count,
-                'candidates'      => $candidates,
+            $width  = (int) ( $row['orig_w'] ?? $row['width'] ?? 0 );
+            $height = (int) ( $row['orig_h'] ?? $row['height'] ?? 0 );
+            $by_gallery[ $gid ]['candidates'][] = [
+                'attachment_id' => (int) $row['attach_id'],
+                'position'      => (int) $row['position'],
+                'set_total'     => (int) $row['total'],
+                'thumbnail_url' => (string) ( $row['src_url'] ?? wp_get_attachment_url( (int) $row['attach_id'] ) ),
+                'width'         => $width,
+                'height'        => $height,
+                'filesize'      => ! empty( $row['original_path'] ) && file_exists( $row['original_path'] ) ? (int) filesize( $row['original_path'] ) : 0,
+                'aspect_ratio'  => $height ? round( $width / $height, 2 ) : 0,
+                'tiers'         => self::cropping_info( $width, $height ),
+                'excluded'      => ! empty( $row['excluded'] ),
             ];
         }
 
-        // Batch-query favorites counts in one query.
-        if ( ! empty( $gallery_ids_with_candidates ) ) {
-            global $wpdb;
-            $fav_table = $wpdb->prefix . 'rincity_gallery_favorites';
-            $ids_in    = implode( ',', array_map( 'intval', $gallery_ids_with_candidates ) );
-            $rows      = $wpdb->get_results(
-                "SELECT gallery_id, COUNT(*) AS cnt FROM {$fav_table} WHERE gallery_id IN ({$ids_in}) GROUP BY gallery_id",
-                ARRAY_A
-            );
-            $fav_map = [];
-            foreach ( $rows as $row ) {
-                $fav_map[ (int) $row['gallery_id'] ] = (int) $row['cnt'];
-            }
-            foreach ( $results as &$r ) {
-                $r['favorites_count'] = $fav_map[ $r['gallery_id'] ] ?? 0;
-            }
-            unset( $r );
-        }
-
-        $timestamp = current_time( 'mysql' );
-        wp_cache_set( self::CACHE_KEY, $results, self::CACHE_GROUP, 0 );
-        wp_cache_set( self::STAMP_KEY, $timestamp, self::CACHE_GROUP, 0 );
-
+        $results = array_values( $by_gallery );
+        self::fill_favorites_counts( $results );
         return $results;
     }
 
+    private static function categories_for_gallery( int $gallery_id ): array {
+        $terms      = get_the_terms( $gallery_id, 'envira-category' );
+        $categories = [];
+        if ( $terms && ! is_wp_error( $terms ) ) {
+            foreach ( $terms as $term ) {
+                $link         = get_term_link( $term );
+                $categories[] = [
+                    'name' => $term->name,
+                    'url'  => is_wp_error( $link ) ? null : (string) $link,
+                ];
+            }
+        }
+        return $categories;
+    }
+
+    private static function fill_favorites_counts( array &$results ): void {
+        if ( empty( $results ) ) {
+            return;
+        }
+
+        global $wpdb;
+        $fav_table = $wpdb->prefix . 'rincity_gallery_favorites';
+        $ids_in    = implode( ',', array_map( 'intval', wp_list_pluck( $results, 'gallery_id' ) ) );
+        if ( ! $ids_in ) {
+            return;
+        }
+
+        $rows = $wpdb->get_results(
+            "SELECT gallery_id, COUNT(*) AS cnt FROM {$fav_table} WHERE gallery_id IN ({$ids_in}) GROUP BY gallery_id",
+            ARRAY_A
+        );
+        $fav_map = [];
+        foreach ( $rows ?: [] as $row ) {
+            $fav_map[ (int) $row['gallery_id'] ] = (int) $row['cnt'];
+        }
+        foreach ( $results as &$result ) {
+            $result['favorites_count'] = $fav_map[ (int) $result['gallery_id'] ] ?? 0;
+        }
+        unset( $result );
+    }
+
     private static function cropping_info( int $w, int $h ): array {
-        $ratio_img    = $w / $h;
         $ratio_target = 16.0 / 9.0;
         $result       = [];
+        if ( $w <= 0 || $h <= 0 ) {
+            return $result;
+        }
 
         foreach ( self::TIERS as $key => $tier ) {
-            if ( $ratio_img > $ratio_target + 0.001 ) {
-                // Wider than 16:9 — crop left and right sides.
+            if ( $w / $h > $ratio_target + 0.001 ) {
                 $effective_w  = $h * $ratio_target;
                 $crop_each    = ( $w - $effective_w ) / 2.0;
                 $pct_retained = round( $effective_w / $w * 100.0, 1 );
-                $qualifies    = ( $h >= $tier['height'] );
+                $qualifies    = $h >= $tier['height'];
                 $direction    = 'sides';
-            } elseif ( $ratio_img < $ratio_target - 0.001 ) {
-                // Landscape but narrower than 16:9 (e.g. 4:3) — crop top and bottom.
+            } elseif ( $w / $h < $ratio_target - 0.001 ) {
                 $effective_h  = $w / $ratio_target;
                 $crop_each    = ( $h - $effective_h ) / 2.0;
                 $pct_retained = round( $effective_h / $h * 100.0, 1 );
-                $qualifies    = ( $w >= $tier['width'] );
+                $qualifies    = $w >= $tier['width'];
                 $direction    = 'top_bottom';
             } else {
-                // Essentially 16:9 — no cropping needed.
                 $crop_each    = 0.0;
                 $pct_retained = 100.0;
-                $qualifies    = ( $w >= $tier['width'] );
+                $qualifies    = $w >= $tier['width'];
                 $direction    = 'none';
             }
 
