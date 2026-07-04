@@ -277,21 +277,6 @@ final class RinCWC_Review_Page {
         }
         echo '</div>'; // .rincwc-variants
 
-        // Custom crop tool (hidden initially).
-        if ( $crop_range > 0 ) {
-            echo '<div class="rincwc-crop-tool" style="display:none">';
-            echo '<div class="rincwc-crop-preview">';
-            echo '<img class="rincwc-preview-img" src="" data-src="' . esc_url( $scaled_url ) . '" alt="">';
-            echo '<div class="rincwc-crop-box"></div>';
-            echo '</div>';
-            echo '<div class="rincwc-crop-ctrl">';
-            echo '<label>Offset <input type="range" class="rincwc-slider" min="0" max="' . esc_attr( $crop_range ) . '" value="' . esc_attr( $custom_off ) . '"></label>';
-            echo '<span class="rincwc-off-val">' . esc_html( $custom_off ) . '</span>px ';
-            echo '<button class="button rincwc-save-off">Save</button>';
-            echo '</div>';
-            echo '</div>'; // .rincwc-crop-tool
-        }
-
         // Watermark controls (hidden until selected).
         echo '<div class="rincwc-wm-row' . ( $is_sel ? '' : ' hidden' ) . '">';
         echo '<select class="rincwc-wm-sel">';
