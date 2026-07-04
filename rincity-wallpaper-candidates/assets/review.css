@@ -62,12 +62,11 @@
 }
 .rincwc-card.is-selected { border-color: #2271b1; background: #f0f6fc; }
 
-/* Thumbnail — 16:9 */
+/* Thumbnail �� full image, height flexes with natural aspect ratio */
 .rincwc-thumb-wrap { position: relative; margin-bottom: 6px; }
 .rincwc-thumb {
     width: 100%;
-    aspect-ratio: 16 / 9;
-    object-fit: cover;
+    height: auto;
     display: block;
     border-radius: 2px;
     cursor: zoom-in;

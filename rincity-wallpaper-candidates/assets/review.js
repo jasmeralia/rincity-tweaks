@@ -28,6 +28,14 @@
         initBatchButtons();
         initExpandCollapse();
         initFilter();
+
+        // Lightbox all crop download links.
+        document.addEventListener( 'click', e => {
+            const a = e.target.closest( '.rincwc-crop-dl a' );
+            if ( ! a ) return;
+            e.preventDefault();
+            openLightbox( a.href, a.textContent.trim() );
+        } );
     } );
 
     // ── Lightbox ──────────────────────────────────────────────────────────────

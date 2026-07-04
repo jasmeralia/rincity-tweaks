@@ -133,7 +133,7 @@ final class RinCWC_Review_Page {
         echo '<div class="rincwc-gal-head">';
         echo '<h3><a href="' . esc_url( $permalink ) . '" target="_blank">' . esc_html( $title . $date_str ) . '</a></h3>';
         echo '</div>';
-        echo '<details class="rincwc-details">';
+        echo '<details class="rincwc-details" open>';
         echo '<summary>' . esc_html( $summary ) . '</summary>';
 
         $selected = [];
@@ -298,10 +298,10 @@ final class RinCWC_Review_Page {
                 $raw_f = RINCWC_CROPS_DIR . "{$slug}_{$aid}_{$sel_crop}{$sfx}.jpg";
                 if ( file_exists( $wm_f ) ) {
                     $url = content_url( "uploads/wallpaper-crops/{$slug}_{$pos}_{$sel_crop}{$sfx}_wm.jpg" );
-                    echo '<a href="' . esc_url( $url ) . '" target="_blank">' . esc_html( $res_lbl ) . ' WM</a> ';
+                    echo '<a href="' . esc_url( $url ) . '">' . esc_html( $res_lbl ) . ' WM</a> ';
                 } elseif ( file_exists( $raw_f ) ) {
                     $url = content_url( "uploads/wallpaper-crops/{$slug}_{$aid}_{$sel_crop}{$sfx}.jpg" );
-                    echo '<a href="' . esc_url( $url ) . '" target="_blank">' . esc_html( $res_lbl ) . '</a> ';
+                    echo '<a href="' . esc_url( $url ) . '">' . esc_html( $res_lbl ) . '</a> ';
                 }
             }
             echo '</div>';
