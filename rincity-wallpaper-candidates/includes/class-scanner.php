@@ -17,14 +17,19 @@ final class RinCity_Wallpaper_Scanner {
             return self::error_result( 'Gallery has no Envira image data.' );
         }
 
-        $images = $gallery_data['gallery'];
-        $total  = count( $images );
-        $rows   = [];
-        $counts = [
-            'seen'       => 0,
-            'candidates' => 0,
-            'excluded'   => 0,
-            'skipped'    => 0,
+        $images   = $gallery_data['gallery'];
+        $total    = count( $images );
+        $rows     = [];
+        $counts   = [
+            'seen'        => 0,
+            'candidates'  => 0,
+            'new'         => 0,
+            'updated'     => 0,
+            'portrait'    => 0,
+            'too_small'   => 0,
+            'scale_fail'  => 0,
+            'no_file'     => 0,
+            'no_dims'     => 0,
         ];
         $written  = 0;
         $position = 0;
@@ -33,8 +38,10 @@ final class RinCity_Wallpaper_Scanner {
             $position++;
             $counts['seen']++;
             $att_id = (int) $att_id;
+
             if ( ! $att_id ) {
-                $counts['skipped']++;
+                $rows[] = [ 'position' => $position, 'total' => $total, 'attach_id' => 0, 'filename' => '', 'width' => 0, 'height' => 0, 'status' => 'skipped', 'reason' => 'Invalid attachment ID.' ];
+                $counts['no_file']++;
                 continue;
             }
 
@@ -43,30 +50,42 @@ final class RinCity_Wallpaper_Scanner {
                 $source = get_attached_file( $att_id );
             }
             if ( ! $source || ! file_exists( $source ) ) {
-                $counts['skipped']++;
+                $rows[] = [ 'position' => $position, 'total' => $total, 'attach_id' => $att_id, 'filename' => '', 'width' => 0, 'height' => 0, 'status' => 'skipped', 'reason' => 'File not found.' ];
+                $counts['no_file']++;
                 continue;
             }
 
-            $dims = self::identify_dimensions( $source );
+            $fname = basename( $source );
+            $dims  = self::identify_dimensions( $source );
             if ( ! $dims ) {
-                $counts['skipped']++;
+                $rows[] = [ 'position' => $position, 'total' => $total, 'attach_id' => $att_id, 'filename' => $fname, 'width' => 0, 'height' => 0, 'status' => 'skipped', 'reason' => 'Could not read dimensions.' ];
+                $counts['no_dims']++;
                 continue;
             }
 
             [ $orig_w, $orig_h ] = $dims;
-            if ( $orig_w <= $orig_h || $orig_w < 3840 || RinCWC_Data::max_crop_scale( $orig_w, $orig_h ) < 1.0 ) {
-                $counts['skipped']++;
+
+            if ( $orig_w <= $orig_h ) {
+                $rows[] = [ 'position' => $position, 'total' => $total, 'attach_id' => $att_id, 'filename' => $fname, 'width' => $orig_w, 'height' => $orig_h, 'status' => 'skipped', 'reason' => "Portrait ({$orig_w}×{$orig_h})." ];
+                $counts['portrait']++;
+                continue;
+            }
+            if ( $orig_w < 3840 ) {
+                $rows[] = [ 'position' => $position, 'total' => $total, 'attach_id' => $att_id, 'filename' => $fname, 'width' => $orig_w, 'height' => $orig_h, 'status' => 'skipped', 'reason' => "Width {$orig_w}px < 3840." ];
+                $counts['too_small']++;
+                continue;
+            }
+            $scale = RinCWC_Data::max_crop_scale( $orig_w, $orig_h );
+            if ( $scale < 1.0 ) {
+                $rows[] = [ 'position' => $position, 'total' => $total, 'attach_id' => $att_id, 'filename' => $fname, 'width' => $orig_w, 'height' => $orig_h, 'status' => 'skipped', 'reason' => sprintf( 'Crop scale %.2f < 1.0 (too narrow for 16:9).', $scale ) ];
+                $counts['scale_fail']++;
                 continue;
             }
 
+            $existing    = RinCWC_Data::get_image_by_gallery_attach( $gallery_id, $att_id );
+            $is_new      = ! $existing;
             $scaled_path = get_attached_file( $att_id );
-            $src_url     = '';
-            if ( is_array( $item ) && ! empty( $item['src'] ) ) {
-                $src_url = (string) $item['src'];
-            }
-            if ( ! $src_url ) {
-                $src_url = (string) wp_get_attachment_url( $att_id );
-            }
+            $src_url     = ( is_array( $item ) && ! empty( $item['src'] ) ) ? (string) $item['src'] : (string) wp_get_attachment_url( $att_id );
 
             $row = [
                 'gallery_id'    => $gallery_id,
@@ -86,14 +105,12 @@ final class RinCity_Wallpaper_Scanner {
 
             if ( $commit && RinCWC_Data::upsert_image( $row ) ) {
                 $written++;
+                if ( $is_new ) { $counts['new']++; } else { $counts['updated']++; }
             }
 
-            $rows[] = [
-                'row'      => $row,
-                'excluded' => false,
-                'status'   => 'candidate',
-                'reason'   => 'Candidate.',
-            ];
+            $label  = $is_new ? 'new' : 'existing';
+            $reason = $is_new ? 'New candidate.' : ( "Already in DB (status: " . ( $existing['status'] ?? '?' ) . ")." );
+            $rows[] = [ 'position' => $position, 'total' => $total, 'attach_id' => $att_id, 'filename' => $fname, 'width' => $orig_w, 'height' => $orig_h, 'status' => $label, 'reason' => $reason ];
             $counts['candidates']++;
         }
 

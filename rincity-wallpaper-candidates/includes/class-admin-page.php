@@ -148,9 +148,30 @@ final class RinCity_Wallpaper_Admin_Page {
             return;
         }
 
-        echo '<p><strong>' . esc_html( (string) ( $counts['candidates'] ?? 0 ) ) . '</strong> candidates, ';
-        echo '<strong>' . esc_html( (string) ( $counts['excluded'] ?? 0 ) ) . '</strong> excluded, ';
-        echo '<strong>' . esc_html( (string) ( $counts['skipped'] ?? 0 ) ) . '</strong> skipped.</p>';
+        $seen       = (int) ( $counts['seen'] ?? 0 );
+        $candidates = (int) ( $counts['candidates'] ?? 0 );
+        $new        = (int) ( $counts['new'] ?? 0 );
+        $updated    = (int) ( $counts['updated'] ?? 0 );
+        $portrait   = (int) ( $counts['portrait'] ?? 0 );
+        $too_small  = (int) ( $counts['too_small'] ?? 0 );
+        $scale_fail = (int) ( $counts['scale_fail'] ?? 0 );
+        $no_file    = (int) ( $counts['no_file'] ?? 0 );
+        $no_dims    = (int) ( $counts['no_dims'] ?? 0 );
+        echo '<p><strong>' . esc_html( (string) $seen ) . '</strong> gallery images checked. ';
+        echo '<strong>' . esc_html( (string) $candidates ) . '</strong> 4K landscape candidates';
+        if ( $new || $updated ) {
+            echo ' (' . esc_html( (string) $new ) . ' new, ' . esc_html( (string) $updated ) . ' updated)';
+        }
+        echo '.</p>';
+        $skip_parts = [];
+        if ( $portrait )  { $skip_parts[] = "{$portrait} portrait"; }
+        if ( $too_small ) { $skip_parts[] = "{$too_small} <4K"; }
+        if ( $scale_fail ){ $skip_parts[] = "{$scale_fail} too narrow for 16:9"; }
+        if ( $no_file )   { $skip_parts[] = "{$no_file} file not found"; }
+        if ( $no_dims )   { $skip_parts[] = "{$no_dims} unreadable"; }
+        if ( $skip_parts ) {
+            echo '<p>Skipped: ' . esc_html( implode( ', ', $skip_parts ) ) . '.</p>';
+        }
 
         if ( ( $preview['message'] ?? '' ) !== 'Scan committed.' ) {
             echo '<form method="post" class="rincwc-commit-form">';
@@ -162,17 +183,17 @@ final class RinCity_Wallpaper_Admin_Page {
         }
 
         echo '<table class="widefat striped rincwc-scan-table"><thead><tr>';
-        echo '<th>Position</th><th>Attachment</th><th>File</th><th>Dimensions</th><th>Status</th><th>Reason</th>';
+        echo '<th>Pos</th><th>Attachment</th><th>File</th><th>Dimensions</th><th>Status</th><th>Reason</th>';
         echo '</tr></thead><tbody>';
         foreach ( $preview['rows'] as $row ) {
-            $status = sanitize_html_class( $row['status'] );
+            $status = sanitize_html_class( $row['status'] ?? 'skipped' );
             echo '<tr class="rincwc-row-' . esc_attr( $status ) . '">';
-            echo '<td>' . esc_html( $row['position'] . ' of ' . $row['total'] ) . '</td>';
-            echo '<td>' . esc_html( (string) $row['attach_id'] ) . '</td>';
-            echo '<td>' . esc_html( $row['filename'] ) . '</td>';
-            echo '<td>' . esc_html( $row['width'] && $row['height'] ? $row['width'] . ' x ' . $row['height'] : '-' ) . '</td>';
-            echo '<td>' . esc_html( $row['status'] ) . '</td>';
-            echo '<td>' . esc_html( $row['reason'] ) . '</td>';
+            echo '<td>' . esc_html( ( $row['position'] ?? '' ) . '/' . ( $row['total'] ?? '' ) ) . '</td>';
+            echo '<td>' . esc_html( (string) ( $row['attach_id'] ?? '' ) ) . '</td>';
+            echo '<td>' . esc_html( $row['filename'] ?? '' ) . '</td>';
+            echo '<td>' . esc_html( ( $row['width'] ?? 0 ) && ( $row['height'] ?? 0 ) ? $row['width'] . '×' . $row['height'] : '-' ) . '</td>';
+            echo '<td>' . esc_html( $row['status'] ?? '' ) . '</td>';
+            echo '<td>' . esc_html( $row['reason'] ?? '' ) . '</td>';
             echo '</tr>';
         }
         echo '</tbody></table>';
@@ -192,9 +213,9 @@ final class RinCity_Wallpaper_Admin_Page {
         .rincwc-gallery-search { width: 320px; max-width: 100%; margin-bottom: 6px; display: block; }
         .rincwc-gallery-select { min-width: 420px; max-width: 100%; margin-top: 4px; }
         .rincwc-commit-form { margin: 0 0 1em; }
-        .rincwc-scan-table .rincwc-row-candidate td { background: #f0f6fc; }
-        .rincwc-scan-table .rincwc-row-excluded td { color: #996800; }
-        .rincwc-scan-table .rincwc-row-skipped td { color: #777; }
+        .rincwc-scan-table .rincwc-row-new td { background: #edfaef; }
+        .rincwc-scan-table .rincwc-row-existing td { background: #f0f6fc; color: #555; }
+        .rincwc-scan-table .rincwc-row-skipped td { color: #999; font-style: italic; }
         .rincwc-sortable th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
         .rincwc-sortable th.sortable::after { content: ' ↕'; opacity: 0.4; font-size: 11px; }
         .rincwc-sortable th.sort-asc::after { content: ' ↑'; opacity: 1; }
