@@ -3,9 +3,9 @@ PLUGINS     := $(WP_CONTENT)/plugins
 MU_PLUGINS  := $(WP_CONTENT)/mu-plugins
 OWNER       := nobody:nogroup
 
-.PHONY: all rc_tweaks rincity-envira-exif rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-nav-tweaks rincity-news-widget rincity-wallpaper-candidates rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds help
+.PHONY: all rc_tweaks rincity-envira-exif rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-nav-tweaks rincity-news-widget rincity-wallpaper-candidates rincity-wf-block-logger rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds help
 
-all: rc_tweaks rincity-envira-exif rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-nav-tweaks rincity-news-widget rincity-wallpaper-candidates rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds ## Deploy all plugins
+all: rc_tweaks rincity-envira-exif rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-nav-tweaks rincity-news-widget rincity-wallpaper-candidates rincity-wf-block-logger rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds ## Deploy all plugins
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*##"}; {printf "  %-40s %s\n", $$1, $$2}'
@@ -36,6 +36,11 @@ rincity-news-widget: ## Deploy rincity-news-widget to wp-content/plugins/rincity
 
 rincity-wallpaper-candidates: ## Deploy rincity-wallpaper-candidates to wp-content/plugins/rincity-wallpaper-candidates/
 	sudo rsync -av --chown=$(OWNER) rincity-wallpaper-candidates/ $(PLUGINS)/rincity-wallpaper-candidates/
+
+rincity-wf-block-logger: ## Deploy rincity-wf-block-logger to wp-content/mu-plugins/
+	sudo install -o nobody -g nogroup -m 644 \
+		rincity-wf-block-logger/rincity-wf-block-logger.php \
+		$(MU_PLUGINS)/rincity-wf-block-logger.php
 
 rincity-wordfence-temp-allowlist: ## Deploy rincity-wordfence-temp-allowlist to wp-content/mu-plugins/
 	sudo install -o nobody -g nogroup -m 644 \
