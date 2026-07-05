@@ -9,9 +9,10 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    margin: 12px 0 16px;
+    margin: 12px 0;
     flex-wrap: wrap;
 }
+.rincwc-toolbar:last-of-type { margin-bottom: 16px; }
 .rincwc-toolbar #rincwc-batch-msg { color: #2271b1; font-size: 13px; }
 .rincwc-search-input { width: 220px; max-width: 100%; }
 .rincwc-filter-btn.is-active { background: #2271b1; color: #fff; border-color: #135e96; }
@@ -34,6 +35,15 @@
 .rincwc-gal-head h3 { margin: 0; font-size: 15px; flex: 1; }
 .rincwc-gal-head a { color: #2271b1; text-decoration: none; }
 .rincwc-gal-head a:hover { text-decoration: underline; }
+.rincwc-gal-tags { font-size: 11px; font-weight: 400; color: #888; }
+.rincwc-gal-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    vertical-align: middle;
+}
 .rincwc-accept-all-btn { color: #1a7a1a !important; border-color: #1a7a1a !important; flex-shrink: 0; }
 .rincwc-exclude-all-btn { color: #b32d2e !important; border-color: #b32d2e !important; flex-shrink: 0; }
 .rincwc-cutoff-btn { font-size: 10px !important; padding: 1px 5px !important; margin-top: 4px; color: #8c5a00 !important; border-color: #c98b0a !important; }
@@ -94,6 +104,9 @@
 .badge-sel { background: #2271b1; color: #fff; }
 .badge-wm  { background: #00a32a; color: #fff; }
 .badge-approved { background: #00a32a; color: #fff; }
+.badge-excluded { background: #6c6c6c; color: #fff; }
+
+.rincwc-card.is-excluded { opacity: .6; }
 
 /* Info */
 .rincwc-info { margin-bottom: 6px; }

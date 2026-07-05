@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.1.0
+**Version:** 3.4.0
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -20,23 +20,34 @@ galleries.
   lists every scanned gallery with Images/Excluded/Selected/Approved/Candidates counts,
   sortable columns, a search-as-you-type filter, and Review/Rescan action links per row.
 - **Review** — the main workflow page. Galleries are grouped into cards, newest first,
-  with:
+  each showing any `envira-category` tags starting with `Model:` or `Dustrat` next to
+  the title/publish date. Toolbar is two rows: filters + search on the first, batch
+  actions on the second.
   - Search-as-you-type filter on gallery name.
-  - Filters: **Ready for review** (has a selection), **Initial inspection** (untouched —
-    no selection and no cutoff set yet), **Approved** (status = APPROVED), and
-    **Clear filters** to reset search + filter state.
-  - A summary line of sets with an approved image / ready for review / untouched.
+  - Filters: **Approved**, **Ready for review** (has a selection), **Initial inspection**
+    (untouched — no selection and no cutoff set yet), **Exclusions** (a cutoff is set
+    and/or the set is fully excluded), and **Clear filters** to reset search + filter
+    state. Exclusions is the one filter that triggers a page reload instead of an
+    instant client-side toggle, since fully-excluded sets (zero visible images) aren't
+    rendered into the page under any other view.
+  - A summary line of sets with an approved image / ready for review / passed initial
+    inspection / excluded / untouched.
   - Per-gallery **Exclude all** and **Accept all** cutoff buttons, plus a per-image
     "Set cutoff here" button that excludes that image and everything after it in the
     set. Cutoffs are stored per gallery (`excluded_after` position) and applied
-    retroactively to already-scanned rows.
+    retroactively to already-scanned rows. A gallery with zero visible images shows a
+    "Fully excluded" badge in its header and, under the Exclusions filter, its excluded
+    images are shown (each marked with an "Excluded" badge) so the decision can be
+    reviewed or undone via Accept all.
   - Per-image crop selection: five preset crops (top/center-top/center/center-bottom/
     bottom) or a custom 2D crop overlay with a zoom slider, X/Y sliders, scroll-to-zoom
     (cursor-anchored), and touch pan/pinch support.
   - Watermark corner selection per image, batch "Generate pending crops" and "Apply
     pending watermarks" actions.
   - Approve/Unapprove per card, gated to the `rincity`/`rincity_member` accounts or the
-    "Allow test approve" setting.
+    "Allow test approve" setting. Approval is a hard invariant: an image can't reach
+    APPROVED without an applied watermark, and any later change that invalidates the
+    watermark automatically demotes it back to SELECTED.
   - Per-image threaded comments (add/edit/delete own comments).
   - "Publish to galleries" batch action to sync approved+watermarked images out.
   - Expand all / Collapse all, and deep links to a specific gallery
@@ -44,7 +55,8 @@ galleries.
 - **Watermarks** — upload/register watermark PNGs, set the default watermark, delete
   unused files, and set per-gallery overrides (with its own search-as-you-type filter).
 - **Settings** — configure the 4K/1440p/1080p target Envira galleries, the test-approve
-  toggle, and per-gallery scanner cutoffs.
+  toggle, and per-gallery scanner cutoffs, with a search-as-you-type filter over the
+  cutoffs table and a "Fully excluded" badge on any gallery with zero visible images.
 
 ## Storage
 
@@ -59,6 +71,17 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.4.0** — Review page: category tags starting with `Model:` or `Dustrat` now show
+  next to the set title/publish date. Toolbar split into two rows (filters/search on
+  the first, batch actions on the second) and gained an **Exclusions** filter (cutoff
+  set and/or fully excluded). Fully-excluded sets — previously invisible everywhere,
+  including to their own "Accept all" undo button — now render under the Exclusions
+  filter with a "Fully excluded" header badge and per-image "Excluded" badges. Settings
+  page's Scanner Cutoffs table gained a search-as-you-type filter and the same
+  "Fully excluded" badge per row. Removed the "Import cutoffs from legacy CSV" button
+  and its handler (`RinCWC_Data::migrate_cutoffs_from_csv()`, `apply_cutoffs_to_db()`)
+  from the Wallpaper admin page — it read a CSV path nothing writes to anymore. A
+  proper JSON export/import is planned separately.
 - **3.3.0** — Review page set-count summary now has two more buckets, both placed before
   "untouched sets": **N sets passed initial inspection** (a cutoff is set and the set still
   has visible candidates below it, but nothing selected yet) and **N sets excluded** (every

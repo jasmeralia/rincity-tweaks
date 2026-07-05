@@ -99,65 +99,6 @@ final class RinCWC_Data {
         );
     }
 
-    public static function migrate_cutoffs_from_csv(): string {
-        $csv = WP_CONTENT_DIR . '/uploads/wallpaper-candidates/wallpaper_db.csv';
-        if ( ! file_exists( $csv ) ) {
-            return 'CSV not found: ' . $csv;
-        }
-        $fh = fopen( $csv, 'r' );
-        if ( ! $fh ) {
-            return 'Could not open CSV.';
-        }
-        $header = fgetcsv( $fh );
-        if ( ! $header ) {
-            fclose( $fh );
-            return 'Empty CSV.';
-        }
-        $col = array_flip( $header );
-        $totals = [];
-        while ( ( $row = fgetcsv( $fh ) ) !== false ) {
-            $gid   = isset( $col['gallery_id'] ) ? (int) $row[ $col['gallery_id'] ] : 0;
-            $total = isset( $col['total'] ) ? (int) $row[ $col['total'] ] : 0;
-            if ( $gid && $total ) {
-                $totals[ $gid ] = $total;
-            }
-        }
-        fclose( $fh );
-        if ( empty( $totals ) ) {
-            return 'No rows found in CSV.';
-        }
-        $cutoffs = [];
-        foreach ( $totals as $gid => $total ) {
-            $cutoffs[ $gid ] = (int) floor( $total / 3 );
-        }
-        self::set_cutoffs( $cutoffs );
-        $updated = self::apply_cutoffs_to_db( $cutoffs );
-        $lines = [];
-        foreach ( $cutoffs as $gid => $cut ) {
-            $lines[] = "Gallery {$gid}: cutoff {$cut} (of {$totals[$gid]})";
-        }
-        return "Cutoffs set and {$updated} rows updated. " . implode( ', ', $lines );
-    }
-
-    public static function apply_cutoffs_to_db( array $cutoffs ): int {
-        global $wpdb;
-        $table   = RinCWC_DB::images_table();
-        $updated = 0;
-        foreach ( $cutoffs as $gid => $cutoff ) {
-            $gid    = (int) $gid;
-            $cutoff = (int) $cutoff;
-            if ( $cutoff > 0 ) {
-                $updated += (int) $wpdb->query(
-                    $wpdb->prepare(
-                        "UPDATE {$table} SET excluded = CASE WHEN position > %d THEN 1 ELSE 0 END WHERE gallery_id = %d",
-                        $cutoff, $gid
-                    )
-                );
-            }
-        }
-        return $updated;
-    }
-
     public static function set_gallery_cutoff( int $gallery_id, int $position ): void {
         global $wpdb;
         $table = RinCWC_DB::images_table();
@@ -191,16 +132,46 @@ final class RinCWC_Data {
     /**
      * Galleries with at least one scanned row but zero visible (non-excluded) rows —
      * either "Exclude all" was used, or a cutoff landed at/before the first position.
-     * These never appear in get_visible_images(), so they need a dedicated count.
+     * These never appear in get_visible_images(), so callers that need to show or
+     * count them must go through these two methods instead.
      */
-    public static function count_fully_excluded_galleries(): int {
+    public static function get_fully_excluded_gallery_ids(): array {
         global $wpdb;
         $table = RinCWC_DB::images_table();
-        return (int) $wpdb->get_var(
-            "SELECT COUNT(*) FROM (
-                SELECT gallery_id FROM {$table} GROUP BY gallery_id HAVING SUM( excluded = 0 ) = 0
-            ) t"
+        $ids   = $wpdb->get_col(
+            "SELECT gallery_id FROM {$table} GROUP BY gallery_id HAVING SUM( excluded = 0 ) = 0"
         );
+        return array_map( 'intval', $ids );
+    }
+
+    public static function get_fully_excluded_gallery_rows(): array {
+        global $wpdb;
+        $ids = self::get_fully_excluded_gallery_ids();
+        if ( ! $ids ) {
+            return [];
+        }
+        $img_table    = RinCWC_DB::images_table();
+        $sel_table    = RinCWC_DB::selections_table();
+        $placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+        return $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT i.*,
+                        s.id AS selection_id,
+                        s.crop_variant,
+                        s.custom_crop_scale,
+                        s.custom_crop_x,
+                        s.custom_crop_y,
+                        s.wm_corner,
+                        s.wm_file_id,
+                        s.wm_applied
+                 FROM {$img_table} i
+                 LEFT JOIN {$sel_table} s ON s.image_id = i.id
+                 WHERE i.gallery_id IN ({$placeholders})
+                 ORDER BY i.gallery_id DESC, i.position ASC",
+                $ids
+            ),
+            ARRAY_A
+        ) ?: [];
     }
 
     public static function set_cutoffs( array $cutoffs ): void {

@@ -53,16 +53,47 @@ final class RinCWC_Settings_Page {
 
         echo '<h2>Scanner Cutoffs</h2>';
         echo '<p class="description">A value of 0 means no cutoff. If set, images after that position are stored as excluded and hidden from review.</p>';
-        echo '<table class="widefat striped"><thead><tr><th>Gallery</th><th>Exclude after position</th></tr></thead><tbody>';
+        echo '<input type="text" id="rincwc-cutoffs-search" placeholder="Filter galleries…" class="rincwc-gallery-search" style="margin-bottom:6px">';
+        echo '<table class="widefat striped" id="rincwc-cutoffs-table"><thead><tr><th>Gallery</th><th>Exclude after position</th><th>Status</th></tr></thead><tbody>';
+        $fully_excluded_ids = array_flip( RinCWC_Data::get_fully_excluded_gallery_ids() );
         foreach ( $galleries as $gallery ) {
-            $value = (int) ( $settings['excluded_after'][ (int) $gallery->ID ] ?? 0 );
-            echo '<tr><td>' . esc_html( sprintf( '%s (#%d)', $gallery->post_title, $gallery->ID ) ) . '</td>';
-            echo '<td><input type="number" min="0" step="1" name="excluded_after[' . esc_attr( $gallery->ID ) . ']" value="' . esc_attr( $value ) . '" class="small-text"></td></tr>';
+            $gid   = (int) $gallery->ID;
+            $value = (int) ( $settings['excluded_after'][ $gid ] ?? 0 );
+            echo '<tr data-title="' . esc_attr( strtolower( $gallery->post_title ) ) . '">';
+            echo '<td>' . esc_html( sprintf( '%s (#%d)', $gallery->post_title, $gid ) ) . '</td>';
+            echo '<td><input type="number" min="0" step="1" name="excluded_after[' . esc_attr( $gid ) . ']" value="' . esc_attr( $value ) . '" class="small-text"></td>';
+            echo '<td>' . ( isset( $fully_excluded_ids[ $gid ] ) ? '<span class="rincwc-gal-badge badge-excluded">Fully excluded</span>' : '' ) . '</td>';
+            echo '</tr>';
         }
         echo '</tbody></table>';
 
         submit_button( 'Save Settings' );
         echo '</form></div>';
+        self::render_inline_script();
+    }
+
+    private static function render_inline_script(): void {
+        ?>
+        <style>
+        .rincwc-gallery-search { width: 320px; max-width: 100%; }
+        .rincwc-gal-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 3px; }
+        .badge-excluded { background: #6c6c6c; color: #fff; }
+        </style>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var search = document.getElementById('rincwc-cutoffs-search');
+            var table = document.getElementById('rincwc-cutoffs-table');
+            if (search && table) {
+                search.addEventListener('input', function() {
+                    var q = search.value.toLowerCase();
+                    Array.from(table.tBodies[0].rows).forEach(function(row) {
+                        row.style.display = (!q || row.dataset.title.indexOf(q) !== -1) ? '' : 'none';
+                    });
+                });
+            }
+        });
+        </script>
+        <?php
     }
 
     private static function handle_save(): string {

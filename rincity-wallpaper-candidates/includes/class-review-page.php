@@ -41,19 +41,20 @@ final class RinCWC_Review_Page {
             wp_die( 'No access.' );
         }
 
-        $rows   = RinCWC_Data::get_visible_images();
-        $counts = RinCWC_Data::counts();
-        $filter = isset( $_GET['filter'] ) ? sanitize_key( wp_unslash( $_GET['filter'] ) ) : '';
+        $rows          = RinCWC_Data::get_visible_images();
+        $excluded_rows = RinCWC_Data::get_fully_excluded_gallery_rows();
+        $counts        = RinCWC_Data::counts();
+        $filter        = isset( $_GET['filter'] ) ? sanitize_key( wp_unslash( $_GET['filter'] ) ) : '';
 
         echo '<div class="wrap rincwc-review">';
         echo '<h1>Wallpaper Review</h1>';
 
-        if ( empty( $rows ) ) {
+        if ( empty( $rows ) && empty( $excluded_rows ) ) {
             echo '<p>No candidates found. Scan one or more galleries from the Wallpaper scanner page.</p></div>';
             return;
         }
 
-        $grouped     = self::group_rows( $rows );
+        $grouped     = self::group_rows( array_merge( $rows, $excluded_rows ) );
         $set_counts  = self::compute_set_counts( $grouped );
 
         echo '<p class="rincwc-summary"><strong>' . esc_html( $counts['candidates'] ) . '</strong> candidates · ';
@@ -73,14 +74,18 @@ final class RinCWC_Review_Page {
         echo '<button class="button button-small rincwc-filter-btn" id="rincwc-filter-approved">Approved</button> ';
         echo '<button class="button button-small rincwc-filter-btn" id="rincwc-filter-sel">Ready for review</button> ';
         echo '<button class="button button-small rincwc-filter-btn" id="rincwc-filter-unreviewed">Initial inspection</button> ';
+        echo '<button class="button button-small rincwc-filter-btn" id="rincwc-filter-excluded">Exclusions</button> ';
         echo '<button class="button button-small" id="rincwc-clear-filters">Clear filters</button> ';
+        echo '<span class="rincwc-expanders">';
+        echo '<a href="#" id="rincwc-expand-all">Expand all</a> · <a href="#" id="rincwc-collapse-all">Collapse all</a>';
+        echo '</span></div>';
+
+        echo '<div class="rincwc-toolbar">';
         echo '<button class="button button-small" id="rincwc-generate-crops">Generate pending crops</button> ';
         echo '<button class="button button-small" id="rincwc-apply-wm">Apply pending watermarks</button> ';
         echo '<button class="button button-secondary button-small" id="rincwc-sync-galleries">Publish to galleries</button>';
         echo '<span id="rincwc-batch-msg"></span>';
-        echo '<span class="rincwc-expanders">';
-        echo '<a href="#" id="rincwc-expand-all">Expand all</a> · <a href="#" id="rincwc-collapse-all">Collapse all</a>';
-        echo '</span></div>';
+        echo '</div>';
 
         foreach ( $grouped as $gid => $imgs ) {
             if ( ! self::gallery_matches_filter( $imgs, (int) $gid, $filter ) ) {
@@ -93,12 +98,24 @@ final class RinCWC_Review_Page {
     }
 
     private static function gallery_matches_filter( array $imgs, int $gid, string $filter ): bool {
+        $visible           = array_values( array_filter( $imgs, fn( $row ) => empty( $row['excluded'] ) ) );
+        $is_fully_excluded = empty( $visible );
+        $cutoff            = RinCWC_Data::get_cutoff( $gid );
+
+        if ( $filter === 'excluded' ) {
+            return $is_fully_excluded || $cutoff > 0;
+        }
+        if ( $is_fully_excluded ) {
+            // Fully-excluded sets only ever show under the Exclusions filter.
+            return false;
+        }
         if ( $filter === '' ) {
             return true;
         }
+
         $has_selected = false;
         $has_approved = false;
-        foreach ( $imgs as $row ) {
+        foreach ( $visible as $row ) {
             if ( $row['status'] === RinCWC_Data::STATUS_APPROVED ) {
                 $has_approved = true;
             }
@@ -114,35 +131,43 @@ final class RinCWC_Review_Page {
             return $has_approved;
         }
         if ( $filter === 'unreviewed' ) {
-            return ! $has_selected && RinCWC_Data::get_cutoff( $gid ) === 0;
+            return ! $has_selected && $cutoff === 0;
         }
         return true;
     }
 
     private static function filter_rows_for_filter( array $imgs, string $filter ): array {
+        if ( $filter === 'excluded' ) {
+            // Show everything, including excluded rows — the point is to review them.
+            return $imgs;
+        }
+        $visible = array_values( array_filter( $imgs, fn( $row ) => empty( $row['excluded'] ) ) );
         if ( $filter === 'selected' ) {
-            return array_values( array_filter( $imgs, fn( $row ) =>
+            return array_values( array_filter( $visible, fn( $row ) =>
                 in_array( $row['status'], [ RinCWC_Data::STATUS_SELECTED, RinCWC_Data::STATUS_APPROVED ], true )
                 && ( $row['crop_variant'] ?? '' ) !== ''
             ) );
         }
         if ( $filter === 'approved' ) {
-            return array_values( array_filter( $imgs, fn( $row ) => $row['status'] === RinCWC_Data::STATUS_APPROVED ) );
+            return array_values( array_filter( $visible, fn( $row ) => $row['status'] === RinCWC_Data::STATUS_APPROVED ) );
         }
-        return $imgs;
+        return $visible;
     }
 
     private static function compute_set_counts( array $grouped ): array {
         $approved  = 0;
         $ready     = 0;
         $passed    = 0;
+        $excluded  = 0;
         $untouched = 0;
 
         foreach ( $grouped as $gid => $imgs ) {
+            $visible = array_filter( $imgs, fn( $row ) => empty( $row['excluded'] ) );
+
             $has_approved  = false;
             $has_selected  = false;
             $has_candidate = false;
-            foreach ( $imgs as $row ) {
+            foreach ( $visible as $row ) {
                 if ( $row['status'] === RinCWC_Data::STATUS_APPROVED ) {
                     $has_approved = true;
                 } elseif ( $row['status'] === RinCWC_Data::STATUS_SELECTED ) {
@@ -151,11 +176,15 @@ final class RinCWC_Review_Page {
                     $has_candidate = true;
                 }
             }
-            $cutoff = RinCWC_Data::get_cutoff( (int) $gid );
+            $is_fully_excluded = empty( $visible );
+            $cutoff            = RinCWC_Data::get_cutoff( (int) $gid );
+
             if ( $has_approved ) {
                 $approved++;
             } elseif ( $has_selected ) {
                 $ready++;
+            } elseif ( $is_fully_excluded ) {
+                $excluded++;
             } elseif ( $cutoff > 0 ) {
                 // Has a cutoff and still has visible candidates below it — passed
                 // initial inspection, but nothing selected yet.
@@ -166,11 +195,11 @@ final class RinCWC_Review_Page {
         }
 
         return [
-            'approved'   => $approved,
-            'ready'      => $ready,
-            'passed'     => $passed,
-            'excluded'   => RinCWC_Data::count_fully_excluded_galleries(),
-            'untouched'  => $untouched,
+            'approved'  => $approved,
+            'ready'     => $ready,
+            'passed'    => $passed,
+            'excluded'  => $excluded,
+            'untouched' => $untouched,
         ];
     }
 
@@ -199,6 +228,10 @@ final class RinCWC_Review_Page {
         $pub_date  = $post ? date( 'Y-m-d', strtotime( $post->post_date ) ) : '';
         $slug      = $imgs[0]['gallery_slug'] ?? '';
         $permalink = get_option( 'siteurl' ) . "/envira/{$slug}/";
+        $tags      = self::matching_category_tags( $gid );
+
+        $visible_imgs      = array_values( array_filter( $imgs, fn( $row ) => empty( $row['excluded'] ) ) );
+        $is_fully_excluded = empty( $visible_imgs );
 
         $selected    = array_values( array_filter( $imgs, fn( $row ) => in_array( $row['status'], [ 'SELECTED', 'APPROVED' ], true ) ) );
         $others      = array_values( array_filter( $imgs, fn( $row ) => ! in_array( $row['status'], [ 'SELECTED', 'APPROVED' ], true ) ) );
@@ -217,10 +250,18 @@ final class RinCWC_Review_Page {
         $gal_attrs = ' id="rincwc-gallery-' . esc_attr( (string) $gid ) . '"'
             . ' data-title="' . esc_attr( strtolower( $title ) ) . '"'
             . ( $has_sel ? ' data-has-selection="1"' : '' )
-            . ( $has_cutoff ? ' data-has-cutoff="1"' : '' );
+            . ( $has_cutoff ? ' data-has-cutoff="1"' : '' )
+            . ( $is_fully_excluded ? ' data-fully-excluded="1"' : '' );
         echo '<div class="rincwc-gallery"' . $gal_attrs . '>';
         echo '<div class="rincwc-gal-head">';
-        echo '<h3><a href="' . esc_url( $permalink ) . '" target="_blank">' . esc_html( $title . ( $pub_date ? " ({$pub_date})" : '' ) ) . '</a></h3>';
+        echo '<h3><a href="' . esc_url( $permalink ) . '" target="_blank">' . esc_html( $title . ( $pub_date ? " ({$pub_date})" : '' ) ) . '</a>';
+        if ( $tags ) {
+            echo ' <span class="rincwc-gal-tags">' . esc_html( implode( ' · ', $tags ) ) . '</span>';
+        }
+        if ( $is_fully_excluded ) {
+            echo ' <span class="rincwc-gal-badge badge-excluded">Fully excluded</span>';
+        }
+        echo '</h3>';
         echo '<button class="button button-small rincwc-accept-all-btn" data-gid="' . esc_attr( (string) $gid ) . '">Accept all</button>';
         echo '<button class="button button-small rincwc-exclude-all-btn" data-gid="' . esc_attr( (string) $gid ) . '">Exclude all</button>';
         echo '</div>';
@@ -259,6 +300,7 @@ final class RinCWC_Review_Page {
         $sel_crop = (string) ( $row['crop_variant'] ?? '' );
         $wm_corner = (string) ( $row['wm_corner'] ?? '' );
         $wm_applied = ! empty( $row['wm_applied'] );
+        $is_excluded = ! empty( $row['excluded'] );
         $is_sel = in_array( $status, [ 'SELECTED', 'APPROVED' ], true ) && $sel_crop !== '';
         $image_key = "{$gid}:{$aid}";
         $max_scale = RinCWC_Data::max_crop_scale( $orig_w, $orig_h );
@@ -299,11 +341,11 @@ final class RinCWC_Review_Page {
             'approveAllowed' => RinCWC_Data::can_current_user_approve(),
         ] ) );
 
-        $card_cls = 'rincwc-card status-' . strtolower( $status ) . ( $is_sel ? ' is-selected' : '' );
+        $card_cls = 'rincwc-card status-' . strtolower( $status ) . ( $is_sel ? ' is-selected' : '' ) . ( $is_excluded ? ' is-excluded' : '' );
         echo '<div class="' . esc_attr( $card_cls ) . '" data-c="' . $card_data . '" data-key="' . esc_attr( $image_key ) . '">';
         echo '<div class="rincwc-thumb-wrap">';
         echo '<img class="rincwc-thumb" src="' . esc_url( $thumb ) . '" alt="' . esc_attr( $fname ) . '" loading="lazy">';
-        self::render_badge( $status, $is_sel, $wm_corner, $wm_applied );
+        self::render_badge( $status, $is_sel, $wm_corner, $wm_applied, $is_excluded );
         echo '</div>';
 
         $show_cutoff = ! $is_sel && $pos > $max_sel_pos;
@@ -348,7 +390,11 @@ final class RinCWC_Review_Page {
         echo '</div>';
     }
 
-    private static function render_badge( string $status, bool $is_sel, string $wm_corner, bool $wm_applied ): void {
+    private static function render_badge( string $status, bool $is_sel, string $wm_corner, bool $wm_applied, bool $is_excluded = false ): void {
+        if ( $is_excluded ) {
+            echo '<span class="rincwc-badge badge-excluded">Excluded</span>';
+            return;
+        }
         if ( $status === 'APPROVED' ) {
             echo '<span class="rincwc-badge badge-approved">Approved</span>';
             return;
@@ -431,6 +477,16 @@ final class RinCWC_Review_Page {
 
     private static function variant_label( string $variant ): string {
         return ucwords( str_replace( '-', ' ', $variant ) );
+    }
+
+    private static function matching_category_tags( int $gid ): array {
+        $terms = get_the_terms( $gid, 'envira-category' );
+        if ( ! $terms || is_wp_error( $terms ) ) {
+            return [];
+        }
+        return array_values( array_filter( array_map( fn( $term ) => $term->name, $terms ), fn( $name ) =>
+            str_starts_with( $name, 'Model:' ) || str_starts_with( $name, 'Dustrat' )
+        ) );
     }
 
     private static function crop_links_for( string $slug, int $aid, string $variant ): array {

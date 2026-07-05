@@ -676,9 +676,11 @@
         const btnSel      = document.getElementById( 'rincwc-filter-sel' );
         const btnUnrev    = document.getElementById( 'rincwc-filter-unreviewed' );
         const btnApproved = document.getElementById( 'rincwc-filter-approved' );
+        const btnExcluded = document.getElementById( 'rincwc-filter-excluded' );
         if ( btnSel )      btnSel.classList.toggle( 'is-active', activeFilter === 'selected' );
         if ( btnUnrev )    btnUnrev.classList.toggle( 'is-active', activeFilter === 'unreviewed' );
         if ( btnApproved ) btnApproved.classList.toggle( 'is-active', activeFilter === 'approved' );
+        if ( btnExcluded ) btnExcluded.classList.toggle( 'is-active', activeFilter === 'excluded' );
     }
 
     function clearFilters() {
@@ -695,6 +697,7 @@
         const btnSel      = document.getElementById( 'rincwc-filter-sel' );
         const btnUnrev    = document.getElementById( 'rincwc-filter-unreviewed' );
         const btnApproved = document.getElementById( 'rincwc-filter-approved' );
+        const btnExcluded = document.getElementById( 'rincwc-filter-excluded' );
         const btnClear    = document.getElementById( 'rincwc-clear-filters' );
         const search      = document.getElementById( 'rincwc-review-search' );
 
@@ -715,6 +718,11 @@
         if ( btnApproved ) btnApproved.addEventListener( 'click', () => {
             setFilter( activeFilter === 'approved' ? '' : 'approved' );
             updateFilterBtnStates();
+        } );
+        if ( btnExcluded ) btnExcluded.addEventListener( 'click', () => {
+            // Fully-excluded sets aren't rendered under the default view, so this
+            // filter needs a real reload rather than an instant client-side toggle.
+            window.location.href = filterUrl( activeFilter === 'excluded' ? '' : 'excluded' );
         } );
         if ( btnClear ) btnClear.addEventListener( 'click', clearFilters );
         if ( search ) search.addEventListener( 'input', () => {

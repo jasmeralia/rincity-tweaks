@@ -31,9 +31,7 @@ final class RinCity_Wallpaper_Admin_Page {
         if ( isset( $_POST['rincwc_action'], $_POST['rincwc_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['rincwc_nonce'] ) ), 'rincwc_scan_gallery' ) ) {
             $gallery_id = (int) ( $_POST['rincwc_gallery_id'] ?? 0 );
             $action     = sanitize_key( $_POST['rincwc_action'] );
-            if ( $action === 'migrate_cutoffs' ) {
-                $notice = RinCWC_Data::migrate_cutoffs_from_csv();
-            } elseif ( $gallery_id ) {
+            if ( $gallery_id ) {
                 $preview = RinCity_Wallpaper_Scanner::scan_gallery( $gallery_id, $action === 'commit_scan' );
                 $notice  = $preview['message'] ?? '';
             }
@@ -87,12 +85,6 @@ final class RinCity_Wallpaper_Admin_Page {
         echo '<strong>' . esc_html( $summary['excluded'] ) . '</strong> excluded, ';
         echo '<strong>' . esc_html( $summary['selected'] ) . '</strong> selected, ';
         echo '<strong>' . esc_html( $summary['approved'] ) . '</strong> approved.</p>';
-
-        echo '<form method="post" style="display:inline">';
-        wp_nonce_field( 'rincwc_scan_gallery', 'rincwc_nonce' );
-        echo '<input type="hidden" name="rincwc_action" value="migrate_cutoffs">';
-        submit_button( 'Import cutoffs from legacy CSV', 'secondary small', 'submit', false );
-        echo '</form>';
 
         if ( empty( $summary['galleries'] ) ) {
             echo '<p>No DB candidates yet. Run a scan to populate the catalog.</p>';
