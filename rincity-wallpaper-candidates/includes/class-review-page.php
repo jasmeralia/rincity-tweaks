@@ -52,14 +52,26 @@ final class RinCWC_Review_Page {
             return;
         }
 
+        $grouped     = self::group_rows( $rows );
+        $set_counts  = self::compute_set_counts( $grouped );
+
         echo '<p class="rincwc-summary"><strong>' . esc_html( $counts['candidates'] ) . '</strong> candidates · ';
         echo '<strong>' . esc_html( $counts['selected'] ) . '</strong> selected · ';
         echo '<strong>' . esc_html( $counts['approved'] ) . '</strong> approved · ';
         echo '<strong>' . esc_html( $counts['wm_pending'] ) . '</strong> approved with watermark pending</p>';
 
+        echo '<p class="rincwc-set-counts">';
+        echo '<strong>' . esc_html( $set_counts['approved'] ) . '</strong> set' . ( $set_counts['approved'] !== 1 ? 's' : '' ) . ' with an approved image · ';
+        echo '<strong>' . esc_html( $set_counts['ready'] ) . '</strong> set' . ( $set_counts['ready'] !== 1 ? 's' : '' ) . ' ready for review · ';
+        echo '<strong>' . esc_html( $set_counts['untouched'] ) . '</strong> untouched set' . ( $set_counts['untouched'] !== 1 ? 's' : '' );
+        echo '</p>';
+
         echo '<div class="rincwc-toolbar">';
-        echo '<button class="button" id="rincwc-filter-sel">Selections only</button> ';
-        echo '<button class="button" id="rincwc-filter-unreviewed">Not yet reviewed</button> ';
+        echo '<input type="text" id="rincwc-review-search" placeholder="Filter galleries…" class="rincwc-search-input">';
+        echo '<button class="button rincwc-filter-btn" id="rincwc-filter-sel">Ready for review</button> ';
+        echo '<button class="button rincwc-filter-btn" id="rincwc-filter-unreviewed">Initial inspection</button> ';
+        echo '<button class="button rincwc-filter-btn" id="rincwc-filter-approved">Approved</button> ';
+        echo '<button class="button" id="rincwc-clear-filters">Clear filters</button> ';
         echo '<button class="button" id="rincwc-generate-crops">Generate pending crops</button> ';
         echo '<button class="button button-primary" id="rincwc-apply-wm">Apply pending watermarks</button> ';
         echo '<button class="button button-secondary" id="rincwc-sync-galleries">Publish to galleries</button>';
@@ -68,11 +80,38 @@ final class RinCWC_Review_Page {
         echo '<a href="#" id="rincwc-expand-all">Expand all</a> · <a href="#" id="rincwc-collapse-all">Collapse all</a>';
         echo '</span></div>';
 
-        foreach ( self::group_rows( $rows ) as $gid => $imgs ) {
+        foreach ( $grouped as $gid => $imgs ) {
             self::render_gallery( (int) $gid, $imgs );
         }
 
         echo '</div>';
+    }
+
+    private static function compute_set_counts( array $grouped ): array {
+        $approved  = 0;
+        $ready     = 0;
+        $untouched = 0;
+
+        foreach ( $grouped as $gid => $imgs ) {
+            $has_approved = false;
+            $has_selected = false;
+            foreach ( $imgs as $row ) {
+                if ( $row['status'] === RinCWC_Data::STATUS_APPROVED ) {
+                    $has_approved = true;
+                } elseif ( $row['status'] === RinCWC_Data::STATUS_SELECTED ) {
+                    $has_selected = true;
+                }
+            }
+            if ( $has_approved ) {
+                $approved++;
+            } elseif ( $has_selected ) {
+                $ready++;
+            } elseif ( RinCWC_Data::get_cutoff( (int) $gid ) === 0 ) {
+                $untouched++;
+            }
+        }
+
+        return [ 'approved' => $approved, 'ready' => $ready, 'untouched' => $untouched ];
     }
 
     private static function group_rows( array $rows ): array {
@@ -116,11 +155,13 @@ final class RinCWC_Review_Page {
             : 0;
 
         $gal_attrs = ' id="rincwc-gallery-' . esc_attr( (string) $gid ) . '"'
+            . ' data-title="' . esc_attr( strtolower( $title ) ) . '"'
             . ( $has_sel ? ' data-has-selection="1"' : '' )
             . ( $has_cutoff ? ' data-has-cutoff="1"' : '' );
         echo '<div class="rincwc-gallery"' . $gal_attrs . '>';
         echo '<div class="rincwc-gal-head">';
         echo '<h3><a href="' . esc_url( $permalink ) . '" target="_blank">' . esc_html( $title . ( $pub_date ? " ({$pub_date})" : '' ) ) . '</a></h3>';
+        echo '<button class="button button-small rincwc-accept-all-btn" data-gid="' . esc_attr( (string) $gid ) . '">Accept all</button>';
         echo '<button class="button button-small rincwc-exclude-all-btn" data-gid="' . esc_attr( (string) $gid ) . '">Exclude all</button>';
         echo '</div>';
         echo '<details class="rincwc-details" open><summary>' . esc_html( $summary ) . '</summary>';

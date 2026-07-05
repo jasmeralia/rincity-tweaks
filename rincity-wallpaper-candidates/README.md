@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.0.0  
+**Version:** 3.1.0
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -11,15 +11,45 @@ galleries.
 
 ## Admin pages
 
-- **Wallpaper** — scan a single Envira gallery, dry-run results, and commit candidates to the v3 database.
-- **Review** — choose preset or custom 2D crops, set watermark corners, approve/unapprove, generate crops, apply watermarks, and publish approved images.
-- **Watermarks** — upload/register watermark PNGs, set the default watermark, delete unused files, and set per-gallery overrides.
-- **Settings** — configure 4K/1440p/1080p target galleries, scanner cutoffs, and the test approval toggle.
+- **Wallpaper** — pick an Envira gallery (search-as-you-type filter over the dropdown),
+  dry-run a scan to preview candidates, then commit them to the database. Scan results
+  show every image checked, including skip reasons (portrait, too small, too narrow for
+  16:9, file not found, unreadable). The gallery picker excludes the three configured
+  publish-target galleries and the Envira default gallery — they only ever hold
+  already-processed crop output, never source photos. A Database Summary table below
+  lists every scanned gallery with Images/Excluded/Selected/Approved/Candidates counts,
+  sortable columns, a search-as-you-type filter, and Review/Rescan action links per row.
+- **Review** — the main workflow page. Galleries are grouped into cards, newest first,
+  with:
+  - Search-as-you-type filter on gallery name.
+  - Filters: **Ready for review** (has a selection), **Initial inspection** (untouched —
+    no selection and no cutoff set yet), **Approved** (status = APPROVED), and
+    **Clear filters** to reset search + filter state.
+  - A summary line of sets with an approved image / ready for review / untouched.
+  - Per-gallery **Exclude all** and **Accept all** cutoff buttons, plus a per-image
+    "Set cutoff here" button that excludes that image and everything after it in the
+    set. Cutoffs are stored per gallery (`excluded_after` position) and applied
+    retroactively to already-scanned rows.
+  - Per-image crop selection: five preset crops (top/center-top/center/center-bottom/
+    bottom) or a custom 2D crop overlay with a zoom slider, X/Y sliders, scroll-to-zoom
+    (cursor-anchored), and touch pan/pinch support.
+  - Watermark corner selection per image, batch "Generate pending crops" and "Apply
+    pending watermarks" actions.
+  - Approve/Unapprove per card, gated to the `rincity`/`rincity_member` accounts or the
+    "Allow test approve" setting.
+  - Per-image threaded comments (add/edit/delete own comments).
+  - "Publish to galleries" batch action to sync approved+watermarked images out.
+  - Expand all / Collapse all, and deep links to a specific gallery
+    (`#rincwc-gallery-{id}`) that auto-expand that gallery and collapse the rest.
+- **Watermarks** — upload/register watermark PNGs, set the default watermark, delete
+  unused files, and set per-gallery overrides (with its own search-as-you-type filter).
+- **Settings** — configure the 4K/1440p/1080p target Envira galleries, the test-approve
+  toggle, and per-gallery scanner cutoffs.
 
 ## Storage
 
-Version 3 stores state in `wp_rincwc_*` tables. CSV files from v2 are only read once
-during migration.
+Version 3 stores state in `wp_rincwc_*` tables (images, selections, watermarks,
+gallery_wm, comments). CSV files from v2 are only read once during migration.
 
 ## Deploy
 
@@ -29,5 +59,16 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
-- **3.0.0** — Rewrote wallpaper candidates around DB-backed images/selections/watermarks, 2D crop controls, approval workflow, and Envira gallery sync.
+- **3.1.0** — Review page: search-as-you-type gallery filter, "Approved" filter,
+  "Clear filters" button, "Accept all" cutoff button (inverse of "Exclude all", clears
+  a gallery's cutoff), set-count summary (approved / ready for review / untouched
+  sets), and renamed filters ("Selections only" → "Ready for review", "Not yet
+  reviewed" → "Initial inspection").
+- **3.0.1** — Database Summary columns (Images/Excluded/Selected/Approved/Candidates),
+  gallery picker filtering (excludes publish-target and default galleries), approval
+  gating, legacy CSV cutoff migration, manual per-gallery/per-image cutoff controls,
+  verbose scan output with skip reasons, Imagick-based dimension probing, search
+  filtering and Review/Rescan links across admin screens.
+- **3.0.0** — Rewrote wallpaper candidates around DB-backed images/selections/watermarks,
+  2D crop controls, approval workflow, and Envira gallery sync.
 - **1.0.0** — Initial release.

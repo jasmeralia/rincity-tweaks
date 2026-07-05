@@ -624,6 +624,7 @@
     }
 
     let activeFilter = '';
+    let searchText = '';
 
     function applyFilters() {
         document.querySelectorAll( '.rincwc-gallery' ).forEach( gal => {
@@ -632,11 +633,20 @@
                 show = !! gal.querySelector( '.rincwc-card.is-selected' );
             } else if ( activeFilter === 'unreviewed' ) {
                 show = ! gal.dataset.hasSelection && ! gal.dataset.hasCutoff;
+            } else if ( activeFilter === 'approved' ) {
+                show = !! gal.querySelector( '.rincwc-card.status-approved' );
+            }
+            if ( show && searchText ) {
+                show = ( gal.dataset.title || '' ).indexOf( searchText ) !== -1;
             }
             gal.style.display = show ? '' : 'none';
             if ( show && activeFilter === 'selected' ) {
                 gal.querySelectorAll( '.rincwc-card' ).forEach( card => {
                     card.style.display = card.classList.contains( 'is-selected' ) ? '' : 'none';
+                } );
+            } else if ( show && activeFilter === 'approved' ) {
+                gal.querySelectorAll( '.rincwc-card' ).forEach( card => {
+                    card.style.display = card.classList.contains( 'status-approved' ) ? '' : 'none';
                 } );
             } else {
                 gal.querySelectorAll( '.rincwc-card' ).forEach( card => {
@@ -659,28 +669,54 @@
         history.replaceState( null, '', filterUrl( filter ) );
     }
 
-    function initFilter() {
-        const btnSel = document.getElementById( 'rincwc-filter-sel' );
-        const btnUnrev = document.getElementById( 'rincwc-filter-unreviewed' );
+    function updateFilterBtnStates() {
+        const btnSel      = document.getElementById( 'rincwc-filter-sel' );
+        const btnUnrev    = document.getElementById( 'rincwc-filter-unreviewed' );
+        const btnApproved = document.getElementById( 'rincwc-filter-approved' );
+        if ( btnSel )      btnSel.classList.toggle( 'is-active', activeFilter === 'selected' );
+        if ( btnUnrev )    btnUnrev.classList.toggle( 'is-active', activeFilter === 'unreviewed' );
+        if ( btnApproved ) btnApproved.classList.toggle( 'is-active', activeFilter === 'approved' );
+    }
 
-        function updateBtnStates() {
-            if ( btnSel ) btnSel.classList.toggle( 'is-active', activeFilter === 'selected' );
-            if ( btnUnrev ) btnUnrev.classList.toggle( 'is-active', activeFilter === 'unreviewed' );
-        }
+    function clearFilters() {
+        activeFilter = '';
+        searchText = '';
+        const search = document.getElementById( 'rincwc-review-search' );
+        if ( search ) search.value = '';
+        applyFilters();
+        updateFilterBtnStates();
+        history.replaceState( null, '', filterUrl( '' ) );
+    }
+
+    function initFilter() {
+        const btnSel      = document.getElementById( 'rincwc-filter-sel' );
+        const btnUnrev    = document.getElementById( 'rincwc-filter-unreviewed' );
+        const btnApproved = document.getElementById( 'rincwc-filter-approved' );
+        const btnClear    = document.getElementById( 'rincwc-clear-filters' );
+        const search      = document.getElementById( 'rincwc-review-search' );
 
         if ( rincwcCfg.initFilter ) {
             activeFilter = rincwcCfg.initFilter;
             applyFilters();
-            updateBtnStates();
+            updateFilterBtnStates();
         }
 
         if ( btnSel ) btnSel.addEventListener( 'click', () => {
             setFilter( activeFilter === 'selected' ? '' : 'selected' );
-            updateBtnStates();
+            updateFilterBtnStates();
         } );
         if ( btnUnrev ) btnUnrev.addEventListener( 'click', () => {
             setFilter( activeFilter === 'unreviewed' ? '' : 'unreviewed' );
-            updateBtnStates();
+            updateFilterBtnStates();
+        } );
+        if ( btnApproved ) btnApproved.addEventListener( 'click', () => {
+            setFilter( activeFilter === 'approved' ? '' : 'approved' );
+            updateFilterBtnStates();
+        } );
+        if ( btnClear ) btnClear.addEventListener( 'click', clearFilters );
+        if ( search ) search.addEventListener( 'input', () => {
+            searchText = search.value.trim().toLowerCase();
+            applyFilters();
         } );
 
         // Collapse all other galleries when navigating to an anchor.
@@ -721,6 +757,16 @@
                 api( 'set-gallery-cutoff', 'POST', { gallery_id: gid, position: 0 } )
                     .then( () => reloadWithFilter() )
                     .catch( err => { alert( 'Error: ' + err.message ); exclBtn.disabled = false; } );
+            }
+
+            const acceptBtn = e.target.closest( '.rincwc-accept-all-btn' );
+            if ( acceptBtn ) {
+                const gid = parseInt( acceptBtn.dataset.gid, 10 );
+                if ( ! confirm( 'Accept ALL images in this gallery as candidates (clear the cutoff)?' ) ) return;
+                acceptBtn.disabled = true;
+                api( 'set-gallery-cutoff', 'POST', { gallery_id: gid, position: 999 } )
+                    .then( () => reloadWithFilter() )
+                    .catch( err => { alert( 'Error: ' + err.message ); acceptBtn.disabled = false; } );
             }
         } );
     }
