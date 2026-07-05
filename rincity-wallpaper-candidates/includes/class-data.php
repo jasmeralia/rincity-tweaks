@@ -352,6 +352,33 @@ final class RinCWC_Data {
         ) ?: [];
     }
 
+    /**
+     * Same shape as a get_review_images() row (joined with its selection), for one
+     * specific image -- used by the per-item crop/watermark generation endpoints.
+     */
+    public static function get_review_image_by_id( int $image_id ): ?array {
+        global $wpdb;
+        $row = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT i.*,
+                        s.id AS selection_id,
+                        s.crop_variant,
+                        s.custom_crop_scale,
+                        s.custom_crop_x,
+                        s.custom_crop_y,
+                        s.wm_corner,
+                        s.wm_file_id,
+                        s.wm_applied
+                 FROM " . RinCWC_DB::images_table() . ' i
+                 LEFT JOIN ' . RinCWC_DB::selections_table() . " s ON s.image_id = i.id
+                 WHERE i.id = %d",
+                $image_id
+            ),
+            ARRAY_A
+        );
+        return $row ?: null;
+    }
+
     public static function get_visible_images(): array {
         return self::get_review_images( false );
     }

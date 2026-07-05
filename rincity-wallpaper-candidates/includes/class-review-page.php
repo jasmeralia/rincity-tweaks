@@ -67,9 +67,9 @@ final class RinCWC_Review_Page {
         echo '<strong>' . esc_html( $set_counts['approved'] ) . '</strong> set' . ( $set_counts['approved'] !== 1 ? 's' : '' ) . ' with an approved image · ';
         echo '<strong>' . esc_html( $set_counts['ready'] ) . '</strong> set' . ( $set_counts['ready'] !== 1 ? 's' : '' ) . ' ready for review · ';
         if ( $nothing_to_inspect ) {
-            echo 'All sets passed initial inspection · ';
+            echo 'All sets initially inspected · ';
         } else {
-            echo '<strong>' . esc_html( $set_counts['passed'] ) . '</strong> set' . ( $set_counts['passed'] !== 1 ? 's' : '' ) . ' passed initial inspection · ';
+            echo '<strong>' . esc_html( $set_counts['passed'] ) . '</strong> set' . ( $set_counts['passed'] !== 1 ? 's' : '' ) . ' initially inspected · ';
         }
         echo '<strong>' . esc_html( $set_counts['excluded'] ) . '</strong> set' . ( $set_counts['excluded'] !== 1 ? 's' : '' ) . ' excluded · ';
         echo '<strong>' . esc_html( $set_counts['untouched'] ) . '</strong> untouched set' . ( $set_counts['untouched'] !== 1 ? 's' : '' );

@@ -673,44 +673,80 @@
         dl.innerHTML = '<em>' + esc( text || 'Pending.' ) + '</em>';
     }
 
+    function spinnerHtml( text ) {
+        return '<span class="rincwc-spinner"></span> ' + esc( text );
+    }
+
+    function findCardByImageId( imageId ) {
+        for ( const card of document.querySelectorAll( '.rincwc-card' ) ) {
+            let cfg;
+            try { cfg = JSON.parse( card.dataset.c || '{}' ); } catch ( _ ) { continue; }
+            if ( cfg.imageId === imageId ) return { card, cfg };
+        }
+        return null;
+    }
+
+    function markCardWatermarked( imageId ) {
+        const found = findCardByImageId( imageId );
+        if ( ! found ) return;
+        const { card, cfg } = found;
+        cfg.wmApplied = true;
+        card.dataset.c = JSON.stringify( cfg );
+        const st = card.querySelector( '.rincwc-wm-status' );
+        if ( st ) {
+            st.textContent = 'applied';
+            st.classList.remove( 'wm-pending' );
+            st.classList.add( 'wm-done' );
+        }
+        updateBadge( card, cfg );
+        updateApprovalRow( card, cfg );
+    }
+
+    async function runPendingBatch( btn, msg, listPath, processPath, opts ) {
+        btn.disabled = true;
+        msg.innerHTML = spinnerHtml( `Checking for pending ${opts.plural}...` );
+        let ids;
+        try {
+            ( { ids } = await api( listPath, 'GET' ) );
+        } catch ( e ) {
+            msg.textContent = 'Error: ' + e.message;
+            btn.disabled = false;
+            return;
+        }
+        const total = ids.length;
+        let ok = 0, err = 0;
+        for ( let i = 0; i < total; i++ ) {
+            msg.innerHTML = spinnerHtml( `${opts.verbing} ${opts.singular} ${i + 1}/${total}...` );
+            try {
+                const r = await api( processPath, 'POST', { image_id: ids[ i ] } );
+                if ( r.status === 'ok' ) {
+                    ok++;
+                    if ( opts.onItemOk ) opts.onItemOk( ids[ i ] );
+                } else {
+                    err++;
+                }
+            } catch ( _ ) {
+                err++;
+            }
+        }
+        msg.textContent = `Done: ${opts.verbed} ${ok} ${ok === 1 ? opts.singular : opts.plural}, ${err} error${err === 1 ? '' : 's'}.`;
+        btn.disabled = false;
+    }
+
     function initBatchButtons() {
         const gc = document.getElementById( 'rincwc-generate-crops' );
         const awm = document.getElementById( 'rincwc-apply-wm' );
         const sync = document.getElementById( 'rincwc-sync-galleries' );
         const msg = document.getElementById( 'rincwc-batch-msg' );
 
-        if ( gc ) gc.addEventListener( 'click', () => {
-            gc.disabled = true; msg.textContent = 'Generating crops...';
-            api( 'generate-crops', 'POST' ).then( r => {
-                const ok = r.results.filter( x => x.status === 'ok' ).length;
-                const err = r.results.filter( x => x.status === 'error' ).length;
-                msg.textContent = `Done: ${ok} ok, ${err} errors.`;
-                gc.disabled = false;
-            } ).catch( e => { msg.textContent = 'Error: ' + e.message; gc.disabled = false; } );
-        } );
+        if ( gc ) gc.addEventListener( 'click', () => runPendingBatch( gc, msg, 'pending-crops', 'generate-crops', {
+            singular: 'crop', plural: 'crops', verbing: 'Generating', verbed: 'generated',
+        } ) );
 
-        if ( awm ) awm.addEventListener( 'click', () => {
-            awm.disabled = true; msg.textContent = 'Applying watermarks...';
-            api( 'apply-watermarks', 'POST' ).then( r => {
-                const ok = r.results.filter( x => x.status === 'ok' ).length;
-                msg.textContent = `Done: ${ok} watermarks applied.`;
-                awm.disabled = false;
-                document.querySelectorAll( '.rincwc-wm-status.wm-pending' ).forEach( el => {
-                    el.textContent = 'applied';
-                    el.classList.replace( 'wm-pending', 'wm-done' );
-                    const card = el.closest( '.rincwc-card' );
-                    if ( card ) {
-                        try {
-                            const cfg = JSON.parse( card.dataset.c || '{}' );
-                            cfg.wmApplied = true;
-                            card.dataset.c = JSON.stringify( cfg );
-                            updateBadge( card, cfg );
-                            updateApprovalRow( card, cfg );
-                        } catch ( _ ) {}
-                    }
-                } );
-            } ).catch( e => { msg.textContent = 'Error: ' + e.message; awm.disabled = false; } );
-        } );
+        if ( awm ) awm.addEventListener( 'click', () => runPendingBatch( awm, msg, 'pending-watermarks', 'apply-watermarks', {
+            singular: 'watermark', plural: 'watermarks', verbing: 'Applying', verbed: 'applied',
+            onItemOk: markCardWatermarked,
+        } ) );
 
         if ( sync ) sync.addEventListener( 'click', () => {
             sync.disabled = true; msg.textContent = 'Publishing galleries...';

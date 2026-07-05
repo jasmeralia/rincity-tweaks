@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.9.1
+**Version:** 3.10.0
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -26,7 +26,7 @@ galleries.
   - Search-as-you-type filter on gallery name.
   - Filters: **Approved**, **Ready for review** (has a selection), **Initial inspection**
     (untouched — no selection and no cutoff set yet; disables itself once nothing is
-    left untouched, and the set-count summary reads "All sets passed initial inspection"
+    left untouched, and the set-count summary reads "All sets initially inspected"
     at that point), **Exclusions** (a cutoff is set and/or the set is fully excluded),
     **Comments** (any image with at least one comment, including excluded ones — a
     genuinely good image can still be commented-and-excluded, e.g. for nudity), and
@@ -57,7 +57,9 @@ galleries.
     is selected) opens a side-by-side "Original" / "Selection" overlay, each pane scaled
     independently to make full use of its half of the screen.
   - Watermark corner selection per image, batch "Generate pending crops" and "Apply
-    pending watermarks" actions.
+    pending watermarks" actions — each processes one image per request and reports
+    live progress ("Generating crop 3/57...", with a spinner) instead of one long
+    request that hangs until everything's done.
   - Approve/Unapprove per card, gated to the `rincity`/`rincity_member` accounts or the
     "Allow test approve" setting. Approval is a hard invariant: an image can't reach
     APPROVED without an applied watermark, and any later change that invalidates the
@@ -89,6 +91,18 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.10.0** — Renamed the "N sets passed initial inspection" set-count segment to
+  "N sets initially inspected" — the old wording read as a near-duplicate of the
+  **Initial inspection** filter button, when the two are actually opposite ends of the
+  pipeline (the filter shows *untouched* sets; the count was showing *already-reviewed*
+  sets). "Generate pending crops" and "Apply pending watermarks" now report live
+  per-item progress ("Generating crop 3/57...", with a spinner) instead of one long
+  synchronous request that hangs until the whole batch finishes. New `GET
+  /pending-crops` and `GET /pending-watermarks` endpoints list the eligible image IDs;
+  `POST /generate-crops` and `POST /apply-watermarks` now take a single `image_id` and
+  process just that one image, so the client can loop and update the message between
+  each — this also removes the previous risk of a large gallery's batch job hitting
+  PHP's `max_execution_time` mid-loop.
 - **3.9.1** — Fixed a real bug in the custom 2D crop overlay, introduced by 3.9.0's
   `scaledUrl`/`originalUrl` split: the crop overlay's preview `<img>` was still loading
   `cfg.scaledUrl`, which for an already-selected-and-watermarked image now points at the
