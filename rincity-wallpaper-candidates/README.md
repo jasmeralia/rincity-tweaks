@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.4.0
+**Version:** 3.4.1
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -71,6 +71,16 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.4.1** — Fixed the Exclusions filter (introduced in 3.4.0): it was showing every
+  card in a matching gallery, including still-active candidates, and never showed images
+  excluded via a partial cutoff at all — only fully-excluded sets ever had their excluded
+  rows fetched (`get_fully_excluded_gallery_rows()`, which only queried fully-excluded
+  gallery IDs). Replaced with `RinCWC_Data::get_excluded_images()`, which fetches every
+  excluded row regardless of whether its gallery is partially or fully cut off, and
+  narrowed the filter's row selection to excluded rows only. The "Fully excluded" header
+  badge now uses the gallery's true (pre-filter) visibility state instead of being
+  recomputed from the already-excluded-only row set, so it no longer mislabels
+  partially-excluded galleries.
 - **3.4.0** — Review page: category tags starting with `Model:` or `Dustrat` now show
   next to the set title/publish date. Toolbar split into two rows (filters/search on
   the first, batch actions on the second) and gained an **Exclusions** filter (cutoff

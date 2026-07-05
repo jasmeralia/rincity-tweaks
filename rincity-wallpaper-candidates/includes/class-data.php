@@ -132,8 +132,8 @@ final class RinCWC_Data {
     /**
      * Galleries with at least one scanned row but zero visible (non-excluded) rows —
      * either "Exclude all" was used, or a cutoff landed at/before the first position.
-     * These never appear in get_visible_images(), so callers that need to show or
-     * count them must go through these two methods instead.
+     * These never appear in get_visible_images(), so callers that need to know or
+     * count them must go through this method instead.
      */
     public static function get_fully_excluded_gallery_ids(): array {
         global $wpdb;
@@ -144,32 +144,29 @@ final class RinCWC_Data {
         return array_map( 'intval', $ids );
     }
 
-    public static function get_fully_excluded_gallery_rows(): array {
+    /**
+     * Every excluded row, from any gallery — partially cut off or fully excluded.
+     * get_visible_images() never returns these, so the Review page's Exclusions
+     * filter needs this to show what actually got cut, not just fully-excluded sets.
+     */
+    public static function get_excluded_images(): array {
         global $wpdb;
-        $ids = self::get_fully_excluded_gallery_ids();
-        if ( ! $ids ) {
-            return [];
-        }
-        $img_table    = RinCWC_DB::images_table();
-        $sel_table    = RinCWC_DB::selections_table();
-        $placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+        $img_table = RinCWC_DB::images_table();
+        $sel_table = RinCWC_DB::selections_table();
         return $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT i.*,
-                        s.id AS selection_id,
-                        s.crop_variant,
-                        s.custom_crop_scale,
-                        s.custom_crop_x,
-                        s.custom_crop_y,
-                        s.wm_corner,
-                        s.wm_file_id,
-                        s.wm_applied
-                 FROM {$img_table} i
-                 LEFT JOIN {$sel_table} s ON s.image_id = i.id
-                 WHERE i.gallery_id IN ({$placeholders})
-                 ORDER BY i.gallery_id DESC, i.position ASC",
-                $ids
-            ),
+            "SELECT i.*,
+                    s.id AS selection_id,
+                    s.crop_variant,
+                    s.custom_crop_scale,
+                    s.custom_crop_x,
+                    s.custom_crop_y,
+                    s.wm_corner,
+                    s.wm_file_id,
+                    s.wm_applied
+             FROM {$img_table} i
+             LEFT JOIN {$sel_table} s ON s.image_id = i.id
+             WHERE i.excluded = 1
+             ORDER BY i.gallery_id DESC, i.position ASC",
             ARRAY_A
         ) ?: [];
     }

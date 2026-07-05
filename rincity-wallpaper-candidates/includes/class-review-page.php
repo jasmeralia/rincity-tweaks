@@ -42,7 +42,7 @@ final class RinCWC_Review_Page {
         }
 
         $rows          = RinCWC_Data::get_visible_images();
-        $excluded_rows = RinCWC_Data::get_fully_excluded_gallery_rows();
+        $excluded_rows = RinCWC_Data::get_excluded_images();
         $counts        = RinCWC_Data::counts();
         $filter        = isset( $_GET['filter'] ) ? sanitize_key( wp_unslash( $_GET['filter'] ) ) : '';
 
@@ -91,7 +91,12 @@ final class RinCWC_Review_Page {
             if ( ! self::gallery_matches_filter( $imgs, (int) $gid, $filter ) ) {
                 continue;
             }
-            self::render_gallery( (int) $gid, self::filter_rows_for_filter( $imgs, $filter ) );
+            $is_fully_excluded = ! array_filter( $imgs, fn( $row ) => empty( $row['excluded'] ) );
+            $filtered          = self::filter_rows_for_filter( $imgs, $filter );
+            if ( ! $filtered ) {
+                continue;
+            }
+            self::render_gallery( (int) $gid, $filtered, $is_fully_excluded );
         }
 
         echo '</div>';
@@ -138,8 +143,9 @@ final class RinCWC_Review_Page {
 
     private static function filter_rows_for_filter( array $imgs, string $filter ): array {
         if ( $filter === 'excluded' ) {
-            // Show everything, including excluded rows — the point is to review them.
-            return $imgs;
+            // Only the excluded rows themselves — the point is to review what got cut,
+            // not the whole set's still-active candidates alongside them.
+            return array_values( array_filter( $imgs, fn( $row ) => ! empty( $row['excluded'] ) ) );
         }
         $visible = array_values( array_filter( $imgs, fn( $row ) => empty( $row['excluded'] ) ) );
         if ( $filter === 'selected' ) {
@@ -222,16 +228,13 @@ final class RinCWC_Review_Page {
         return $by_gallery;
     }
 
-    private static function render_gallery( int $gid, array $imgs ): void {
+    private static function render_gallery( int $gid, array $imgs, bool $is_fully_excluded = false ): void {
         $post      = get_post( $gid );
         $title     = $post ? $post->post_title : ( $imgs[0]['gallery_title'] ?? "Gallery {$gid}" );
         $pub_date  = $post ? date( 'Y-m-d', strtotime( $post->post_date ) ) : '';
         $slug      = $imgs[0]['gallery_slug'] ?? '';
         $permalink = get_option( 'siteurl' ) . "/envira/{$slug}/";
         $tags      = self::matching_category_tags( $gid );
-
-        $visible_imgs      = array_values( array_filter( $imgs, fn( $row ) => empty( $row['excluded'] ) ) );
-        $is_fully_excluded = empty( $visible_imgs );
 
         $selected    = array_values( array_filter( $imgs, fn( $row ) => in_array( $row['status'], [ 'SELECTED', 'APPROVED' ], true ) ) );
         $others      = array_values( array_filter( $imgs, fn( $row ) => ! in_array( $row['status'], [ 'SELECTED', 'APPROVED' ], true ) ) );
@@ -348,7 +351,7 @@ final class RinCWC_Review_Page {
         self::render_badge( $status, $is_sel, $wm_corner, $wm_applied, $is_excluded );
         echo '</div>';
 
-        $show_cutoff = ! $is_sel && $pos > $max_sel_pos;
+        $show_cutoff = ! $is_sel && ! $is_excluded && $pos > $max_sel_pos;
         echo '<div class="rincwc-info">';
         echo '<div class="rincwc-fname">' . esc_html( $fname ) . '</div>';
         echo '<div class="rincwc-dims">' . esc_html( "{$orig_w}x{$orig_h} · img {$pos}/{$row['total']}" ) . '</div>';

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: RinCity Wallpaper Candidates
  * Description: Wallpaper candidate scanner and interactive review/selection tool.
- * Version:     3.4.0
+ * Version:     3.4.1
  * Author:      Morgan Blackthorne
  */
 
