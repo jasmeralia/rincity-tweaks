@@ -61,20 +61,29 @@ final class RinCWC_Review_Page {
         echo '<strong>' . esc_html( $counts['selected'] ) . '</strong> selected · ';
         echo '<strong>' . esc_html( $counts['approved'] ) . '</strong> approved</p>';
 
+        $nothing_to_inspect = $set_counts['untouched'] === 0;
+
         echo '<p class="rincwc-set-counts">';
         echo '<strong>' . esc_html( $set_counts['approved'] ) . '</strong> set' . ( $set_counts['approved'] !== 1 ? 's' : '' ) . ' with an approved image · ';
         echo '<strong>' . esc_html( $set_counts['ready'] ) . '</strong> set' . ( $set_counts['ready'] !== 1 ? 's' : '' ) . ' ready for review · ';
-        echo '<strong>' . esc_html( $set_counts['passed'] ) . '</strong> set' . ( $set_counts['passed'] !== 1 ? 's' : '' ) . ' passed initial inspection · ';
+        if ( $nothing_to_inspect ) {
+            echo 'All sets passed initial inspection · ';
+        } else {
+            echo '<strong>' . esc_html( $set_counts['passed'] ) . '</strong> set' . ( $set_counts['passed'] !== 1 ? 's' : '' ) . ' passed initial inspection · ';
+        }
         echo '<strong>' . esc_html( $set_counts['excluded'] ) . '</strong> set' . ( $set_counts['excluded'] !== 1 ? 's' : '' ) . ' excluded · ';
         echo '<strong>' . esc_html( $set_counts['untouched'] ) . '</strong> untouched set' . ( $set_counts['untouched'] !== 1 ? 's' : '' );
         echo '</p>';
+
+        $commented_keys = RinCWC_DB::get_commented_image_keys();
 
         echo '<div class="rincwc-toolbar">';
         echo '<input type="text" id="rincwc-review-search" placeholder="Filter galleries…" class="rincwc-search-input">';
         echo '<button class="button button-small rincwc-filter-btn" id="rincwc-filter-approved">Approved</button> ';
         echo '<button class="button button-small rincwc-filter-btn" id="rincwc-filter-sel">Ready for review</button> ';
-        echo '<button class="button button-small rincwc-filter-btn" id="rincwc-filter-unreviewed">Initial inspection</button> ';
+        echo '<button class="button button-small rincwc-filter-btn" id="rincwc-filter-unreviewed"' . disabled( $nothing_to_inspect, true, false ) . '>Initial inspection</button> ';
         echo '<button class="button button-small rincwc-filter-btn" id="rincwc-filter-excluded">Exclusions</button> ';
+        echo '<button class="button button-small rincwc-filter-btn" id="rincwc-filter-comments">Comments</button> ';
         echo '<button class="button button-small" id="rincwc-clear-filters">Clear filters</button> ';
         echo '<span class="rincwc-expanders">';
         echo '<a href="#" id="rincwc-expand-all">Expand all</a> · <a href="#" id="rincwc-collapse-all">Collapse all</a>';
@@ -88,11 +97,11 @@ final class RinCWC_Review_Page {
         echo '</div>';
 
         foreach ( $grouped as $gid => $imgs ) {
-            if ( ! self::gallery_matches_filter( $imgs, (int) $gid, $filter ) ) {
+            if ( ! self::gallery_matches_filter( $imgs, (int) $gid, $filter, $commented_keys ) ) {
                 continue;
             }
             $is_fully_excluded = ! array_filter( $imgs, fn( $row ) => empty( $row['excluded'] ) );
-            $filtered          = self::filter_rows_for_filter( $imgs, $filter );
+            $filtered          = self::filter_rows_for_filter( $imgs, $filter, $commented_keys );
             if ( ! $filtered ) {
                 continue;
             }
@@ -102,7 +111,7 @@ final class RinCWC_Review_Page {
         echo '</div>';
     }
 
-    private static function gallery_matches_filter( array $imgs, int $gid, string $filter ): bool {
+    private static function gallery_matches_filter( array $imgs, int $gid, string $filter, array $commented_keys = [] ): bool {
         $visible           = array_values( array_filter( $imgs, fn( $row ) => empty( $row['excluded'] ) ) );
         $is_fully_excluded = empty( $visible );
         $cutoff            = RinCWC_Data::get_cutoff( $gid );
@@ -110,8 +119,17 @@ final class RinCWC_Review_Page {
         if ( $filter === 'excluded' ) {
             return $is_fully_excluded || $cutoff > 0;
         }
+        if ( $filter === 'comments' ) {
+            // Comments can be on an excluded image, so check every row, not just visible.
+            foreach ( $imgs as $row ) {
+                if ( isset( $commented_keys[ $row['gallery_id'] . ':' . $row['attach_id'] ] ) ) {
+                    return true;
+                }
+            }
+            return false;
+        }
         if ( $is_fully_excluded ) {
-            // Fully-excluded sets only ever show under the Exclusions filter.
+            // Fully-excluded sets only ever show under the Exclusions/Comments filters.
             return false;
         }
         if ( $filter === '' ) {
@@ -141,11 +159,17 @@ final class RinCWC_Review_Page {
         return true;
     }
 
-    private static function filter_rows_for_filter( array $imgs, string $filter ): array {
+    private static function filter_rows_for_filter( array $imgs, string $filter, array $commented_keys = [] ): array {
         if ( $filter === 'excluded' ) {
             // Only the excluded rows themselves — the point is to review what got cut,
             // not the whole set's still-active candidates alongside them.
             return array_values( array_filter( $imgs, fn( $row ) => ! empty( $row['excluded'] ) ) );
+        }
+        if ( $filter === 'comments' ) {
+            // Only the commented images themselves, visible or excluded.
+            return array_values( array_filter( $imgs, fn( $row ) =>
+                isset( $commented_keys[ $row['gallery_id'] . ':' . $row['attach_id'] ] )
+            ) );
         }
         $visible = array_values( array_filter( $imgs, fn( $row ) => empty( $row['excluded'] ) ) );
         if ( $filter === 'selected' ) {
@@ -288,6 +312,7 @@ final class RinCWC_Review_Page {
             }
             echo '</div>';
         }
+        echo '<div class="rincwc-back-to-top"><a href="#" class="rincwc-scroll-top" title="Back to top">&uarr; Top</a></div>';
         echo '</details></div>';
     }
 
@@ -360,7 +385,7 @@ final class RinCWC_Review_Page {
             echo '<button class="button button-small rincwc-cutoff-btn" data-gid="' . esc_attr( (string) $gid ) . '" data-pos="' . esc_attr( (string) $pos ) . '" title="Exclude this image and all after it">Set cutoff here</button>';
         }
         if ( $is_excluded ) {
-            echo '<button class="button button-small rincwc-include-from-btn" data-gid="' . esc_attr( (string) $gid ) . '" data-pos="' . esc_attr( (string) $pos ) . '" title="Include this image and everything before it">Include from here</button>';
+            echo '<button class="button button-small rincwc-include-from-btn" data-gid="' . esc_attr( (string) $gid ) . '" data-pos="' . esc_attr( (string) $pos ) . '" title="Include this image and everything before it">Include through here</button>';
         }
         echo '</div>';
 

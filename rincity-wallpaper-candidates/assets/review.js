@@ -29,6 +29,7 @@
         initExpandCollapse();
         initFilter();
         initCutoffButtons();
+        initBackToTop();
 
         document.addEventListener( 'click', e => {
             const a = e.target.closest( '.rincwc-crop-dl a' );
@@ -703,10 +704,12 @@
         const btnUnrev    = document.getElementById( 'rincwc-filter-unreviewed' );
         const btnApproved = document.getElementById( 'rincwc-filter-approved' );
         const btnExcluded = document.getElementById( 'rincwc-filter-excluded' );
+        const btnComments = document.getElementById( 'rincwc-filter-comments' );
         if ( btnSel )      btnSel.classList.toggle( 'is-active', activeFilter === 'selected' );
         if ( btnUnrev )    btnUnrev.classList.toggle( 'is-active', activeFilter === 'unreviewed' );
         if ( btnApproved ) btnApproved.classList.toggle( 'is-active', activeFilter === 'approved' );
         if ( btnExcluded ) btnExcluded.classList.toggle( 'is-active', activeFilter === 'excluded' );
+        if ( btnComments ) btnComments.classList.toggle( 'is-active', activeFilter === 'comments' );
     }
 
     function clearFilters() {
@@ -727,6 +730,7 @@
         const btnUnrev    = document.getElementById( 'rincwc-filter-unreviewed' );
         const btnApproved = document.getElementById( 'rincwc-filter-approved' );
         const btnExcluded = document.getElementById( 'rincwc-filter-excluded' );
+        const btnComments = document.getElementById( 'rincwc-filter-comments' );
         const btnClear    = document.getElementById( 'rincwc-clear-filters' );
         const search      = document.getElementById( 'rincwc-review-search' );
 
@@ -734,9 +738,10 @@
         updateFilterBtnStates();
 
         if ( btnSel )      btnSel.addEventListener( 'click', () => goToFilter( activeFilter === 'selected' ? '' : 'selected' ) );
-        if ( btnUnrev )    btnUnrev.addEventListener( 'click', () => goToFilter( activeFilter === 'unreviewed' ? '' : 'unreviewed' ) );
+        if ( btnUnrev && ! btnUnrev.disabled ) btnUnrev.addEventListener( 'click', () => goToFilter( activeFilter === 'unreviewed' ? '' : 'unreviewed' ) );
         if ( btnApproved ) btnApproved.addEventListener( 'click', () => goToFilter( activeFilter === 'approved' ? '' : 'approved' ) );
         if ( btnExcluded ) btnExcluded.addEventListener( 'click', () => goToFilter( activeFilter === 'excluded' ? '' : 'excluded' ) );
+        if ( btnComments ) btnComments.addEventListener( 'click', () => goToFilter( activeFilter === 'comments' ? '' : 'comments' ) );
         if ( btnClear )    btnClear.addEventListener( 'click', clearFilters );
         if ( search ) search.addEventListener( 'input', () => {
             searchText = search.value.trim().toLowerCase();
@@ -812,6 +817,15 @@
         const ca = document.getElementById( 'rincwc-collapse-all' );
         if ( ea ) ea.addEventListener( 'click', e => { e.preventDefault(); document.querySelectorAll( '.rincwc-details' ).forEach( d => d.open = true ); } );
         if ( ca ) ca.addEventListener( 'click', e => { e.preventDefault(); document.querySelectorAll( '.rincwc-details' ).forEach( d => d.open = false ); } );
+    }
+
+    function initBackToTop() {
+        document.addEventListener( 'click', e => {
+            const link = e.target.closest( '.rincwc-scroll-top' );
+            if ( ! link ) return;
+            e.preventDefault();
+            window.scrollTo( { top: 0, behavior: 'smooth' } );
+        } );
     }
 
     function initComments( card ) {

@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.5.3
+**Version:** 3.6.0
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -25,22 +25,27 @@ galleries.
   actions on the second.
   - Search-as-you-type filter on gallery name.
   - Filters: **Approved**, **Ready for review** (has a selection), **Initial inspection**
-    (untouched — no selection and no cutoff set yet), **Exclusions** (a cutoff is set
-    and/or the set is fully excluded), and **Clear filters** to reset search + filter
-    state. Every filter button (and Clear filters) reloads the page rather than toggling
-    client-side, since PHP renders a different row/gallery subset per filter value.
+    (untouched — no selection and no cutoff set yet; disables itself once nothing is
+    left untouched, and the set-count summary reads "All sets passed initial inspection"
+    at that point), **Exclusions** (a cutoff is set and/or the set is fully excluded),
+    **Comments** (any image with at least one comment, including excluded ones — a
+    genuinely good image can still be commented-and-excluded, e.g. for nudity), and
+    **Clear filters** to reset search + filter state. Every filter button (and Clear
+    filters) reloads the page rather than toggling client-side, since PHP renders a
+    different row/gallery subset per filter value.
   - A summary line of sets with an approved image / ready for review / passed initial
     inspection / excluded / untouched.
   - Per-gallery **Exclude all** and **Accept all** cutoff buttons, plus a per-image
     "Set cutoff here" button that excludes that image and everything after it in the
-    set, and an **Include from here** button on already-excluded images that raises the
-    cutoff back past that position (includes it and everything before it — works the
+    set, and an **Include through here** button on already-excluded images that raises
+    the cutoff back past that position (includes it and everything before it — works the
     same whether the set was partially or fully excluded). No confirmation dialogs on
     any of these; all are one click to undo. Cutoffs use an explicit sentinel: -1 =
     entire gallery excluded, 0 = no cutoff, >0 = exclude from that position onward.
     A gallery with zero visible images shows a "Fully excluded" badge in its header and,
     under the Exclusions filter, its excluded images are shown (each marked with an
     "Excluded" badge) so the decision can be reviewed or undone.
+  - A "↑ Top" link at the bottom-right of each set jumps back to the top of the page.
   - Per-image crop selection: five preset crops (top/center-top/center/center-bottom/
     bottom) or a custom 2D crop overlay with a zoom slider, X/Y sliders, scroll-to-zoom
     (cursor-anchored), and touch pan/pinch support.
@@ -77,6 +82,16 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.6.0** — Renamed "Include from here" to **Include through here** (the old name
+  read as symmetric with "Set cutoff here", which cuts forward; this one restores
+  backward toward the current cutoff, so the wording was misleading). When there are
+  zero untouched sets left, the set-count summary now reads "All sets passed initial
+  inspection" instead of "0 sets", and the Initial Inspection filter button disables
+  itself (nothing to show there). Added a **Comments** filter — surfaces images with at
+  least one comment, including excluded ones (comments can exist on an image that was
+  later excluded, e.g. a genuinely good shot flagged as unusable for wallpaper use).
+  Each set now has a "↑ Top" link at its bottom-right to jump back to the top of the
+  page without scrolling back up through a long set.
 - **3.5.3** — 3.5.2 went too far: dropping the "Accept all" vs "never touched"
   distinction entirely removed a needed signal, not just a fragile implementation of
   one. Restored it the way the original (pre-3.5.0) code did it — "Accept all" sends a

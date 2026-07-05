@@ -184,6 +184,17 @@ final class RinCWC_DB {
         ), ARRAY_A ) ?: [];
     }
 
+    /**
+     * Every image_key ("gallery_id:attach_id") with at least one comment, as a lookup
+     * set. Used by the Review page's Comments filter, which needs to check excluded
+     * images too, not just visible candidates.
+     */
+    public static function get_commented_image_keys(): array {
+        global $wpdb;
+        $keys = $wpdb->get_col( 'SELECT DISTINCT image_key FROM ' . self::comments_table() );
+        return array_flip( $keys );
+    }
+
     public static function add( string $image_key, int $user_id, string $body ): int {
         global $wpdb;
         $now = current_time( 'mysql' );
