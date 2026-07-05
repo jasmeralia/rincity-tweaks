@@ -192,9 +192,9 @@ final class RinCWC_Review_Page {
             } elseif ( $is_fully_excluded ) {
                 $excluded++;
             } elseif ( $cutoff > 0 ) {
-                // Has a partial cutoff and still has visible candidates below it —
-                // passed initial inspection, but nothing selected yet. "Accept all"
-                // (cutoff 0) is deliberately not tracked separately from untouched.
+                // Reviewed but nothing selected yet — either a real partial cutoff, or
+                // "Accept all" (sent as a position far beyond any real gallery size, so
+                // it lands in this same bucket with no special-casing needed).
                 $passed++;
             } elseif ( $has_candidate ) {
                 $untouched++;

@@ -797,7 +797,10 @@
             if ( acceptBtn ) {
                 const gid = parseInt( acceptBtn.dataset.gid, 10 );
                 acceptBtn.disabled = true;
-                api( 'set-gallery-cutoff', 'POST', { gallery_id: gid, position: 0 } )
+                // A position no real gallery reaches (largest sets are under 200 images):
+                // nothing gets excluded, but the stored cutoff still marks this set as
+                // reviewed, distinct from one that's never been looked at.
+                api( 'set-gallery-cutoff', 'POST', { gallery_id: gid, position: 999 } )
                     .then( () => reloadWithFilter() )
                     .catch( err => { alert( 'Error: ' + err.message ); acceptBtn.disabled = false; } );
             }

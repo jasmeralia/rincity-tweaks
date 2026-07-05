@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.5.2
+**Version:** 3.5.3
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -77,6 +77,16 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.5.3** — 3.5.2 went too far: dropping the "Accept all" vs "never touched"
+  distinction entirely removed a needed signal, not just a fragile implementation of
+  one. Restored it the way the original (pre-3.5.0) code did it — "Accept all" sends a
+  cutoff position far beyond any real gallery size (largest sets are under 200 images,
+  so 999 has enormous headroom), which flows through the ordinary `>0` partial-cutoff
+  code path with no special-casing: nothing gets excluded, but the stored cutoff value
+  itself (998) is what marks the set as reviewed and lands it in "passed initial
+  inspection" instead of "untouched" or "Initial inspection". No new sentinel or
+  key-presence tracking needed — it's just a number, exactly as robust for a future
+  JSON export/import as -1 already is.
 - **3.5.2** — Reverted 3.5.1's `has_cutoff_decision()` distinction between "Accept all"
   and "never touched" — on reflection, encoding that via settings-key presence (rather
   than the stored value) is exactly the kind of thing a future JSON export/import round

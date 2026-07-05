@@ -7,6 +7,13 @@ final class RinCWC_Data {
     public const STATUS_SELECTED  = 'SELECTED';
     public const STATUS_APPROVED  = 'APPROVED';
 
+    // Cutoff sentinel (stored in wp_options['rincwc_settings']['excluded_after']):
+    // -1 = entire gallery excluded. 0 (or an absent key) = never touched. >0 = exclude
+    // from that position onward -- "Accept all" also lands here, sent as a position far
+    // beyond any real gallery size, so it needs no special-casing of its own and is
+    // just as visible/robust in a JSON export as any other stored number.
+    public const CUTOFF_EXCLUDE_ALL = -1;
+
     private const VALID_STATUSES = [
         self::STATUS_CANDIDATE,
         self::STATUS_SELECTED,
@@ -99,30 +106,27 @@ final class RinCWC_Data {
         );
     }
 
-    /**
-     * Cutoff sentinel values: -1 = entire gallery excluded ("Exclude all"), 0 = no
-     * cutoff (nothing excluded), >0 = exclude from that position onward.
-     */
     public static function set_gallery_cutoff( int $gallery_id, int $position ): void {
         global $wpdb;
         $table    = RinCWC_DB::images_table();
         $settings = self::get_settings();
 
-        if ( $position < 0 ) {
-            // Exclude entire gallery — sentinel cutoff of -1.
+        if ( $position === self::CUTOFF_EXCLUDE_ALL ) {
+            // Exclude entire gallery.
             $wpdb->update( $table, [ 'excluded' => 1 ], [ 'gallery_id' => $gallery_id ] );
-            $settings['excluded_after'][ $gallery_id ] = -1;
-        } elseif ( $position === 0 ) {
-            // No cutoff — nothing excluded. Deliberately not distinguished from "never
-            // touched": that would only be knowable via key-presence in the settings
-            // array rather than the stored value, which doesn't survive a JSON
-            // export/import round-trip (or a hand edit) reliably. Value-only, always.
+            $settings['excluded_after'][ $gallery_id ] = self::CUTOFF_EXCLUDE_ALL;
+        } elseif ( $position <= 0 ) {
+            // No cutoff at all — back to never touched.
             $wpdb->update( $table, [ 'excluded' => 0 ], [ 'gallery_id' => $gallery_id ] );
             unset( $settings['excluded_after'][ $gallery_id ] );
         } else {
             // Exclude from $position onward (position >= $position → excluded). This
             // also correctly clears a prior full exclusion, since every row's excluded
             // flag is recomputed from the new threshold regardless of its previous value.
+            // "Accept all" sends a position far beyond any real gallery size, so it
+            // lands here too: nothing gets excluded, but the stored cutoff (position - 1)
+            // is what distinguishes "reviewed, accepted everything" from "never touched"
+            // (cutoff 0) in the set-count summary and the Initial Inspection filter.
             $wpdb->query(
                 $wpdb->prepare(
                     "UPDATE {$table} SET excluded = CASE WHEN position >= %d THEN 1 ELSE 0 END WHERE gallery_id = %d",
