@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.7.1
+**Version:** 3.8.0
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -85,6 +85,16 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.8.0** — Once an image is selected and its watermark applied, the thumbnail and
+  the lightbox (opened by clicking it, and when arrow-navigating between a set's
+  images) now both show that cropped+watermarked version instead of the lightbox
+  showing something different from what the thumbnail displays — previously the
+  thumbnail already switched to the watermarked crop but clicking it opened the
+  original in the lightbox anyway. A new **View original** link appears under the
+  filename for these cards specifically, opening the true original standalone (not
+  part of the set's arrow navigation). Ordinary not-yet-selected candidates are
+  unaffected: the lightbox still opens WordPress's bigger "large" attachment size
+  (not the small grid thumbnail), same as before.
 - **3.7.1** — Per-set summary line (the collapsed `<summary>` text) reworked: "X
   selected, Y (other) candidates, Z excluded · best Wpx", replacing the old "other"
   with "candidates" (or "other candidates" once there's at least one selection, since

@@ -333,14 +333,20 @@ final class RinCWC_Review_Page {
         $max_scale = RinCWC_Data::max_crop_scale( $orig_w, $orig_h );
         $geom = RinCWC_Data::crop_geometry( $row, $row, $sel_crop ?: 'center' );
 
-        $scaled_url = wp_get_attachment_image_url( $aid, 'large' ) ?: (string) $row['src_url'];
-        $thumb = (string) $row['src_url'];
+        $original_url = wp_get_attachment_image_url( $aid, 'large' ) ?: (string) $row['src_url'];
+        $thumb        = (string) $row['src_url'];
+        $thumb_is_wm  = false;
         if ( $is_sel && $wm_applied ) {
             $wm_f = RINCWC_CROPS_DIR . "{$slug}_{$pos}_{$sel_crop}_1080p_wm.jpg";
             if ( file_exists( $wm_f ) ) {
-                $thumb = content_url( "uploads/wallpaper-crops/{$slug}_{$pos}_{$sel_crop}_1080p_wm.jpg" );
+                $thumb       = content_url( "uploads/wallpaper-crops/{$slug}_{$pos}_{$sel_crop}_1080p_wm.jpg" );
+                $thumb_is_wm = true;
             }
         }
+        // Lightbox/arrow-nav target: the wm crop when that's what the thumbnail shows
+        // (so they're never inconsistent), otherwise the bigger "large" size — not the
+        // small grid thumbnail — same as before this card ever had a selection.
+        $lightbox_url = $thumb_is_wm ? $thumb : $original_url;
 
         $card_data = esc_attr( wp_json_encode( [
             'imageId'     => $image_id,
@@ -354,7 +360,8 @@ final class RinCWC_Review_Page {
             'origW'       => $orig_w,
             'origH'       => $orig_h,
             'imageKey'    => $image_key,
-            'scaledUrl'   => $scaled_url,
+            'scaledUrl'   => $lightbox_url,
+            'originalUrl' => $original_url,
             'selCrop'     => $sel_crop,
             'wmCorner'    => $wm_corner,
             'wmApplied'   => $wm_applied,
@@ -379,6 +386,9 @@ final class RinCWC_Review_Page {
         echo '<div class="rincwc-info">';
         echo '<div class="rincwc-fname">' . esc_html( $fname ) . '</div>';
         echo '<div class="rincwc-dims">' . esc_html( "{$orig_w}x{$orig_h} · img {$pos}/{$row['total']}" ) . '</div>';
+        if ( $thumb_is_wm ) {
+            echo '<a href="#" class="rincwc-view-original" data-url="' . esc_url( $original_url ) . '" data-alt="' . esc_attr( $fname ) . '">View original</a>';
+        }
         if ( $show_cutoff ) {
             echo '<button class="button button-small rincwc-cutoff-btn" data-gid="' . esc_attr( (string) $gid ) . '" data-pos="' . esc_attr( (string) $pos ) . '" title="Exclude this image and all after it">Set cutoff here</button>';
         }

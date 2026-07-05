@@ -38,6 +38,14 @@
             // Resolution-variant download links — no set navigation, just the one image.
             openLightbox( a.href, a.textContent.trim(), null );
         } );
+
+        document.addEventListener( 'click', e => {
+            const link = e.target.closest( '.rincwc-view-original' );
+            if ( ! link ) return;
+            e.preventDefault();
+            // The true original, standalone — not part of the set's arrow navigation.
+            openLightbox( link.dataset.url, link.dataset.alt || '', null );
+        } );
     } );
 
     let lightboxContext = null;
