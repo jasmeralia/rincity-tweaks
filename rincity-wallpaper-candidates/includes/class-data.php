@@ -99,18 +99,27 @@ final class RinCWC_Data {
         );
     }
 
+    /**
+     * Cutoff sentinel values: -1 = entire gallery excluded ("Exclude all"), 0 = no
+     * cutoff (nothing excluded), >0 = exclude from that position onward.
+     */
     public static function set_gallery_cutoff( int $gallery_id, int $position ): void {
         global $wpdb;
-        $table = RinCWC_DB::images_table();
+        $table    = RinCWC_DB::images_table();
+        $settings = self::get_settings();
 
-        if ( $position <= 0 ) {
-            // Exclude entire gallery.
+        if ( $position < 0 ) {
+            // Exclude entire gallery — sentinel cutoff of -1.
             $wpdb->update( $table, [ 'excluded' => 1 ], [ 'gallery_id' => $gallery_id ] );
-            $settings = self::get_settings();
+            $settings['excluded_after'][ $gallery_id ] = -1;
+        } elseif ( $position === 0 ) {
+            // No cutoff — nothing excluded.
+            $wpdb->update( $table, [ 'excluded' => 0 ], [ 'gallery_id' => $gallery_id ] );
             unset( $settings['excluded_after'][ $gallery_id ] );
-            update_option( 'rincwc_settings', $settings, false );
         } else {
-            // Exclude from $position onward (position >= $position → excluded).
+            // Exclude from $position onward (position >= $position → excluded). This
+            // also correctly clears a prior full exclusion, since every row's excluded
+            // flag is recomputed from the new threshold regardless of its previous value.
             $wpdb->query(
                 $wpdb->prepare(
                     "UPDATE {$table} SET excluded = CASE WHEN position >= %d THEN 1 ELSE 0 END WHERE gallery_id = %d",
@@ -118,15 +127,14 @@ final class RinCWC_Data {
                 )
             );
             // Store as last-included position for scanner compat.
-            $settings = self::get_settings();
             $settings['excluded_after'][ $gallery_id ] = $position - 1;
-            update_option( 'rincwc_settings', $settings, false );
         }
+        update_option( 'rincwc_settings', $settings, false );
     }
 
     public static function get_cutoff( int $gallery_id ): int {
         $settings = self::get_settings();
-        return max( 0, (int) ( $settings['excluded_after'][ $gallery_id ] ?? 0 ) );
+        return (int) ( $settings['excluded_after'][ $gallery_id ] ?? 0 );
     }
 
     /**

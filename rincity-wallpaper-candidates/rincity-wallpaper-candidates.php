@@ -2,7 +2,7 @@
 /**
  * Plugin Name: RinCity Wallpaper Candidates
  * Description: Wallpaper candidate scanner and interactive review/selection tool.
- * Version:     3.4.1
+ * Version:     3.5.0
  * Author:      Morgan Blackthorne
  */
 
@@ -13,8 +13,6 @@ define( 'RINCWC_VERSION',    $rincwc_plugin_data['Version'] );
 define( 'RINCWC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'RINCWC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
-define( 'RINCWC_DB_CSV',    WP_CONTENT_DIR . '/uploads/wallpaper-candidates/wallpaper_db.csv' );
-define( 'RINCWC_SEL_CSV',   WP_CONTENT_DIR . '/uploads/wallpaper-candidates/wallpaper_selections.csv' );
 define( 'RINCWC_CROPS_DIR', WP_CONTENT_DIR . '/uploads/wallpaper-crops/' );
 define( 'RINCWC_CROPS_SUBDIR', 'wallpaper-crops' );
 define( 'RINCWC_WATERMARKS_DIR', WP_CONTENT_DIR . '/uploads/wallpaper-watermarks/' );

@@ -34,32 +34,74 @@
             const a = e.target.closest( '.rincwc-crop-dl a' );
             if ( ! a ) return;
             e.preventDefault();
-            openLightbox( a.href, a.textContent.trim() );
+            // Resolution-variant download links — no set navigation, just the one image.
+            openLightbox( a.href, a.textContent.trim(), null );
         } );
     } );
+
+    let lightboxContext = null;
+
+    function galleryImagesFor( card ) {
+        const gallery = card.closest( '.rincwc-gallery' );
+        if ( ! gallery ) return [];
+        return Array.from( gallery.querySelectorAll( '.rincwc-card' ) )
+            .map( c => {
+                try {
+                    const c2 = JSON.parse( c.dataset.c || '{}' );
+                    return { url: c2.scaledUrl || '', alt: c2.title || c2.fname || '', imageId: c2.imageId };
+                } catch ( _ ) {
+                    return null;
+                }
+            } )
+            .filter( item => item && item.url );
+    }
 
     function buildLightbox() {
         const lb = document.createElement( 'div' );
         lb.id = 'rincwc-lb';
         lb.innerHTML = '<button class="rincwc-lb-close" aria-label="Close">x</button>'
-            + '<img class="rincwc-lb-img" src="" alt="">';
+            + '<button class="rincwc-lb-prev" aria-label="Previous">‹</button>'
+            + '<img class="rincwc-lb-img" src="" alt="">'
+            + '<button class="rincwc-lb-next" aria-label="Next">›</button>';
         document.body.appendChild( lb );
         lightboxEl = lb;
         lightboxImg = lb.querySelector( '.rincwc-lb-img' );
+        const prevBtn = lb.querySelector( '.rincwc-lb-prev' );
+        const nextBtn = lb.querySelector( '.rincwc-lb-next' );
 
-        const close = () => { lb.hidden = true; };
+        const close = () => { lb.hidden = true; lightboxContext = null; };
         lb.querySelector( '.rincwc-lb-close' ).addEventListener( 'click', e => { e.stopPropagation(); close(); } );
         lb.addEventListener( 'click', close );
         lightboxImg.addEventListener( 'click', e => e.stopPropagation() );
-        document.addEventListener( 'keydown', e => { if ( e.key === 'Escape' && ! lb.hidden ) close(); } );
+        prevBtn.addEventListener( 'click', e => { e.stopPropagation(); showLightboxAt( lightboxContext.index - 1 ); } );
+        nextBtn.addEventListener( 'click', e => { e.stopPropagation(); showLightboxAt( lightboxContext.index + 1 ); } );
+        document.addEventListener( 'keydown', e => {
+            if ( lb.hidden ) return;
+            if ( e.key === 'Escape' ) { close(); return; }
+            if ( ! lightboxContext ) return;
+            if ( e.key === 'ArrowLeft' ) { showLightboxAt( lightboxContext.index - 1 ); }
+            else if ( e.key === 'ArrowRight' ) { showLightboxAt( lightboxContext.index + 1 ); }
+        } );
         lb.hidden = true;
     }
 
-    function openLightbox( url, alt ) {
+    function showLightboxAt( index ) {
+        if ( ! lightboxContext || ! lightboxContext.images.length ) return;
+        const n = lightboxContext.images.length;
+        const i = ( ( index % n ) + n ) % n;
+        lightboxContext.index = i;
+        const img = lightboxContext.images[ i ];
+        lightboxImg.src = img.url;
+        lightboxImg.alt = img.alt;
+    }
+
+    function openLightbox( url, alt, context ) {
         if ( ! lightboxEl ) return;
         lightboxImg.src = url;
         lightboxImg.alt = alt || '';
         lightboxEl.hidden = false;
+        lightboxContext = ( context && context.images && context.images.length > 1 ) ? context : null;
+        lightboxEl.classList.toggle( 'has-nav', !! lightboxContext );
     }
 
     function buildCropOverlay() {
@@ -402,7 +444,11 @@
     function initCard( card ) {
         const cfg = JSON.parse( card.dataset.c || '{}' );
         const thumb = card.querySelector( '.rincwc-thumb' );
-        if ( thumb ) thumb.addEventListener( 'click', () => openLightbox( cfg.scaledUrl || thumb.src, cfg.title || cfg.fname ) );
+        if ( thumb ) thumb.addEventListener( 'click', () => {
+            const images = galleryImagesFor( card );
+            const idx = images.findIndex( img => img.imageId === cfg.imageId );
+            openLightbox( cfg.scaledUrl || thumb.src, cfg.title || cfg.fname, { images, index: Math.max( 0, idx ) } );
+        } );
 
         card.querySelectorAll( '.rincwc-vbtn' ).forEach( btn => {
             if ( btn.classList.contains( 'rincwc-custbtn' ) ) {
@@ -629,33 +675,15 @@
     let activeFilter = '';
     let searchText = '';
 
+    // Filter selection (which galleries/cards exist at all) is handled entirely
+    // server-side per ?filter= — PHP renders a different subset for each filter
+    // value, so a client-side toggle can't correctly reveal content that was never
+    // rendered under the previously-loaded filter. This only narrows by search text
+    // over whatever the current page load already contains.
     function applyFilters() {
         document.querySelectorAll( '.rincwc-gallery' ).forEach( gal => {
-            let show = true;
-            if ( activeFilter === 'selected' ) {
-                show = !! gal.querySelector( '.rincwc-card.is-selected' );
-            } else if ( activeFilter === 'unreviewed' ) {
-                show = ! gal.dataset.hasSelection && ! gal.dataset.hasCutoff;
-            } else if ( activeFilter === 'approved' ) {
-                show = !! gal.querySelector( '.rincwc-card.status-approved' );
-            }
-            if ( show && searchText ) {
-                show = ( gal.dataset.title || '' ).indexOf( searchText ) !== -1;
-            }
+            const show = ! searchText || ( gal.dataset.title || '' ).indexOf( searchText ) !== -1;
             gal.style.display = show ? '' : 'none';
-            if ( show && activeFilter === 'selected' ) {
-                gal.querySelectorAll( '.rincwc-card' ).forEach( card => {
-                    card.style.display = card.classList.contains( 'is-selected' ) ? '' : 'none';
-                } );
-            } else if ( show && activeFilter === 'approved' ) {
-                gal.querySelectorAll( '.rincwc-card' ).forEach( card => {
-                    card.style.display = card.classList.contains( 'status-approved' ) ? '' : 'none';
-                } );
-            } else {
-                gal.querySelectorAll( '.rincwc-card' ).forEach( card => {
-                    card.style.display = '';
-                } );
-            }
         } );
     }
 
@@ -666,10 +694,8 @@
         return u.toString();
     }
 
-    function setFilter( filter ) {
-        activeFilter = filter;
-        applyFilters();
-        history.replaceState( null, '', filterUrl( filter ) );
+    function goToFilter( filter ) {
+        window.location.href = filterUrl( filter );
     }
 
     function updateFilterBtnStates() {
@@ -684,13 +710,16 @@
     }
 
     function clearFilters() {
-        activeFilter = '';
+        // If a filter is active, its reload may have omitted galleries that belong
+        // in the default view — only a fresh load can bring them back.
+        if ( activeFilter !== '' ) {
+            goToFilter( '' );
+            return;
+        }
         searchText = '';
         const search = document.getElementById( 'rincwc-review-search' );
         if ( search ) search.value = '';
         applyFilters();
-        updateFilterBtnStates();
-        history.replaceState( null, '', filterUrl( '' ) );
     }
 
     function initFilter() {
@@ -701,30 +730,14 @@
         const btnClear    = document.getElementById( 'rincwc-clear-filters' );
         const search      = document.getElementById( 'rincwc-review-search' );
 
-        if ( rincwcCfg.initFilter ) {
-            activeFilter = rincwcCfg.initFilter;
-            applyFilters();
-            updateFilterBtnStates();
-        }
+        activeFilter = rincwcCfg.initFilter || '';
+        updateFilterBtnStates();
 
-        if ( btnSel ) btnSel.addEventListener( 'click', () => {
-            setFilter( activeFilter === 'selected' ? '' : 'selected' );
-            updateFilterBtnStates();
-        } );
-        if ( btnUnrev ) btnUnrev.addEventListener( 'click', () => {
-            setFilter( activeFilter === 'unreviewed' ? '' : 'unreviewed' );
-            updateFilterBtnStates();
-        } );
-        if ( btnApproved ) btnApproved.addEventListener( 'click', () => {
-            setFilter( activeFilter === 'approved' ? '' : 'approved' );
-            updateFilterBtnStates();
-        } );
-        if ( btnExcluded ) btnExcluded.addEventListener( 'click', () => {
-            // Fully-excluded sets aren't rendered under the default view, so this
-            // filter needs a real reload rather than an instant client-side toggle.
-            window.location.href = filterUrl( activeFilter === 'excluded' ? '' : 'excluded' );
-        } );
-        if ( btnClear ) btnClear.addEventListener( 'click', clearFilters );
+        if ( btnSel )      btnSel.addEventListener( 'click', () => goToFilter( activeFilter === 'selected' ? '' : 'selected' ) );
+        if ( btnUnrev )    btnUnrev.addEventListener( 'click', () => goToFilter( activeFilter === 'unreviewed' ? '' : 'unreviewed' ) );
+        if ( btnApproved ) btnApproved.addEventListener( 'click', () => goToFilter( activeFilter === 'approved' ? '' : 'approved' ) );
+        if ( btnExcluded ) btnExcluded.addEventListener( 'click', () => goToFilter( activeFilter === 'excluded' ? '' : 'excluded' ) );
+        if ( btnClear )    btnClear.addEventListener( 'click', clearFilters );
         if ( search ) search.addEventListener( 'input', () => {
             searchText = search.value.trim().toLowerCase();
             applyFilters();
@@ -744,7 +757,7 @@
     }
 
     function reloadWithFilter() {
-        window.location.href = filterUrl( activeFilter );
+        goToFilter( activeFilter );
     }
 
     function initCutoffButtons() {
@@ -753,19 +766,29 @@
             if ( cutBtn ) {
                 const gid = parseInt( cutBtn.dataset.gid, 10 );
                 const pos = parseInt( cutBtn.dataset.pos, 10 );
-                if ( ! confirm( `Exclude image #${pos} and everything after it in this gallery?` ) ) return;
                 cutBtn.disabled = true;
                 api( 'set-gallery-cutoff', 'POST', { gallery_id: gid, position: pos } )
                     .then( () => reloadWithFilter() )
                     .catch( err => { alert( 'Error: ' + err.message ); cutBtn.disabled = false; } );
             }
 
+            const inclBtn = e.target.closest( '.rincwc-include-from-btn' );
+            if ( inclBtn ) {
+                const gid = parseInt( inclBtn.dataset.gid, 10 );
+                const pos = parseInt( inclBtn.dataset.pos, 10 );
+                inclBtn.disabled = true;
+                // Raise the cutoff past this position — includes this image and
+                // everything before it; anything after stays excluded.
+                api( 'set-gallery-cutoff', 'POST', { gallery_id: gid, position: pos + 1 } )
+                    .then( () => reloadWithFilter() )
+                    .catch( err => { alert( 'Error: ' + err.message ); inclBtn.disabled = false; } );
+            }
+
             const exclBtn = e.target.closest( '.rincwc-exclude-all-btn' );
             if ( exclBtn ) {
                 const gid = parseInt( exclBtn.dataset.gid, 10 );
-                if ( ! confirm( 'Exclude ALL images in this gallery?' ) ) return;
                 exclBtn.disabled = true;
-                api( 'set-gallery-cutoff', 'POST', { gallery_id: gid, position: 0 } )
+                api( 'set-gallery-cutoff', 'POST', { gallery_id: gid, position: -1 } )
                     .then( () => reloadWithFilter() )
                     .catch( err => { alert( 'Error: ' + err.message ); exclBtn.disabled = false; } );
             }
@@ -773,9 +796,8 @@
             const acceptBtn = e.target.closest( '.rincwc-accept-all-btn' );
             if ( acceptBtn ) {
                 const gid = parseInt( acceptBtn.dataset.gid, 10 );
-                if ( ! confirm( 'Accept ALL images in this gallery as candidates (clear the cutoff)?' ) ) return;
                 acceptBtn.disabled = true;
-                api( 'set-gallery-cutoff', 'POST', { gallery_id: gid, position: 999 } )
+                api( 'set-gallery-cutoff', 'POST', { gallery_id: gid, position: 0 } )
                     .then( () => reloadWithFilter() )
                     .catch( err => { alert( 'Error: ' + err.message ); acceptBtn.disabled = false; } );
             }

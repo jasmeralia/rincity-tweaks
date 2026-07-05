@@ -32,11 +32,6 @@ final class RinCWC_DB {
         return $wpdb->prefix . 'rincwc_comments';
     }
 
-    public static function legacy_comments_table(): string {
-        global $wpdb;
-        return $wpdb->prefix . 'rincity_wallpaper_comments';
-    }
-
     public static function table(): string {
         return self::comments_table();
     }
@@ -133,8 +128,6 @@ final class RinCWC_DB {
         self::$created = true;
         update_option( 'rincwc_schema_version', self::SCHEMA_VERSION, false );
         self::seed_default_watermark();
-        self::migrate_legacy_comments();
-        self::migrate_csv_once();
     }
 
     public static function maybe_create_table(): void {
@@ -152,8 +145,6 @@ final class RinCWC_DB {
         }
 
         self::seed_default_watermark();
-        self::migrate_legacy_comments();
-        self::migrate_csv_once();
         self::$created = true;
     }
 
@@ -179,146 +170,6 @@ final class RinCWC_DB {
             'is_default' => 1,
             'created_at' => current_time( 'mysql' ),
         ] );
-    }
-
-    private static function migrate_legacy_comments(): void {
-        global $wpdb;
-        $old = self::legacy_comments_table();
-        $new = self::comments_table();
-
-        $old_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $old ) ) === $old;
-        $new_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $new ) ) === $new;
-
-        if ( $old_exists && ! $new_exists ) {
-            $wpdb->query( "RENAME TABLE {$old} TO {$new}" );
-        } elseif ( $old_exists && $new_exists ) {
-            $count_new = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$new}" );
-            if ( $count_new === 0 ) {
-                $wpdb->query( "DROP TABLE {$new}" );
-                $wpdb->query( "RENAME TABLE {$old} TO {$new}" );
-            }
-        }
-    }
-
-    private static function migrate_csv_once(): void {
-        if ( get_option( 'rincwc_csv_migrated_v3' ) ) {
-            return;
-        }
-
-        $db_rows  = self::read_csv_flat( RINCWC_DB_CSV );
-        $sel_rows = self::read_csv_flat( RINCWC_SEL_CSV );
-
-        if ( empty( $db_rows ) && empty( $sel_rows ) ) {
-            update_option( 'rincwc_csv_migrated_v3', current_time( 'mysql' ), false );
-            return;
-        }
-
-        foreach ( $db_rows as $row ) {
-            self::migrate_db_row( $row );
-        }
-
-        foreach ( $sel_rows as $row ) {
-            self::migrate_selection_row( $row );
-        }
-
-        update_option( 'rincwc_csv_migrated_v3', current_time( 'mysql' ), false );
-    }
-
-    private static function migrate_db_row( array $row ): int {
-        if ( class_exists( 'RinCWC_Data' ) ) {
-            return RinCWC_Data::upsert_image( [
-                'gallery_id'    => (int) ( $row['gallery_id'] ?? 0 ),
-                'gallery_slug'  => (string) ( $row['gallery_slug'] ?? '' ),
-                'gallery_title' => (string) ( $row['gallery_title'] ?? '' ),
-                'attach_id'     => (int) ( $row['attach_id'] ?? 0 ),
-                'position'      => (int) ( $row['position'] ?? 0 ),
-                'total'         => (int) ( $row['total'] ?? 0 ),
-                'original_path' => (string) ( $row['original_path'] ?? '' ),
-                'scaled_path'   => (string) ( $row['scaled_path'] ?? '' ),
-                'src_url'       => (string) ( $row['src_url'] ?? '' ),
-                'orig_w'        => (int) ( $row['orig_w'] ?? $row['width'] ?? 0 ),
-                'orig_h'        => (int) ( $row['orig_h'] ?? $row['height'] ?? 0 ),
-                'excluded'      => ! empty( $row['excluded'] ) && $row['excluded'] !== '0' ? 1 : 0,
-                'status'        => 'CANDIDATE',
-            ] );
-        }
-
-        return 0;
-    }
-
-    private static function migrate_selection_row( array $row ): void {
-        if ( ! class_exists( 'RinCWC_Data' ) ) {
-            return;
-        }
-
-        $image = RinCWC_Data::get_image_by_gallery_attach( (int) ( $row['gallery_id'] ?? 0 ), (int) ( $row['attach_id'] ?? 0 ) );
-        if ( ! $image ) {
-            return;
-        }
-
-        $variant = sanitize_key( $row['selected_crop'] ?? '' );
-        if ( ! $variant ) {
-            return;
-        }
-
-        $custom = [];
-        if ( $variant === 'custom' ) {
-            $offset = (int) ( $row['custom_crop_offset'] ?? 0 );
-            $custom = self::legacy_offset_to_custom_crop( $image, $offset );
-        }
-
-        RinCWC_Data::upsert_selection( (int) $image['id'], [
-            'crop_variant'      => $variant,
-            'custom_crop_scale' => $custom['scale'] ?? null,
-            'custom_crop_x'     => $custom['x'] ?? null,
-            'custom_crop_y'     => $custom['y'] ?? null,
-            'wm_corner'         => sanitize_text_field( $row['wm_corner'] ?? '' ),
-            'wm_applied'        => ( ( $row['wm_applied'] ?? '' ) === 'true' || ( $row['wm_applied'] ?? '' ) === '1' ) ? 1 : 0,
-        ] );
-
-        // v2 CSV has no durable "published" marker, so migrated rows become SELECTED.
-        RinCWC_Data::set_status( (int) $image['id'], 'SELECTED' );
-    }
-
-    private static function legacy_offset_to_custom_crop( array $image, int $offset ): array {
-        $orig_w = max( 1, (int) $image['orig_w'] );
-        $orig_h = max( 1, (int) $image['orig_h'] );
-        $scale  = RinCWC_Data::max_crop_scale( $orig_w, $orig_h );
-        $box_w  = (int) round( $scale * 3840 );
-        $box_h  = (int) round( $scale * 2160 );
-        $max_x  = max( 0, $orig_w - $box_w );
-        $max_y  = max( 0, $orig_h - $box_h );
-        $source_offset = (int) round( $offset * $scale );
-
-        if ( $orig_w / $orig_h >= 3840 / 2160 ) {
-            return [ 'scale' => $scale, 'x' => min( $max_x, max( 0, $source_offset ) ), 'y' => 0 ];
-        }
-
-        return [ 'scale' => $scale, 'x' => 0, 'y' => min( $max_y, max( 0, $source_offset ) ) ];
-    }
-
-    private static function read_csv_flat( string $path ): array {
-        if ( ! file_exists( $path ) ) {
-            return [];
-        }
-        $fh = fopen( $path, 'r' );
-        if ( ! $fh ) {
-            return [];
-        }
-        $headers = fgetcsv( $fh );
-        if ( ! $headers ) {
-            fclose( $fh );
-            return [];
-        }
-        $rows = [];
-        while ( ( $row = fgetcsv( $fh ) ) !== false ) {
-            if ( count( $row ) < count( $headers ) ) {
-                $row = array_pad( $row, count( $headers ), '' );
-            }
-            $rows[] = array_combine( $headers, array_slice( $row, 0, count( $headers ) ) );
-        }
-        fclose( $fh );
-        return $rows;
     }
 
     public static function get_comments( string $image_key ): array {

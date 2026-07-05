@@ -358,6 +358,9 @@ final class RinCWC_Review_Page {
         if ( $show_cutoff ) {
             echo '<button class="button button-small rincwc-cutoff-btn" data-gid="' . esc_attr( (string) $gid ) . '" data-pos="' . esc_attr( (string) $pos ) . '" title="Exclude this image and all after it">Set cutoff here</button>';
         }
+        if ( $is_excluded ) {
+            echo '<button class="button button-small rincwc-include-from-btn" data-gid="' . esc_attr( (string) $gid ) . '" data-pos="' . esc_attr( (string) $pos ) . '" title="Include this image and everything before it">Include from here</button>';
+        }
         echo '</div>';
 
         echo '<div class="rincwc-variants">';

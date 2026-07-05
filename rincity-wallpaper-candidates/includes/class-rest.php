@@ -387,10 +387,10 @@ final class RinCWC_Rest {
 
     public static function set_gallery_cutoff( WP_REST_Request $req ): WP_REST_Response {
         $gallery_id = (int) ( $req->get_param( 'gallery_id' ) ?? 0 );
-        $position   = (int) ( $req->get_param( 'position' ) ?? -1 );
-        if ( ! $gallery_id ) {
-            return new WP_REST_Response( [ 'error' => 'gallery_id required' ], 400 );
+        if ( ! $gallery_id || $req->get_param( 'position' ) === null ) {
+            return new WP_REST_Response( [ 'error' => 'gallery_id and position required' ], 400 );
         }
+        $position = (int) $req->get_param( 'position' );
         RinCWC_Data::set_gallery_cutoff( $gallery_id, $position );
         return new WP_REST_Response( [ 'ok' => true, 'gallery_id' => $gallery_id, 'position' => $position ], 200 );
     }

@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.4.1
+**Version:** 3.5.0
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -27,21 +27,26 @@ galleries.
   - Filters: **Approved**, **Ready for review** (has a selection), **Initial inspection**
     (untouched — no selection and no cutoff set yet), **Exclusions** (a cutoff is set
     and/or the set is fully excluded), and **Clear filters** to reset search + filter
-    state. Exclusions is the one filter that triggers a page reload instead of an
-    instant client-side toggle, since fully-excluded sets (zero visible images) aren't
-    rendered into the page under any other view.
+    state. Every filter button (and Clear filters) reloads the page rather than toggling
+    client-side, since PHP renders a different row/gallery subset per filter value.
   - A summary line of sets with an approved image / ready for review / passed initial
     inspection / excluded / untouched.
   - Per-gallery **Exclude all** and **Accept all** cutoff buttons, plus a per-image
     "Set cutoff here" button that excludes that image and everything after it in the
-    set. Cutoffs are stored per gallery (`excluded_after` position) and applied
-    retroactively to already-scanned rows. A gallery with zero visible images shows a
-    "Fully excluded" badge in its header and, under the Exclusions filter, its excluded
-    images are shown (each marked with an "Excluded" badge) so the decision can be
-    reviewed or undone via Accept all.
+    set, and an **Include from here** button on already-excluded images that raises the
+    cutoff back past that position (includes it and everything before it — works the
+    same whether the set was partially or fully excluded). No confirmation dialogs on
+    any of these; all are one click to undo. Cutoffs use an explicit sentinel: -1 =
+    entire gallery excluded, 0 = no cutoff, >0 = exclude from that position onward.
+    A gallery with zero visible images shows a "Fully excluded" badge in its header and,
+    under the Exclusions filter, its excluded images are shown (each marked with an
+    "Excluded" badge) so the decision can be reviewed or undone.
   - Per-image crop selection: five preset crops (top/center-top/center/center-bottom/
     bottom) or a custom 2D crop overlay with a zoom slider, X/Y sliders, scroll-to-zoom
     (cursor-anchored), and touch pan/pinch support.
+  - Thumbnail lightbox supports arrow-key or on-screen prev/next navigation between a
+    set's images. Resolution-variant download links (4K/1440p/1080p) still open in the
+    same lightbox but standalone, with no set navigation.
   - Watermark corner selection per image, batch "Generate pending crops" and "Apply
     pending watermarks" actions.
   - Approve/Unapprove per card, gated to the `rincity`/`rincity_member` accounts or the
@@ -61,7 +66,8 @@ galleries.
 ## Storage
 
 Version 3 stores state in `wp_rincwc_*` tables (images, selections, watermarks,
-gallery_wm, comments). CSV files from v2 are only read once during migration.
+gallery_wm, comments). The v2 CSV migration has been removed; a JSON export/import
+is planned separately.
 
 ## Deploy
 
@@ -71,6 +77,27 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.5.0** — Removed the v2→v3 CSV migration entirely (`class-db.php`'s
+  `migrate_csv_once()`/`migrate_db_row()`/`migrate_selection_row()`/
+  `legacy_offset_to_custom_crop()`/`read_csv_flat()`/`migrate_legacy_comments()`, and
+  the `RINCWC_DB_CSV`/`RINCWC_SEL_CSV` constants) — dead code now that v3 has been
+  running on live data for a while. A proper JSON export/import is planned separately.
+  Cutoffs now use an explicit sentinel scheme: **-1** = entire gallery excluded, **0** =
+  no cutoff, **>0** = exclude from that position onward — replacing the old scheme where
+  "Accept all" sent a magic `999` and "no cutoff" and "fully excluded" were both stored
+  as an absent/zero setting. Excluded images now have an **Include from here** button
+  (mirrors "Set cutoff here": raises the cutoff past that position, including it and
+  everything before it, whether the set was partially or fully excluded) — Rin can
+  reconsider an excluded image without needing the coarser Accept all. Removed the
+  confirmation dialogs on Set cutoff here / Exclude all / Accept all, since undoing any
+  of them is one click away. `set-gallery-cutoff` REST endpoint now requires `position`
+  explicitly instead of silently defaulting to a (now destructive) `-1`. Review-page
+  filter buttons and Clear filters now always reload the page instead of toggling
+  client-side, since PHP renders a different row/gallery subset per filter — switching
+  between filters without a reload could show stale or empty content that belonged to
+  whichever filter was active on the last real page load. Lightbox now supports
+  arrow-key/on-screen prev-next navigation between a set's images (not the resolution-
+  variant download links, which still open standalone).
 - **3.4.1** — Fixed the Exclusions filter (introduced in 3.4.0): it was showing every
   card in a matching gallery, including still-active candidates, and never showed images
   excluded via a partial cutoff at all — only fully-excluded sets ever had their excluded
