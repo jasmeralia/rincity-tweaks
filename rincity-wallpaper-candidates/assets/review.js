@@ -468,6 +468,12 @@
         api( 'watermark', 'POST', { image_id: cfg.imageId, gallery_id: cfg.gid, attach_id: cfg.aid, wm_corner: corner } ).then( () => {
             cfg.wmCorner = corner;
             cfg.wmApplied = false;
+            if ( cfg.status === 'APPROVED' ) {
+                // Server auto-demotes: an APPROVED image can't sit with a stale watermark.
+                cfg.status = 'SELECTED';
+                card.classList.remove( 'status-approved' );
+                card.classList.add( 'status-selected' );
+            }
             card.dataset.c = JSON.stringify( cfg );
             const st = card.querySelector( '.rincwc-wm-status' );
             if ( st ) {
@@ -526,10 +532,7 @@
             badge = document.createElement( 'span' );
             card.querySelector( '.rincwc-thumb-wrap' ).appendChild( badge );
         }
-        if ( cfg.status === 'APPROVED' && ! cfg.wmApplied ) {
-            badge.className = 'rincwc-badge badge-pending';
-            badge.textContent = 'Approved - WM pending';
-        } else if ( cfg.status === 'APPROVED' ) {
+        if ( cfg.status === 'APPROVED' ) {
             badge.className = 'rincwc-badge badge-approved';
             badge.textContent = 'Approved';
         } else {

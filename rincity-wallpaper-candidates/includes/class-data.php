@@ -386,17 +386,10 @@ final class RinCWC_Data {
     public static function counts(): array {
         $statuses = self::count_by_status();
         $rows     = self::get_review_images( false );
-        $pending  = 0;
-        foreach ( $rows as $row ) {
-            if ( $row['status'] === self::STATUS_APPROVED && empty( $row['wm_applied'] ) ) {
-                $pending++;
-            }
-        }
         return [
             'candidates' => count( $rows ),
             'selected'   => $statuses[ self::STATUS_SELECTED ] + $statuses[ self::STATUS_APPROVED ],
             'approved'   => $statuses[ self::STATUS_APPROVED ],
-            'wm_pending' => $pending,
         ];
     }
 
@@ -450,11 +443,27 @@ final class RinCWC_Data {
         }
         $row['wm_applied'] = $wm_applied;
 
-        if ( $existing ) {
-            return $wpdb->update( RinCWC_DB::selections_table(), $row, [ 'image_id' => $image_id ] ) !== false;
+        $ok = $existing
+            ? $wpdb->update( RinCWC_DB::selections_table(), $row, [ 'image_id' => $image_id ] ) !== false
+            : (bool) $wpdb->insert( RinCWC_DB::selections_table(), $row );
+
+        if ( $ok && $wm_applied === 0 ) {
+            self::demote_if_approved_without_watermark( $image_id );
         }
 
-        return (bool) $wpdb->insert( RinCWC_DB::selections_table(), $row );
+        return $ok;
+    }
+
+    /**
+     * An APPROVED image must always have an applied watermark. If a crop or watermark
+     * change just invalidated it, drop the image back to SELECTED until it's reapplied
+     * and re-approved — "approved with watermark pending" must never be a stored state.
+     */
+    private static function demote_if_approved_without_watermark( int $image_id ): void {
+        $image = self::get_image( $image_id );
+        if ( $image && $image['status'] === self::STATUS_APPROVED ) {
+            self::set_status( $image_id, self::STATUS_SELECTED );
+        }
     }
 
     public static function get_selection( int $image_id ): ?array {
@@ -554,7 +563,7 @@ final class RinCWC_Data {
             return false;
         }
         $selection = self::get_selection( (int) $image['id'] );
-        if ( ! $selection || empty( $selection['crop_variant'] ) || empty( $selection['wm_corner'] ) ) {
+        if ( ! $selection || empty( $selection['crop_variant'] ) || empty( $selection['wm_corner'] ) || empty( $selection['wm_applied'] ) ) {
             return false;
         }
         return self::set_status( (int) $image['id'], self::STATUS_APPROVED );
@@ -688,6 +697,7 @@ final class RinCWC_Data {
     public static function mark_all_watermarks_pending(): void {
         global $wpdb;
         $wpdb->update( RinCWC_DB::selections_table(), [ 'wm_applied' => 0 ], [ 'wm_applied' => 1 ] );
+        self::demote_all_approved_without_watermark();
     }
 
     public static function mark_gallery_watermarks_pending( int $gallery_id ): void {
@@ -701,6 +711,24 @@ final class RinCWC_Data {
                 $gallery_id
             )
         );
+        self::demote_all_approved_without_watermark( $gallery_id );
+    }
+
+    /**
+     * Bulk counterpart to demote_if_approved_without_watermark() for the two
+     * batch "mark pending" paths, which write wm_applied directly via SQL rather
+     * than through upsert_selection().
+     */
+    private static function demote_all_approved_without_watermark( ?int $gallery_id = null ): void {
+        global $wpdb;
+        $sql = 'UPDATE ' . RinCWC_DB::images_table() . ' i
+                JOIN ' . RinCWC_DB::selections_table() . " s ON s.image_id = i.id
+                SET i.status = '" . self::STATUS_SELECTED . "', i.approved_by = NULL, i.approved_at = NULL
+                WHERE i.status = '" . self::STATUS_APPROVED . "' AND s.wm_applied = 0";
+        if ( $gallery_id !== null ) {
+            $sql = $wpdb->prepare( $sql . ' AND i.gallery_id = %d', $gallery_id );
+        }
+        $wpdb->query( $sql );
     }
 
     public static function approved_for_sync(): array {

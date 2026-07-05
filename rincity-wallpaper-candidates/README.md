@@ -59,6 +59,14 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.2.0** — "Approved with watermark pending" is no longer a reachable state: `approve()`
+  now requires `wm_applied` in addition to a crop variant and watermark corner, and any
+  change that invalidates a selection's applied watermark (crop change, watermark-corner
+  change, or a batch "mark pending" from the Watermarks page) now automatically demotes an
+  APPROVED image back to SELECTED instead of leaving it approved with a stale watermark.
+  Removed the now-impossible "approved with watermark pending" summary count and badge.
+  "Apply pending watermarks" button no longer uses the blue primary style. Untouched-set
+  count now explicitly requires at least one CANDIDATE-status image in the set.
 - **3.1.2** — Review page: filter order is now Approved / Ready for review / Initial
   inspection (left to right). Fixed the button-size reduction from 3.1.1, which never
   actually took effect — it used a single-class selector that lost the specificity fight

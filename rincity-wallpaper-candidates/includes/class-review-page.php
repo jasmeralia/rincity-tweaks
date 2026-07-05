@@ -58,8 +58,7 @@ final class RinCWC_Review_Page {
 
         echo '<p class="rincwc-summary"><strong>' . esc_html( $counts['candidates'] ) . '</strong> candidates · ';
         echo '<strong>' . esc_html( $counts['selected'] ) . '</strong> selected · ';
-        echo '<strong>' . esc_html( $counts['approved'] ) . '</strong> approved · ';
-        echo '<strong>' . esc_html( $counts['wm_pending'] ) . '</strong> approved with watermark pending</p>';
+        echo '<strong>' . esc_html( $counts['approved'] ) . '</strong> approved</p>';
 
         echo '<p class="rincwc-set-counts">';
         echo '<strong>' . esc_html( $set_counts['approved'] ) . '</strong> set' . ( $set_counts['approved'] !== 1 ? 's' : '' ) . ' with an approved image · ';
@@ -74,7 +73,7 @@ final class RinCWC_Review_Page {
         echo '<button class="button button-small rincwc-filter-btn" id="rincwc-filter-unreviewed">Initial inspection</button> ';
         echo '<button class="button button-small" id="rincwc-clear-filters">Clear filters</button> ';
         echo '<button class="button button-small" id="rincwc-generate-crops">Generate pending crops</button> ';
-        echo '<button class="button button-primary button-small" id="rincwc-apply-wm">Apply pending watermarks</button> ';
+        echo '<button class="button button-small" id="rincwc-apply-wm">Apply pending watermarks</button> ';
         echo '<button class="button button-secondary button-small" id="rincwc-sync-galleries">Publish to galleries</button>';
         echo '<span id="rincwc-batch-msg"></span>';
         echo '<span class="rincwc-expanders">';
@@ -137,20 +136,23 @@ final class RinCWC_Review_Page {
         $untouched = 0;
 
         foreach ( $grouped as $gid => $imgs ) {
-            $has_approved = false;
-            $has_selected = false;
+            $has_approved  = false;
+            $has_selected  = false;
+            $has_candidate = false;
             foreach ( $imgs as $row ) {
                 if ( $row['status'] === RinCWC_Data::STATUS_APPROVED ) {
                     $has_approved = true;
                 } elseif ( $row['status'] === RinCWC_Data::STATUS_SELECTED ) {
                     $has_selected = true;
+                } elseif ( $row['status'] === RinCWC_Data::STATUS_CANDIDATE ) {
+                    $has_candidate = true;
                 }
             }
             if ( $has_approved ) {
                 $approved++;
             } elseif ( $has_selected ) {
                 $ready++;
-            } elseif ( RinCWC_Data::get_cutoff( (int) $gid ) === 0 ) {
+            } elseif ( $has_candidate && RinCWC_Data::get_cutoff( (int) $gid ) === 0 ) {
                 $untouched++;
             }
         }
@@ -333,10 +335,6 @@ final class RinCWC_Review_Page {
     }
 
     private static function render_badge( string $status, bool $is_sel, string $wm_corner, bool $wm_applied ): void {
-        if ( $status === 'APPROVED' && ! $wm_applied ) {
-            echo '<span class="rincwc-badge badge-pending">Approved · WM pending</span>';
-            return;
-        }
         if ( $status === 'APPROVED' ) {
             echo '<span class="rincwc-badge badge-approved">Approved</span>';
             return;
