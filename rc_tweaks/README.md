@@ -8,6 +8,9 @@ The `rc_tweaks` plugin provides several features for WordPress sites using the E
 3. **Custom Album Display Page:** A shortcode that renders a custom grid of all galleries in a given Envira album, with cover thumbnails, titles, photo counts, and optional category filtering via URL parameter.
 4. **Envira Gallery Categories Widget:** Displays a bulleted list of Envira categories (with gallery counts) in the sidebar, only on single Envira gallery pages. Each category links to the Members Gallery album page filtered by that category.
 5. **Envira Album Categories Widget:** Displays a hierarchical, collapsible category tree with gallery counts in the sidebar, visible on Envira album pages, album taxonomy pages (e.g. `/album/members-gallery`), and the `/members-gallery/` page.
+6. **aMember Login Bridge:** Maps an active aMember session to its corresponding WP user account via a `determine_current_user` filter, so authenticated aMember-only members are recognized as logged-in WP users — fixes native WP comment forms that otherwise showed a login prompt.
+7. **Envira Gallery No-Cache Headers:** Sends `Cache-Control: no-store` on standalone Envira gallery pages so browsers never serve stale cached HTML after the server-side gallery transient cache is rebuilt.
+8. **Envira Breadcrumb Style Override:** Overrides Envira's hardcoded `.envira-breadcrumbs` background color so the breadcrumb bar matches the site's dark theme.
 
 ## Installation
 1. Download the `rc_tweaks` plugin files.
@@ -85,6 +88,9 @@ A lazy load option for the album display can be toggled in the WordPress admin v
 For support, please open an issue on the plugin's repository or contact the developer directly.
 
 ## Changelog
+- **2.1.12** - Guards the aMember bridge's `determine_current_user` filter against `am4_Settings_Config` not being loaded yet in cron context, fixing a PHP fatal that had killed every wp-cron.php run since the bridge was deployed. Also adds no-store Cache-Control headers on Envira gallery pages and overrides the Envira breadcrumb bar's hardcoded background color for dark-theme compatibility.
+- **2.1.11** - Bridges aMember session auth into WordPress via a `determine_current_user` filter, mapping the active aMember identity to its WP user account; fixes native WP comment forms showing a login prompt to already-authenticated aMember members. (Odoo #286)
+- **2.1.10** - Renamed plugin display name from "Rin City Tweaks" to "RinCity Tweaks" for consistency across all plugins.
 - **2.1.9** - Future-status (scheduled) galleries now appear in the album picker and album page for admins; adds a "Scheduled" badge on thumbnails. Admins can also preview a scheduled gallery via the WordPress preview link without getting a 404.
 - **2.1.8** - Album galleries now default "Make Gallery Title Linkable?" to enabled on first pencil save, removing a manual step from the publish workflow.
 - **2.1.7** - Removed leftover debug HTML comments from album page shortcode (`<!-- data: ... -->` and `<!-- full album data: ... -->`), which were causing severe page hangs on large galleries.

@@ -27,15 +27,21 @@ The script writes cover images to a flat directory and a `manifest.json` alongsi
 ```json
 [
   {
-    "post_id": 3740,
-    "title": "Bloomlight",
-    "date": "2026-05-30",
-    "slug": "bloomlight",
-    "cover_file": "2026-05-30-bloomlight.jpg",
-    "cover_path": "/path/to/Rin_Covers/2026-05-30-bloomlight.jpg"
+    "filename": "2026-05-30-bloomlight.jpg",
+    "set_name": "Bloomlight",
+    "date_published": "2026-05-30T12:00:00-07:00",
+    "set_url": "https://rin-city.com/envira/bloomlight/",
+    "tags": "#bloomlight #outdoors",
+    "envira_categories": ["Bloomlight", "Outdoors"]
   }
 ]
 ```
+
+`filename` is relative to the output directory. `date_published` is ISO 8601 (`c` format).
+`tags` is a space-separated string of `#hashtag`-formatted category/tag slugs.
+`envira_categories` holds the human-readable term names (used by `rincity-throwback-posts`
+for photographer/model credit lines). This manifest is consumed directly by
+`rincity-throwback-posts`.
 
 ## Environment variables
 

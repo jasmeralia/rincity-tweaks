@@ -14,6 +14,7 @@ Default behavior posts to **both X/Twitter and Bluesky**.
   - Bluesky (`--platform bluesky`)
   - Both (`--platform both`)
 - Supports `--dry-run`
+- Sends an HTML summary email (with the cover image embedded inline) after every run, dry or live
 
 ## Requirements
 
@@ -187,7 +188,38 @@ Official docs:
 --platform {twitter,bluesky,both}
 --dry-run
 --record-dry-run
+--email-to EMAIL               # default: morgan@windsofstorm.net
+--no-email
 ```
+
+## Email Notifications
+
+After every run — dry or live — an HTML summary email is sent to `--email-to`
+(default `morgan@windsofstorm.net`), unless `--no-email` is passed. The email
+includes:
+
+- The cover image, resized to 600px wide and embedded inline
+- Set name, published date, and the rendered post text
+- A "View Gallery" button linking to the gallery page
+- X/Twitter and Bluesky post links (labelled "(mock)" on dry runs)
+- A red **DRY RUN** banner when the run did not actually post to social media
+- Subject line prefixed with `[rin-city.com]`
+
+Credentials and sender config are read from a `.env` file (gitignored) next to
+the script, not from CLI flags:
+
+```
+FROM_EMAIL=...
+REPLY_TO_EMAIL=...       # optional, defaults to FROM_EMAIL
+SMTP_HOST=smtp.gmail.com # optional, this is the default
+SMTP_PORT=465            # optional, this is the default
+SMTP_USER=...            # optional, defaults to FROM_EMAIL
+SMTP_PASS=...            # Gmail app password
+```
+
+Sending is delivered via SMTP over SSL (`smtplib.SMTP_SSL`). A failed email send
+prints a warning but does not fail the run — the throwback post itself (or dry
+run) already completed.
 
 ## Notes
 

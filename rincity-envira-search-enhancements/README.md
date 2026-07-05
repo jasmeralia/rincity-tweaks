@@ -1,6 +1,6 @@
 # rincity-envira-search-enhancements
 
-**Version:** 1.3.0  
+**Version:** 1.5.0  
 **Deploy path:** `wp-content/plugins/rincity-envira-search-enhancements/`
 
 ## Description
@@ -27,6 +27,10 @@ Below the thumbnail, a count line is shown: e.g. `80 photos`, `3 videos`, or `12
 
 Video items are identified using `envira_video_get_video_type()` when the Envira Videos addon is active. Falls back to URL pattern matching for self-hosted `.mp4`/`.webm` files and YouTube/Vimeo links.
 
+### "View Set" button label
+
+On search results, Envira gallery entries show a **View Set** button instead of the theme's default "Read More" label. This is applied via the `option_ashe_options` filter (the Ashe Pro theme reads the more-text label directly from that option, with no intervening filter of its own).
+
 ## Deploy
 
 ```bash
@@ -35,5 +39,6 @@ make rincity-envira-search-enhancements
 
 ## Changelog
 
+- **1.5.0** — Show "View Set" instead of "Read More" on Envira gallery entries in search results, via the `option_ashe_options` filter.
 - **1.3.0** — Current version.
 - **1.0.0** — Initial release.
