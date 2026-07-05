@@ -63,6 +63,8 @@ final class RinCWC_Review_Page {
         echo '<p class="rincwc-set-counts">';
         echo '<strong>' . esc_html( $set_counts['approved'] ) . '</strong> set' . ( $set_counts['approved'] !== 1 ? 's' : '' ) . ' with an approved image · ';
         echo '<strong>' . esc_html( $set_counts['ready'] ) . '</strong> set' . ( $set_counts['ready'] !== 1 ? 's' : '' ) . ' ready for review · ';
+        echo '<strong>' . esc_html( $set_counts['passed'] ) . '</strong> set' . ( $set_counts['passed'] !== 1 ? 's' : '' ) . ' passed initial inspection · ';
+        echo '<strong>' . esc_html( $set_counts['excluded'] ) . '</strong> set' . ( $set_counts['excluded'] !== 1 ? 's' : '' ) . ' excluded · ';
         echo '<strong>' . esc_html( $set_counts['untouched'] ) . '</strong> untouched set' . ( $set_counts['untouched'] !== 1 ? 's' : '' );
         echo '</p>';
 
@@ -133,6 +135,7 @@ final class RinCWC_Review_Page {
     private static function compute_set_counts( array $grouped ): array {
         $approved  = 0;
         $ready     = 0;
+        $passed    = 0;
         $untouched = 0;
 
         foreach ( $grouped as $gid => $imgs ) {
@@ -148,16 +151,27 @@ final class RinCWC_Review_Page {
                     $has_candidate = true;
                 }
             }
+            $cutoff = RinCWC_Data::get_cutoff( (int) $gid );
             if ( $has_approved ) {
                 $approved++;
             } elseif ( $has_selected ) {
                 $ready++;
-            } elseif ( $has_candidate && RinCWC_Data::get_cutoff( (int) $gid ) === 0 ) {
+            } elseif ( $cutoff > 0 ) {
+                // Has a cutoff and still has visible candidates below it — passed
+                // initial inspection, but nothing selected yet.
+                $passed++;
+            } elseif ( $has_candidate ) {
                 $untouched++;
             }
         }
 
-        return [ 'approved' => $approved, 'ready' => $ready, 'untouched' => $untouched ];
+        return [
+            'approved'   => $approved,
+            'ready'      => $ready,
+            'passed'     => $passed,
+            'excluded'   => RinCWC_Data::count_fully_excluded_galleries(),
+            'untouched'  => $untouched,
+        ];
     }
 
     private static function group_rows( array $rows ): array {

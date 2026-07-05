@@ -188,6 +188,21 @@ final class RinCWC_Data {
         return max( 0, (int) ( $settings['excluded_after'][ $gallery_id ] ?? 0 ) );
     }
 
+    /**
+     * Galleries with at least one scanned row but zero visible (non-excluded) rows —
+     * either "Exclude all" was used, or a cutoff landed at/before the first position.
+     * These never appear in get_visible_images(), so they need a dedicated count.
+     */
+    public static function count_fully_excluded_galleries(): int {
+        global $wpdb;
+        $table = RinCWC_DB::images_table();
+        return (int) $wpdb->get_var(
+            "SELECT COUNT(*) FROM (
+                SELECT gallery_id FROM {$table} GROUP BY gallery_id HAVING SUM( excluded = 0 ) = 0
+            ) t"
+        );
+    }
+
     public static function set_cutoffs( array $cutoffs ): void {
         $clean = [];
         foreach ( $cutoffs as $gallery_id => $position ) {

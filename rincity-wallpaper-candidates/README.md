@@ -59,6 +59,14 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.3.0** — Review page set-count summary now has two more buckets, both placed before
+  "untouched sets": **N sets passed initial inspection** (a cutoff is set and the set still
+  has visible candidates below it, but nothing selected yet) and **N sets excluded** (every
+  scanned image in the set is excluded — via "Exclude all" or a cutoff at/before the first
+  position — so the set never appears anywhere else on the page). New
+  `RinCWC_Data::count_fully_excluded_galleries()` covers the "excluded" count, since fully
+  excluded galleries have zero visible rows and are otherwise invisible to
+  `get_visible_images()`.
 - **3.2.0** — "Approved with watermark pending" is no longer a reachable state: `approve()`
   now requires `wm_applied` in addition to a crop variant and watermark corner, and any
   change that invalidates a selection's applied watermark (crop change, watermark-corner
