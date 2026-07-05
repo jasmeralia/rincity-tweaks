@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.6.1
+**Version:** 3.7.0
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -62,8 +62,9 @@ galleries.
   - "Publish to galleries" batch action to sync approved+watermarked images out.
   - Expand all / Collapse all, and deep links to a specific gallery
     (`#rincwc-gallery-{id}`) that auto-expand that gallery and collapse the rest.
-- **Watermarks** — upload/register watermark PNGs, set the default watermark, delete
-  unused files, and set per-gallery overrides (with its own search-as-you-type filter).
+- **Watermarks** — upload/register watermark PNGs (or PSD/PSB, auto-flattened to a PNG
+  via Imagick with the original discarded), set the default watermark, delete unused
+  files, and set per-gallery overrides (with its own search-as-you-type filter).
 - **Settings** — configure the 4K/1440p/1080p target Envira galleries, the test-approve
   toggle, and per-gallery scanner cutoffs (only galleries with at least one scanned
   candidate row are listed), with a search-as-you-type filter over the cutoffs table
@@ -84,6 +85,13 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.7.0** — Watermark upload accepts `.psd`/`.psb` in addition to `.png`. Since
+  `wp_handle_upload()`'s image-content check (`getimagesize()`/`exif_imagetype()`)
+  doesn't recognize Photoshop files, PSD/PSB uploads are handled directly and read via
+  Imagick instead: frame `[0]` of a PSD is Photoshop's own merged/flattened composite
+  (no layer picking needed), read against a transparent background (not ImageMagick's
+  default white) and written out as `png32` so the alpha channel survives intact. The
+  original PSD/PSB is discarded; only the derived PNG is stored.
 - **3.6.1** — Two Settings page fixes: the Scanner Cutoffs table now only lists
   galleries with at least one candidate row (`RinCWC_Data::scanned_gallery_ids()`),
   instead of every Envira gallery on the site (most had zero rows, especially after

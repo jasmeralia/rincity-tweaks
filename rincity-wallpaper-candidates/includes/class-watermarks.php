@@ -77,28 +77,69 @@ final class RinCWC_Watermarks {
 
     private static function handle_upload(): string {
         if ( empty( $_FILES['watermark_file']['name'] ) ) {
-            return 'Choose a PNG file to upload.';
+            return 'Choose a PNG, PSD, or PSB file to upload.';
+        }
+        if ( ( $_FILES['watermark_file']['error'] ?? UPLOAD_ERR_NO_FILE ) !== UPLOAD_ERR_OK ) {
+            return 'Upload failed.';
+        }
+
+        $orig_name = $_FILES['watermark_file']['name'];
+        $ext       = strtolower( pathinfo( $orig_name, PATHINFO_EXTENSION ) );
+        if ( ! in_array( $ext, [ 'png', 'psd', 'psb' ], true ) ) {
+            return 'Choose a PNG, PSD, or PSB file to upload.';
         }
 
         wp_mkdir_p( RINCWC_WATERMARKS_DIR );
         require_once ABSPATH . 'wp-admin/includes/file.php';
 
-        add_filter( 'upload_dir', [ __CLASS__, 'upload_dir' ] );
-        $file = wp_handle_upload( $_FILES['watermark_file'], [
-            'test_form' => false,
-            'mimes'     => [ 'png' => 'image/png' ],
-        ] );
-        remove_filter( 'upload_dir', [ __CLASS__, 'upload_dir' ] );
+        if ( $ext === 'png' ) {
+            add_filter( 'upload_dir', [ __CLASS__, 'upload_dir' ] );
+            $file = wp_handle_upload( $_FILES['watermark_file'], [
+                'test_form' => false,
+                'mimes'     => [ 'png' => 'image/png' ],
+            ] );
+            remove_filter( 'upload_dir', [ __CLASS__, 'upload_dir' ] );
 
-        if ( isset( $file['error'] ) ) {
-            return 'Upload failed: ' . $file['error'];
+            if ( isset( $file['error'] ) ) {
+                return 'Upload failed: ' . $file['error'];
+            }
+            $dest_path = $file['file'];
+        } else {
+            // PSD/PSB: wp_handle_upload()'s image-content check (getimagesize() /
+            // exif_imagetype()) doesn't recognize Photoshop files, so handle this
+            // upload directly and let Imagick validate the file by trying to read it.
+            $tmp_name = $_FILES['watermark_file']['tmp_name'];
+            if ( ! is_uploaded_file( $tmp_name ) ) {
+                return 'Upload failed.';
+            }
+            if ( ! class_exists( 'Imagick' ) ) {
+                return 'Imagick is not available on this server; cannot process PSD/PSB files.';
+            }
+            try {
+                $imagick = new Imagick();
+                // Flatten against transparent, not ImageMagick's default white, so a
+                // PSD with no background layer doesn't end up with an opaque box
+                // behind the watermark.
+                $imagick->setBackgroundColor( new ImagickPixel( 'transparent' ) );
+                // Frame 0 of a PSD is Photoshop's own merged/flattened composite —
+                // exactly "the relevant PNG", no layer picking needed.
+                $imagick->readImage( $tmp_name . '[0]' );
+                $imagick->setImageFormat( 'png32' ); // force RGBA so alpha survives
+                $filename  = wp_unique_filename( RINCWC_WATERMARKS_DIR, sanitize_file_name( pathinfo( $orig_name, PATHINFO_FILENAME ) . '.png' ) );
+                $dest_path = trailingslashit( RINCWC_WATERMARKS_DIR ) . $filename;
+                $imagick->writeImage( $dest_path );
+                $imagick->clear();
+                $imagick->destroy();
+            } catch ( ImagickException $e ) {
+                return 'Could not read PSD/PSB file: ' . $e->getMessage();
+            }
         }
 
         $name = sanitize_text_field( $_POST['watermark_name'] ?? '' );
         if ( ! $name ) {
-            $name = basename( $file['file'] );
+            $name = basename( $dest_path );
         }
-        RinCWC_Data::add_watermark( $name, $file['file'], false );
+        RinCWC_Data::add_watermark( $name, $dest_path, false );
         return 'Watermark uploaded.';
     }
 
@@ -115,7 +156,8 @@ final class RinCWC_Watermarks {
         wp_nonce_field( 'rincwc_watermarks', 'rincwc_wm_nonce' );
         echo '<input type="hidden" name="rincwc_wm_action" value="upload">';
         echo '<label>Name <input type="text" name="watermark_name"></label> ';
-        echo '<input type="file" name="watermark_file" accept="image/png" required> ';
+        echo '<input type="file" name="watermark_file" accept="image/png,.psd,.psb" required> ';
+        echo '<span class="description">PSD/PSB files are flattened to a PNG automatically; the original is discarded.</span> ';
         submit_button( 'Upload watermark', 'primary', 'submit', false );
         echo '</form>';
     }
