@@ -136,7 +136,7 @@ final class RinCWC_Review_Page {
             return $has_approved;
         }
         if ( $filter === 'unreviewed' ) {
-            return ! $has_selected && $cutoff === 0;
+            return ! $has_selected && ! RinCWC_Data::has_cutoff_decision( $gid );
         }
         return true;
     }
@@ -183,7 +183,7 @@ final class RinCWC_Review_Page {
                 }
             }
             $is_fully_excluded = empty( $visible );
-            $cutoff            = RinCWC_Data::get_cutoff( (int) $gid );
+            $touched           = RinCWC_Data::has_cutoff_decision( (int) $gid );
 
             if ( $has_approved ) {
                 $approved++;
@@ -191,9 +191,9 @@ final class RinCWC_Review_Page {
                 $ready++;
             } elseif ( $is_fully_excluded ) {
                 $excluded++;
-            } elseif ( $cutoff > 0 ) {
-                // Has a cutoff and still has visible candidates below it — passed
-                // initial inspection, but nothing selected yet.
+            } elseif ( $touched ) {
+                // A cutoff decision was made — a partial cutoff, or "Accept all" (which
+                // stores an explicit 0) — but nothing selected yet.
                 $passed++;
             } elseif ( $has_candidate ) {
                 $untouched++;

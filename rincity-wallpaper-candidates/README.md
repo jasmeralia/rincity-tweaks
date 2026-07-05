@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.5.0
+**Version:** 3.5.1
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -77,6 +77,15 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.5.1** — Fixed a regression from 3.5.0's cutoff sentinel change: "Accept all" now
+  sends `position: 0`, and the code used to `unset()` the settings key for that case —
+  making an Accept-All'd set indistinguishable from one that had simply never been
+  looked at (both read as `get_cutoff() === 0`). "Passed initial inspection" and
+  "untouched" collapsed into each other. Fixed by storing `0` explicitly instead of
+  unsetting, and adding `RinCWC_Data::has_cutoff_decision()` (checks whether the settings
+  key exists at all, independent of its value) for anywhere that needs to know "has this
+  set been reviewed" rather than "what's its cutoff position". The set-count summary and
+  the Initial Inspection filter now use that instead of `cutoff === 0` / `cutoff > 0`.
 - **3.5.0** — Removed the v2→v3 CSV migration entirely (`class-db.php`'s
   `migrate_csv_once()`/`migrate_db_row()`/`migrate_selection_row()`/
   `legacy_offset_to_custom_crop()`/`read_csv_flat()`/`migrate_legacy_comments()`, and
