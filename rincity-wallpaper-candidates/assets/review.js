@@ -14,6 +14,7 @@
     let cropOverlayEl = null;
     let lightboxEl = null;
     let lightboxImg = null;
+    let compareEl = null;
 
     function api( path, method, data ) {
         const opts = { url: base + path, method: method || 'GET' };
@@ -23,6 +24,7 @@
 
     document.addEventListener( 'DOMContentLoaded', () => {
         buildLightbox();
+        buildCompareOverlay();
         buildCropOverlay();
         document.querySelectorAll( '.rincwc-card' ).forEach( initCard );
         initBatchButtons();
@@ -45,6 +47,13 @@
             e.preventDefault();
             // The true original, standalone — not part of the set's arrow navigation.
             openLightbox( link.dataset.url, link.dataset.alt || '', null );
+        } );
+
+        document.addEventListener( 'click', e => {
+            const link = e.target.closest( '.rincwc-compare-link' );
+            if ( ! link ) return;
+            e.preventDefault();
+            openCompare( link.dataset.original, link.dataset.selection );
         } );
     } );
 
@@ -111,6 +120,36 @@
         lightboxEl.hidden = false;
         lightboxContext = ( context && context.images && context.images.length > 1 ) ? context : null;
         lightboxEl.classList.toggle( 'has-nav', !! lightboxContext );
+    }
+
+    function buildCompareOverlay() {
+        const cmp = document.createElement( 'div' );
+        cmp.id = 'rincwc-compare';
+        cmp.innerHTML = '<button class="rincwc-cmp-close" aria-label="Close">x</button>'
+            + '<div class="rincwc-cmp-pane">'
+            +   '<div class="rincwc-cmp-label">Original</div>'
+            +   '<img class="rincwc-cmp-img rincwc-cmp-original" src="" alt="Original">'
+            + '</div>'
+            + '<div class="rincwc-cmp-pane">'
+            +   '<div class="rincwc-cmp-label">Selection</div>'
+            +   '<img class="rincwc-cmp-img rincwc-cmp-selection" src="" alt="Selection">'
+            + '</div>';
+        document.body.appendChild( cmp );
+        compareEl = cmp;
+
+        const close = () => { cmp.hidden = true; };
+        cmp.querySelector( '.rincwc-cmp-close' ).addEventListener( 'click', e => { e.stopPropagation(); close(); } );
+        cmp.addEventListener( 'click', close );
+        cmp.querySelectorAll( '.rincwc-cmp-img' ).forEach( img => img.addEventListener( 'click', e => e.stopPropagation() ) );
+        document.addEventListener( 'keydown', e => { if ( e.key === 'Escape' && ! cmp.hidden ) close(); } );
+        cmp.hidden = true;
+    }
+
+    function openCompare( originalUrl, selectionUrl ) {
+        if ( ! compareEl || ! originalUrl || ! selectionUrl ) return;
+        compareEl.querySelector( '.rincwc-cmp-original' ).src = originalUrl;
+        compareEl.querySelector( '.rincwc-cmp-selection' ).src = selectionUrl;
+        compareEl.hidden = false;
     }
 
     function buildCropOverlay() {

@@ -333,20 +333,42 @@ final class RinCWC_Review_Page {
         $max_scale = RinCWC_Data::max_crop_scale( $orig_w, $orig_h );
         $geom = RinCWC_Data::crop_geometry( $row, $row, $sel_crop ?: 'center' );
 
-        $original_url = wp_get_attachment_image_url( $aid, 'large' ) ?: (string) $row['src_url'];
+        // The true full-resolution original — not wp_get_attachment_url()/'large', both
+        // of which return WP's auto-scaled "-scaled.jpg" derivative when the original
+        // exceeds the big-image threshold.
+        $original_url = wp_get_original_image_url( $aid ) ?: ( wp_get_attachment_url( $aid ) ?: (string) $row['src_url'] );
         $thumb        = (string) $row['src_url'];
         $thumb_is_wm  = false;
+        $wm_4k_url    = null;
         if ( $is_sel && $wm_applied ) {
-            $wm_f = RINCWC_CROPS_DIR . "{$slug}_{$pos}_{$sel_crop}_1080p_wm.jpg";
-            if ( file_exists( $wm_f ) ) {
+            $wm_thumb_f = RINCWC_CROPS_DIR . "{$slug}_{$pos}_{$sel_crop}_1080p_wm.jpg";
+            if ( file_exists( $wm_thumb_f ) ) {
+                // Grid thumbnail only — small on purpose, this is just for layout.
                 $thumb       = content_url( "uploads/wallpaper-crops/{$slug}_{$pos}_{$sel_crop}_1080p_wm.jpg" );
                 $thumb_is_wm = true;
             }
+            $wm_4k_f = RINCWC_CROPS_DIR . "{$slug}_{$pos}_{$sel_crop}_wm.jpg";
+            if ( file_exists( $wm_4k_f ) ) {
+                $wm_4k_url = content_url( "uploads/wallpaper-crops/{$slug}_{$pos}_{$sel_crop}_wm.jpg" );
+            }
         }
-        // Lightbox/arrow-nav target: the wm crop when that's what the thumbnail shows
-        // (so they're never inconsistent), otherwise the bigger "large" size — not the
-        // small grid thumbnail — same as before this card ever had a selection.
-        $lightbox_url = $thumb_is_wm ? $thumb : $original_url;
+        // Lightbox/arrow-nav never uses the small grid thumbnail — the point is to
+        // inspect quality, so it's always either the full original or the 4K crop.
+        $lightbox_url = $wm_4k_url ?: $original_url;
+
+        // "Compare" needs the selection's best available file even before a watermark
+        // is applied (raw 4K crop), so resolve it independently of $wm_4k_url above.
+        $selection_url = null;
+        if ( $is_sel ) {
+            if ( $wm_4k_url ) {
+                $selection_url = $wm_4k_url;
+            } else {
+                $raw_4k_f = RINCWC_CROPS_DIR . "{$slug}_{$aid}_{$sel_crop}.jpg";
+                if ( file_exists( $raw_4k_f ) ) {
+                    $selection_url = content_url( "uploads/wallpaper-crops/{$slug}_{$aid}_{$sel_crop}.jpg" );
+                }
+            }
+        }
 
         $card_data = esc_attr( wp_json_encode( [
             'imageId'     => $image_id,
@@ -362,6 +384,7 @@ final class RinCWC_Review_Page {
             'imageKey'    => $image_key,
             'scaledUrl'   => $lightbox_url,
             'originalUrl' => $original_url,
+            'selectionUrl' => $selection_url,
             'selCrop'     => $sel_crop,
             'wmCorner'    => $wm_corner,
             'wmApplied'   => $wm_applied,
@@ -388,6 +411,9 @@ final class RinCWC_Review_Page {
         echo '<div class="rincwc-dims">' . esc_html( "{$orig_w}x{$orig_h} · img {$pos}/{$row['total']}" ) . '</div>';
         if ( $thumb_is_wm ) {
             echo '<a href="#" class="rincwc-view-original" data-url="' . esc_url( $original_url ) . '" data-alt="' . esc_attr( $fname ) . '">View original</a>';
+        }
+        if ( $selection_url ) {
+            echo '<a href="#" class="rincwc-compare-link" data-original="' . esc_url( $original_url ) . '" data-selection="' . esc_url( $selection_url ) . '">Compare to original</a>';
         }
         if ( $show_cutoff ) {
             echo '<button class="button button-small rincwc-cutoff-btn" data-gid="' . esc_attr( (string) $gid ) . '" data-pos="' . esc_attr( (string) $pos ) . '" title="Exclude this image and all after it">Set cutoff here</button>';

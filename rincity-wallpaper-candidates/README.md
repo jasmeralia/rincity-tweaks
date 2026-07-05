@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.8.0
+**Version:** 3.9.0
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -50,8 +50,12 @@ galleries.
     bottom) or a custom 2D crop overlay with a zoom slider, X/Y sliders, scroll-to-zoom
     (cursor-anchored), and touch pan/pinch support.
   - Thumbnail lightbox supports arrow-key or on-screen prev/next navigation between a
-    set's images. Resolution-variant download links (4K/1440p/1080p) still open in the
-    same lightbox but standalone, with no set navigation.
+    set's images. Never shows the small grid thumbnail — always the true full-resolution
+    original or the 4K crop/watermark, since this is detail review, not browsing.
+    Resolution-variant download links (4K/1440p/1080p) still open in the same lightbox
+    but standalone, with no set navigation. A **Compare to original** link (once a crop
+    is selected) opens a side-by-side "Original" / "Selection" overlay, each pane scaled
+    independently to make full use of its half of the screen.
   - Watermark corner selection per image, batch "Generate pending crops" and "Apply
     pending watermarks" actions.
   - Approve/Unapprove per card, gated to the `rincity`/`rincity_member` accounts or the
@@ -85,6 +89,18 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.9.0** — The lightbox (and arrow-navigation between a set's images) never shows
+  the small grid thumbnail anymore — it's admin-only detail review, so quality matters
+  more than load time. It now always uses either the true full-resolution original
+  (`wp_get_original_image_url()`, not `wp_get_attachment_url()`/`'large'`, both of which
+  return WordPress's auto-scaled "-scaled.jpg" derivative) or the **4K** crop/watermark
+  (previously the 1080p file meant for the grid thumbnail leaked into the lightbox
+  too). Resolution-variant download links are unaffected — they already opened their
+  own specific file. Added a **Compare to original** link (shown once a crop is
+  selected, even before its watermark is applied, as long as a crop file exists) that
+  opens a new side-by-side overlay: "Original" and "Selection" panes, each scaled
+  independently via `object-fit: contain` to make full use of its half of the screen
+  regardless of the two images' differing resolutions/aspect ratios.
 - **3.8.0** — Once an image is selected and its watermark applied, the thumbnail and
   the lightbox (opened by clicking it, and when arrow-navigating between a set's
   images) now both show that cropped+watermarked version instead of the lightbox
