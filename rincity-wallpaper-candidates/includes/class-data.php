@@ -113,11 +113,12 @@ final class RinCWC_Data {
             $wpdb->update( $table, [ 'excluded' => 1 ], [ 'gallery_id' => $gallery_id ] );
             $settings['excluded_after'][ $gallery_id ] = -1;
         } elseif ( $position === 0 ) {
-            // No cutoff — nothing excluded. Stored explicitly (not unset) so "reviewed,
-            // accepted everything" stays distinguishable from "never touched at all";
-            // has_cutoff_decision() is what tells those two apart.
+            // No cutoff — nothing excluded. Deliberately not distinguished from "never
+            // touched": that would only be knowable via key-presence in the settings
+            // array rather than the stored value, which doesn't survive a JSON
+            // export/import round-trip (or a hand edit) reliably. Value-only, always.
             $wpdb->update( $table, [ 'excluded' => 0 ], [ 'gallery_id' => $gallery_id ] );
-            $settings['excluded_after'][ $gallery_id ] = 0;
+            unset( $settings['excluded_after'][ $gallery_id ] );
         } else {
             // Exclude from $position onward (position >= $position → excluded). This
             // also correctly clears a prior full exclusion, since every row's excluded
@@ -137,16 +138,6 @@ final class RinCWC_Data {
     public static function get_cutoff( int $gallery_id ): int {
         $settings = self::get_settings();
         return (int) ( $settings['excluded_after'][ $gallery_id ] ?? 0 );
-    }
-
-    /**
-     * Whether this gallery has ever had a cutoff decision made — including "Accept all"
-     * (stored as an explicit 0), which must stay distinguishable from a gallery that has
-     * simply never been looked at (no key at all, get_cutoff() also reads as 0).
-     */
-    public static function has_cutoff_decision( int $gallery_id ): bool {
-        $settings = self::get_settings();
-        return array_key_exists( $gallery_id, $settings['excluded_after'] ?? [] );
     }
 
     /**

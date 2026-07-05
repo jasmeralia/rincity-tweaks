@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.5.1
+**Version:** 3.5.2
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -77,6 +77,17 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.5.2** — Reverted 3.5.1's `has_cutoff_decision()` distinction between "Accept all"
+  and "never touched" — on reflection, encoding that via settings-key presence (rather
+  than the stored value) is exactly the kind of thing a future JSON export/import round
+  trip or hand edit would silently drop, and the 3.5.1 regression it was fixing is
+  itself evidence of how easy that distinction is to get wrong. Back to a pure 3-value
+  scheme: -1 = fully excluded, 0 = no cutoff (whether never reviewed or reviewed and
+  accepted — not distinguished), >0 = partial cutoff. "Accept all" sets collapse back
+  into the "untouched" bucket and the Initial Inspection filter. Also fixed the Settings
+  page's cutoff `<input min="0">`, which would have blocked saving the form (or let the
+  browser silently coerce the value) for any fully-excluded gallery now that -1 is a
+  real, valid stored value; changed to `min="-1"`.
 - **3.5.1** — Fixed a regression from 3.5.0's cutoff sentinel change: "Accept all" now
   sends `position: 0`, and the code used to `unset()` the settings key for that case —
   making an Accept-All'd set indistinguishable from one that had simply never been

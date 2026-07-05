@@ -52,7 +52,7 @@ final class RinCWC_Settings_Page {
         echo '</td></tr></tbody></table>';
 
         echo '<h2>Scanner Cutoffs</h2>';
-        echo '<p class="description">A value of 0 means no cutoff. If set, images after that position are stored as excluded and hidden from review.</p>';
+        echo '<p class="description">0 = no cutoff. A positive value excludes images at or after that position. -1 = entire gallery excluded.</p>';
         echo '<input type="text" id="rincwc-cutoffs-search" placeholder="Filter galleries…" class="rincwc-gallery-search" style="margin-bottom:6px">';
         echo '<table class="widefat striped" id="rincwc-cutoffs-table"><thead><tr><th>Gallery</th><th>Exclude after position</th><th>Status</th></tr></thead><tbody>';
         $fully_excluded_ids = array_flip( RinCWC_Data::get_fully_excluded_gallery_ids() );
@@ -61,7 +61,7 @@ final class RinCWC_Settings_Page {
             $value = (int) ( $settings['excluded_after'][ $gid ] ?? 0 );
             echo '<tr data-title="' . esc_attr( strtolower( $gallery->post_title ) ) . '">';
             echo '<td>' . esc_html( sprintf( '%s (#%d)', $gallery->post_title, $gid ) ) . '</td>';
-            echo '<td><input type="number" min="0" step="1" name="excluded_after[' . esc_attr( $gid ) . ']" value="' . esc_attr( $value ) . '" class="small-text"></td>';
+            echo '<td><input type="number" min="-1" step="1" name="excluded_after[' . esc_attr( $gid ) . ']" value="' . esc_attr( $value ) . '" class="small-text"></td>';
             echo '<td>' . ( isset( $fully_excluded_ids[ $gid ] ) ? '<span class="rincwc-gal-badge badge-excluded">Fully excluded</span>' : '' ) . '</td>';
             echo '</tr>';
         }
