@@ -43,6 +43,7 @@ final class RinCWC_Review_Page {
 
         $rows   = RinCWC_Data::get_visible_images();
         $counts = RinCWC_Data::counts();
+        $filter = isset( $_GET['filter'] ) ? sanitize_key( wp_unslash( $_GET['filter'] ) ) : '';
 
         echo '<div class="wrap rincwc-review">';
         echo '<h1>Wallpaper Review</h1>';
@@ -68,9 +69,9 @@ final class RinCWC_Review_Page {
 
         echo '<div class="rincwc-toolbar">';
         echo '<input type="text" id="rincwc-review-search" placeholder="Filter galleries…" class="rincwc-search-input">';
-        echo '<button class="button rincwc-filter-btn" id="rincwc-filter-sel">Ready for review</button> ';
-        echo '<button class="button rincwc-filter-btn" id="rincwc-filter-unreviewed">Initial inspection</button> ';
         echo '<button class="button rincwc-filter-btn" id="rincwc-filter-approved">Approved</button> ';
+        echo '<button class="button rincwc-filter-btn" id="rincwc-filter-unreviewed">Initial inspection</button> ';
+        echo '<button class="button rincwc-filter-btn" id="rincwc-filter-sel">Ready for review</button> ';
         echo '<button class="button" id="rincwc-clear-filters">Clear filters</button> ';
         echo '<button class="button" id="rincwc-generate-crops">Generate pending crops</button> ';
         echo '<button class="button button-primary" id="rincwc-apply-wm">Apply pending watermarks</button> ';
@@ -81,10 +82,53 @@ final class RinCWC_Review_Page {
         echo '</span></div>';
 
         foreach ( $grouped as $gid => $imgs ) {
-            self::render_gallery( (int) $gid, $imgs );
+            if ( ! self::gallery_matches_filter( $imgs, (int) $gid, $filter ) ) {
+                continue;
+            }
+            self::render_gallery( (int) $gid, self::filter_rows_for_filter( $imgs, $filter ) );
         }
 
         echo '</div>';
+    }
+
+    private static function gallery_matches_filter( array $imgs, int $gid, string $filter ): bool {
+        if ( $filter === '' ) {
+            return true;
+        }
+        $has_selected = false;
+        $has_approved = false;
+        foreach ( $imgs as $row ) {
+            if ( $row['status'] === RinCWC_Data::STATUS_APPROVED ) {
+                $has_approved = true;
+            }
+            if ( in_array( $row['status'], [ RinCWC_Data::STATUS_SELECTED, RinCWC_Data::STATUS_APPROVED ], true )
+                && ( $row['crop_variant'] ?? '' ) !== '' ) {
+                $has_selected = true;
+            }
+        }
+        if ( $filter === 'selected' ) {
+            return $has_selected;
+        }
+        if ( $filter === 'approved' ) {
+            return $has_approved;
+        }
+        if ( $filter === 'unreviewed' ) {
+            return ! $has_selected && RinCWC_Data::get_cutoff( $gid ) === 0;
+        }
+        return true;
+    }
+
+    private static function filter_rows_for_filter( array $imgs, string $filter ): array {
+        if ( $filter === 'selected' ) {
+            return array_values( array_filter( $imgs, fn( $row ) =>
+                in_array( $row['status'], [ RinCWC_Data::STATUS_SELECTED, RinCWC_Data::STATUS_APPROVED ], true )
+                && ( $row['crop_variant'] ?? '' ) !== ''
+            ) );
+        }
+        if ( $filter === 'approved' ) {
+            return array_values( array_filter( $imgs, fn( $row ) => $row['status'] === RinCWC_Data::STATUS_APPROVED ) );
+        }
+        return $imgs;
     }
 
     private static function compute_set_counts( array $grouped ): array {

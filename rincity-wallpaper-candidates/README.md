@@ -59,6 +59,11 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.1.1** — Review page: filtered galleries/cards are now selected server-side from
+  the `filter` query param, so filtered reloads (after a cutoff/exclude-all/accept-all
+  action) never flash the full unfiltered list before hiding non-matches. Reordered the
+  filter buttons ("Approved" now leftmost, swapped with "Ready for review") and reduced
+  their size.
 - **3.1.0** — Review page: search-as-you-type gallery filter, "Approved" filter,
   "Clear filters" button, "Accept all" cutoff button (inverse of "Exclude all", clears
   a gallery's cutoff), set-count summary (approved / ready for review / untouched
