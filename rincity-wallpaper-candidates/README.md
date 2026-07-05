@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.9.0
+**Version:** 3.9.1
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -89,6 +89,17 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.9.1** — Fixed a real bug in the custom 2D crop overlay, introduced by 3.9.0's
+  `scaledUrl`/`originalUrl` split: the crop overlay's preview `<img>` was still loading
+  `cfg.scaledUrl`, which for an already-selected-and-watermarked image now points at the
+  already-cropped 4K file instead of the full original. Since the overlay's box/slider
+  math (`displayScales()`) assumes the loaded image spans the full `origW x origH`
+  canvas, loading an already-cropped 3840×2160 file there silently misaligned every
+  on-screen crop-box calculation against a smaller, already-zoomed-in image — the drawn
+  box no longer corresponded to where the crop would actually land. Re-opening the
+  overlay for an existing selection now always loads `cfg.originalUrl` (the true
+  original) instead. "View original" and "Compare to original" now sit on one line
+  separated by `·`, rather than stacked.
 - **3.9.0** — The lightbox (and arrow-navigation between a set's images) never shows
   the small grid thumbnail anymore — it's admin-only detail review, so quality matters
   more than load time. It now always uses either the true full-resolution original

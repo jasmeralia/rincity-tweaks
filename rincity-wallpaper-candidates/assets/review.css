@@ -117,10 +117,9 @@
 .rincwc-info { margin-bottom: 6px; }
 .rincwc-fname { font-weight: 600; word-break: break-all; }
 .rincwc-dims  { color: #888; font-size: 12px; }
-.rincwc-view-original { display: block; font-size: 11px; color: #2271b1; text-decoration: none; }
-.rincwc-view-original:hover { text-decoration: underline; }
-.rincwc-compare-link { display: block; font-size: 11px; color: #2271b1; text-decoration: none; }
-.rincwc-compare-link:hover { text-decoration: underline; }
+.rincwc-card-links { font-size: 11px; }
+.rincwc-card-links a { color: #2271b1; text-decoration: none; }
+.rincwc-card-links a:hover { text-decoration: underline; }
 .rincwc-status-line { color: #555; font-size: 12px; margin-top: 2px; }
 
 /* Variant buttons */

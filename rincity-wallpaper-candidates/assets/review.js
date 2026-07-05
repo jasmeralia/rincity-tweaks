@@ -315,9 +315,14 @@
             renderCropBox();
         } );
 
-        if ( img.dataset.src !== cfg.scaledUrl ) {
-            img.onload = () => { img.dataset.src = cfg.scaledUrl; doUpdate(); };
-            img.src = cfg.scaledUrl;
+        // Always the true original, never cfg.scaledUrl -- once a card is selected
+        // and watermarked, scaledUrl points at that already-cropped 4K file, and
+        // displayScales() below assumes the loaded image spans the full origW x
+        // origH canvas. Loading anything already-cropped there silently misaligns
+        // every box/slider computation against a smaller, already-zoomed-in image.
+        if ( img.dataset.src !== cfg.originalUrl ) {
+            img.onload = () => { img.dataset.src = cfg.originalUrl; doUpdate(); };
+            img.src = cfg.originalUrl;
         } else if ( img.complete && img.naturalWidth ) {
             doUpdate();
         } else {

@@ -409,11 +409,15 @@ final class RinCWC_Review_Page {
         echo '<div class="rincwc-info">';
         echo '<div class="rincwc-fname">' . esc_html( $fname ) . '</div>';
         echo '<div class="rincwc-dims">' . esc_html( "{$orig_w}x{$orig_h} · img {$pos}/{$row['total']}" ) . '</div>';
+        $card_links = [];
         if ( $thumb_is_wm ) {
-            echo '<a href="#" class="rincwc-view-original" data-url="' . esc_url( $original_url ) . '" data-alt="' . esc_attr( $fname ) . '">View original</a>';
+            $card_links[] = '<a href="#" class="rincwc-view-original" data-url="' . esc_url( $original_url ) . '" data-alt="' . esc_attr( $fname ) . '">View original</a>';
         }
         if ( $selection_url ) {
-            echo '<a href="#" class="rincwc-compare-link" data-original="' . esc_url( $original_url ) . '" data-selection="' . esc_url( $selection_url ) . '">Compare to original</a>';
+            $card_links[] = '<a href="#" class="rincwc-compare-link" data-original="' . esc_url( $original_url ) . '" data-selection="' . esc_url( $selection_url ) . '">Compare to original</a>';
+        }
+        if ( $card_links ) {
+            echo '<div class="rincwc-card-links">' . implode( ' · ', $card_links ) . '</div>';
         }
         if ( $show_cutoff ) {
             echo '<button class="button button-small rincwc-cutoff-btn" data-gid="' . esc_attr( (string) $gid ) . '" data-pos="' . esc_attr( (string) $pos ) . '" title="Exclude this image and all after it">Set cutoff here</button>';
