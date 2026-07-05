@@ -69,13 +69,13 @@ final class RinCWC_Review_Page {
 
         echo '<div class="rincwc-toolbar">';
         echo '<input type="text" id="rincwc-review-search" placeholder="Filter galleries…" class="rincwc-search-input">';
-        echo '<button class="button rincwc-filter-btn" id="rincwc-filter-approved">Approved</button> ';
-        echo '<button class="button rincwc-filter-btn" id="rincwc-filter-unreviewed">Initial inspection</button> ';
-        echo '<button class="button rincwc-filter-btn" id="rincwc-filter-sel">Ready for review</button> ';
-        echo '<button class="button" id="rincwc-clear-filters">Clear filters</button> ';
-        echo '<button class="button" id="rincwc-generate-crops">Generate pending crops</button> ';
-        echo '<button class="button button-primary" id="rincwc-apply-wm">Apply pending watermarks</button> ';
-        echo '<button class="button button-secondary" id="rincwc-sync-galleries">Publish to galleries</button>';
+        echo '<button class="button button-small rincwc-filter-btn" id="rincwc-filter-approved">Approved</button> ';
+        echo '<button class="button button-small rincwc-filter-btn" id="rincwc-filter-sel">Ready for review</button> ';
+        echo '<button class="button button-small rincwc-filter-btn" id="rincwc-filter-unreviewed">Initial inspection</button> ';
+        echo '<button class="button button-small" id="rincwc-clear-filters">Clear filters</button> ';
+        echo '<button class="button button-small" id="rincwc-generate-crops">Generate pending crops</button> ';
+        echo '<button class="button button-primary button-small" id="rincwc-apply-wm">Apply pending watermarks</button> ';
+        echo '<button class="button button-secondary button-small" id="rincwc-sync-galleries">Publish to galleries</button>';
         echo '<span id="rincwc-batch-msg"></span>';
         echo '<span class="rincwc-expanders">';
         echo '<a href="#" id="rincwc-expand-all">Expand all</a> · <a href="#" id="rincwc-collapse-all">Collapse all</a>';

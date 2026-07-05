@@ -59,6 +59,12 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.1.2** — Review page: filter order is now Approved / Ready for review / Initial
+  inspection (left to right). Fixed the button-size reduction from 3.1.1, which never
+  actually took effect — it used a single-class selector that lost the specificity fight
+  against WordPress core's `.wp-core-ui .button` rule. Switched to WordPress's own
+  `button-small` modifier class instead, applied to all toolbar buttons (filters, Clear
+  filters, Generate pending crops, Apply pending watermarks, Publish to galleries).
 - **3.1.1** — Review page: filtered galleries/cards are now selected server-side from
   the `filter` query param, so filtered reloads (after a cutoff/exclude-all/accept-all
   action) never flash the full unfiltered list before hiding non-matches. Reordered the
