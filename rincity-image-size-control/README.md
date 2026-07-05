@@ -47,4 +47,5 @@ Existing attachments are unaffected either way.
 
 ## Changelog
 
+- **0.1.1** — Renamed plugin display name from "Rin City Image Size Control" to "RinCity Image Size Control" for consistency across all plugins.
 - **0.1.0** — Initial release.

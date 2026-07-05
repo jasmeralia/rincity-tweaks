@@ -2,7 +2,7 @@
 /**
  * Plugin Name: RinCity Gallery Favorites
  * Description: Member-only favorites/bookmarks for Envira standalone gallery pages, with sidebar widget and management page.
- * Version:     1.0.0
+ * Version:     1.0.3
  * Author:      Morgan Blackthorne
  */
 

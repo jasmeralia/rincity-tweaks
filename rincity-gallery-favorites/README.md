@@ -72,5 +72,5 @@ make rincity-gallery-favorites
 
 ## Changelog
 
-- **1.0.3** — Current version.
-- **1.0.0** — Initial release.
+- **1.0.3** — Add Categories column to the favorites management table (comma-separated deep links to `envira-category` archive pages; included in the search filter); add a sortable Favorites count column to the WP Admin Envira Galleries list; fix the mobile virtual keyboard dismissing on each search keypress by splitting rendering into a one-time shell init and a table-only update on input.
+- **1.0.0** — Initial release: sidebar widget, favorites page shortcode, REST API, aMember session integration.

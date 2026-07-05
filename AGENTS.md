@@ -103,6 +103,22 @@ plugins at initial release.
 
 ---
 
+### Documentation must reflect current state
+Any code change must be accompanied by updates to every `.md` file that describes
+the changed behavior (plugin `README.md`, `AGENTS.md`, etc.) in the same commit.
+Do not defer doc updates to a later pass — stale docs are treated as a bug, not a
+cleanup task. Before marking work done, re-read every doc file that mentions the
+changed component and correct anything no longer accurate (version numbers,
+feature lists, admin page names, endpoint names, workflow steps).
+
+### Keep open PRs in sync with their own commits
+If you push additional commits to a branch that already has an open pull request,
+update that PR's title and description in the same step (`gh pr edit`) so they
+describe the PR's current full contents — not just what was true when it was
+opened. Do this every time the scope changes, not only right before merge.
+
+---
+
 ## Changelog (README.md)
 
 Each plugin's `README.md` has a `## Changelog` section. Add entries newest-first:
@@ -126,8 +142,10 @@ Keep entries on a single line. Reference Odoo task IDs where relevant.
 | `rincity-envira-search-enhancements` | `plugins/rincity-envira-search-enhancements/` | |
 | `rincity-gallery-favorites` | `plugins/rincity-gallery-favorites/` | Member favorites system |
 | `rincity-image-size-control` | `plugins/rincity-image-size-control/` | Suppresses unwanted intermediate image sizes on upload |
+| `rincity-nav-tweaks` | `plugins/rincity-nav-tweaks/` | Fixes mobile submenu expand/collapse and desktop scroll-to-top on the Ashe Pro theme |
 | `rincity-news-widget` | `plugins/rincity-news-widget/` | |
 | `rincity-wallpaper-candidates` | `plugins/rincity-wallpaper-candidates/` | Wallpaper candidate tracking |
+| `rincity-wf-block-logger` | **mu-plugins** | Logs Wordfence IP ban events to the systemd journal for Vector/OpenSearch ingestion |
 | `rincity-wordfence-temp-allowlist` | **mu-plugins** | Auto-allowlist for Morgan's IP |
 | `rincity-zero-scheduled-seconds` | **mu-plugins** | Forces scheduled post times to :00 seconds |
 | `rincity-envira-covers` | _(cron script, not a WP plugin)_ | Indexes cover images nightly |
