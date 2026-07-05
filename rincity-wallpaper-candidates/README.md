@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.6.0
+**Version:** 3.6.1
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -65,8 +65,10 @@ galleries.
 - **Watermarks** — upload/register watermark PNGs, set the default watermark, delete
   unused files, and set per-gallery overrides (with its own search-as-you-type filter).
 - **Settings** — configure the 4K/1440p/1080p target Envira galleries, the test-approve
-  toggle, and per-gallery scanner cutoffs, with a search-as-you-type filter over the
-  cutoffs table and a "Fully excluded" badge on any gallery with zero visible images.
+  toggle, and per-gallery scanner cutoffs (only galleries with at least one scanned
+  candidate row are listed), with a search-as-you-type filter over the cutoffs table
+  and a "Fully excluded" badge — and a `-1` displayed value — on any gallery with zero
+  visible images, regardless of what its stored cutoff setting actually says.
 
 ## Storage
 
@@ -82,6 +84,15 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.6.1** — Two Settings page fixes: the Scanner Cutoffs table now only lists
+  galleries with at least one candidate row (`RinCWC_Data::scanned_gallery_ids()`),
+  instead of every Envira gallery on the site (most had zero rows, especially after
+  the sub-4K cleanup). And it now shows `-1` for any gallery flagged "Fully excluded"
+  by the row data, instead of trusting the stored setting alone — four galleries were
+  excluded via the old "Exclude all" button before the `-1` sentinel existed, leaving
+  their setting absent (reads as `0`) despite every row actually being excluded. Their
+  stored value has been backfilled to `-1` to match reality, and the display now falls
+  back to the row-based truth for any future case like it.
 - **3.6.0** — Renamed "Include from here" to **Include through here** (the old name
   read as symmetric with "Set cutoff here", which cuts forward; this one restores
   backward toward the current cutoff, so the wording was misleading). When there are

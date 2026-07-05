@@ -56,13 +56,22 @@ final class RinCWC_Settings_Page {
         echo '<input type="text" id="rincwc-cutoffs-search" placeholder="Filter galleries…" class="rincwc-gallery-search" style="margin-bottom:6px">';
         echo '<table class="widefat striped" id="rincwc-cutoffs-table"><thead><tr><th>Gallery</th><th>Exclude after position</th><th>Status</th></tr></thead><tbody>';
         $fully_excluded_ids = array_flip( RinCWC_Data::get_fully_excluded_gallery_ids() );
+        $scanned_ids        = array_flip( RinCWC_Data::scanned_gallery_ids() );
         foreach ( $galleries as $gallery ) {
-            $gid   = (int) $gallery->ID;
-            $value = (int) ( $settings['excluded_after'][ $gid ] ?? 0 );
+            $gid = (int) $gallery->ID;
+            if ( ! isset( $scanned_ids[ $gid ] ) ) {
+                // No candidate rows at all — nothing here to set a cutoff on.
+                continue;
+            }
+            $is_fully_excluded = isset( $fully_excluded_ids[ $gid ] );
+            // Row data is the ground truth for "fully excluded" — some galleries were
+            // excluded before the -1 sentinel existed and never got backfilled, so the
+            // stored setting alone can't be trusted to show that state accurately.
+            $value = $is_fully_excluded ? -1 : (int) ( $settings['excluded_after'][ $gid ] ?? 0 );
             echo '<tr data-title="' . esc_attr( strtolower( $gallery->post_title ) ) . '">';
             echo '<td>' . esc_html( sprintf( '%s (#%d)', $gallery->post_title, $gid ) ) . '</td>';
             echo '<td><input type="number" min="-1" step="1" name="excluded_after[' . esc_attr( $gid ) . ']" value="' . esc_attr( $value ) . '" class="small-text"></td>';
-            echo '<td>' . ( isset( $fully_excluded_ids[ $gid ] ) ? '<span class="rincwc-gal-badge badge-excluded">Fully excluded</span>' : '' ) . '</td>';
+            echo '<td>' . ( $is_fully_excluded ? '<span class="rincwc-gal-badge badge-excluded">Fully excluded</span>' : '' ) . '</td>';
             echo '</tr>';
         }
         echo '</tbody></table>';

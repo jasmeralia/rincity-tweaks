@@ -159,6 +159,14 @@ final class RinCWC_Data {
         return array_map( 'intval', $ids );
     }
 
+    /** Every gallery_id with at least one scanned row, regardless of status/excluded. */
+    public static function scanned_gallery_ids(): array {
+        global $wpdb;
+        $table = RinCWC_DB::images_table();
+        $ids   = $wpdb->get_col( "SELECT DISTINCT gallery_id FROM {$table}" );
+        return array_map( 'intval', $ids );
+    }
+
     /**
      * Every excluded row, from any gallery — partially cut off or fully excluded.
      * get_visible_images() never returns these, so the Review page's Exclusions
