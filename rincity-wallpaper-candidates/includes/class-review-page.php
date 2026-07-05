@@ -105,7 +105,7 @@ final class RinCWC_Review_Page {
             if ( ! $filtered ) {
                 continue;
             }
-            self::render_gallery( (int) $gid, $filtered, $is_fully_excluded );
+            self::render_gallery( (int) $gid, $filtered, $is_fully_excluded, $imgs );
         }
 
         echo '</div>';
@@ -253,7 +253,8 @@ final class RinCWC_Review_Page {
         return $by_gallery;
     }
 
-    private static function render_gallery( int $gid, array $imgs, bool $is_fully_excluded = false ): void {
+    private static function render_gallery( int $gid, array $imgs, bool $is_fully_excluded = false, array $full_imgs = [] ): void {
+        $full_imgs = $full_imgs ?: $imgs;
         $post      = get_post( $gid );
         $title     = $post ? $post->post_title : ( $imgs[0]['gallery_title'] ?? "Gallery {$gid}" );
         $pub_date  = $post ? date( 'Y-m-d', strtotime( $post->post_date ) ) : '';
@@ -263,12 +264,9 @@ final class RinCWC_Review_Page {
 
         $selected    = array_values( array_filter( $imgs, fn( $row ) => in_array( $row['status'], [ 'SELECTED', 'APPROVED' ], true ) ) );
         $others      = array_values( array_filter( $imgs, fn( $row ) => ! in_array( $row['status'], [ 'SELECTED', 'APPROVED' ], true ) ) );
-        $best_w      = max( array_map( fn( $row ) => (int) $row['orig_w'], $imgs ) );
         $has_sel     = count( $selected ) > 0;
         $has_cutoff  = RinCWC_Data::get_cutoff( $gid ) > 0;
-        $summary     = $has_sel
-            ? count( $selected ) . ' selected, ' . count( $others ) . ' other · best ' . $best_w . 'px'
-            : count( $imgs ) . ' candidates · best ' . $best_w . 'px';
+        $summary     = self::build_gallery_summary( $full_imgs );
 
         // Cutoff button only appears after the last selected/approved image.
         $max_sel_pos = $has_sel
@@ -505,6 +503,45 @@ final class RinCWC_Review_Page {
             echo '</div>';
         }
         echo '</div>';
+    }
+
+    /**
+     * "X selected, Y (other) candidates, Z excluded · best Wpx" — always computed from
+     * the set's full row list, not whatever subset the active filter is currently
+     * rendering, so the breakdown stays accurate regardless of which filter matched
+     * this set. Zero-count segments are omitted; "candidates" becomes "other
+     * candidates" once there's at least one selection, since at that point the
+     * remaining un-selected candidates are "other" relative to what's been picked.
+     */
+    private static function build_gallery_summary( array $imgs ): string {
+        $selected_count  = 0;
+        $candidate_count = 0;
+        $excluded_count  = 0;
+        foreach ( $imgs as $row ) {
+            if ( ! empty( $row['excluded'] ) ) {
+                $excluded_count++;
+            } elseif ( in_array( $row['status'], [ RinCWC_Data::STATUS_SELECTED, RinCWC_Data::STATUS_APPROVED ], true ) ) {
+                $selected_count++;
+            } else {
+                $candidate_count++;
+            }
+        }
+
+        $parts = [];
+        if ( $selected_count > 0 ) {
+            $parts[] = "{$selected_count} selected";
+        }
+        if ( $candidate_count > 0 ) {
+            $noun    = $candidate_count === 1 ? 'candidate' : 'candidates';
+            $label   = $selected_count > 0 ? "other {$noun}" : $noun;
+            $parts[] = "{$candidate_count} {$label}";
+        }
+        if ( $excluded_count > 0 ) {
+            $parts[] = "{$excluded_count} excluded";
+        }
+
+        $best_w = max( array_map( fn( $row ) => (int) $row['orig_w'], $imgs ) );
+        return implode( ', ', $parts ) . ' · best ' . $best_w . 'px';
     }
 
     private static function variant_label( string $variant ): string {

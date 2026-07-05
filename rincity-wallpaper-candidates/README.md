@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.7.0
+**Version:** 3.7.1
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -85,6 +85,15 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.7.1** — Per-set summary line (the collapsed `<summary>` text) reworked: "X
+  selected, Y (other) candidates, Z excluded · best Wpx", replacing the old "other"
+  with "candidates" (or "other candidates" once there's at least one selection, since
+  at that point the rest are "other" relative to what's picked). Zero-count segments
+  are omitted. These counts are now always computed from the set's full row list, not
+  whatever subset the active filter is currently rendering — e.g. under the Exclusions
+  filter a set still shows its true "X selected, Y candidates, Z excluded" breakdown,
+  not just the excluded count, even though only the excluded cards are actually shown
+  in the grid below. "Best Wpx" now reflects the same full-set data for consistency.
 - **3.7.0** — Watermark upload accepts `.psd`/`.psb` in addition to `.png`. Since
   `wp_handle_upload()`'s image-content check (`getimagesize()`/`exif_imagetype()`)
   doesn't recognize Photoshop files, PSD/PSB uploads are handled directly and read via
