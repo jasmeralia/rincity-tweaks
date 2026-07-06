@@ -24,296 +24,266 @@ final class RinCity_Wallpaper_Admin_Page {
             wp_die( esc_html__( 'You do not have permission to access this page.' ) );
         }
 
-        // Handle Re-scan.
-        if (
-            isset( $_POST['rincwc_action'], $_POST['rincwc_nonce'] ) &&
-            $_POST['rincwc_action'] === 'rescan' &&
-            wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['rincwc_nonce'] ) ), 'rincwc_rescan' )
-        ) {
-            RinCity_Wallpaper_Scanner::clear_cache();
-            RinCity_Wallpaper_Scanner::get_results( true );
-            wp_safe_redirect( add_query_arg( 'rincwc_notice', 'rescanned', self::page_url() ) );
-            exit;
-        }
+        $preview    = null;
+        $notice     = '';
+        $prescan_id = (int) ( $_GET['prescan'] ?? 0 );
 
-        // Handle settings save (clears cache and rescans).
-        if (
-            isset( $_POST['rincwc_action'], $_POST['rincwc_nonce'] ) &&
-            $_POST['rincwc_action'] === 'save_settings' &&
-            wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['rincwc_nonce'] ) ), 'rincwc_save_settings' )
-        ) {
-            $tail_pct = max( 0, min( 100, (int) ( $_POST['rincwc_tail_exclude_pct'] ?? 33 ) ) );
-            $min_tier = sanitize_key( $_POST['rincwc_min_tier'] ?? '1080p' );
-            if ( ! in_array( $min_tier, [ '1080p', '1440p', '4k' ], true ) ) {
-                $min_tier = '1080p';
-            }
-            update_option( 'rincwc_tail_exclude_pct', $tail_pct );
-            update_option( 'rincwc_min_tier', $min_tier );
-            RinCity_Wallpaper_Scanner::clear_cache();
-            RinCity_Wallpaper_Scanner::get_results( true );
-            wp_safe_redirect( add_query_arg( 'rincwc_notice', 'settings_saved', self::page_url() ) );
-            exit;
-        }
-
-        $sort      = isset( $_GET['sort'] ) ? sanitize_key( $_GET['sort'] ) : 'newest';
-        $results   = RinCity_Wallpaper_Scanner::get_results();
-        $timestamp = RinCity_Wallpaper_Scanner::get_timestamp();
-        $results   = self::sort_results( $results, $sort );
-
-        $tail_pct = (int) get_option( 'rincwc_tail_exclude_pct', 33 );
-        $min_tier = (string) get_option( 'rincwc_min_tier', '1080p' );
-
-        ?>
-        <div class="wrap">
-        <?php self::render_inline_styles(); ?>
-        <h1>Wallpaper Candidates</h1>
-
-        <?php if ( isset( $_GET['rincwc_notice'] ) ) :
-            $notice = sanitize_key( $_GET['rincwc_notice'] );
-        ?>
-            <div class="notice notice-success is-dismissible"><p>
-                <?php if ( $notice === 'rescanned' ) : ?>Scan complete.
-                <?php elseif ( $notice === 'settings_saved' ) : ?>Settings saved and scan refreshed.
-                <?php endif; ?>
-            </p></div>
-        <?php endif; ?>
-
-        <div class="rincwc-settings-wrap">
-            <form method="post">
-                <?php wp_nonce_field( 'rincwc_save_settings', 'rincwc_nonce' ); ?>
-                <input type="hidden" name="rincwc_action" value="save_settings">
-                <table class="form-table rincwc-settings-table">
-                    <tr>
-                        <th scope="row">
-                            <label for="rincwc_tail_pct">Exclude last N% of each set</label>
-                        </th>
-                        <td>
-                            <input type="number" id="rincwc_tail_pct" name="rincwc_tail_exclude_pct"
-                                   min="0" max="100" value="<?php echo esc_attr( $tail_pct ); ?>"
-                                   style="width:70px">
-                            <span class="description">
-                                Images beyond position <?php echo esc_html( 100 - $tail_pct ); ?>% through the set are skipped.
-                            </span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">
-                            <label for="rincwc_min_tier">Minimum qualifying tier</label>
-                        </th>
-                        <td>
-                            <select id="rincwc_min_tier" name="rincwc_min_tier">
-                                <option value="1080p" <?php selected( $min_tier, '1080p' ); ?>>1080p — Full HD (1920×1080)</option>
-                                <option value="1440p" <?php selected( $min_tier, '1440p' ); ?>>1440p — QHD (2560×1440)</option>
-                                <option value="4k"    <?php selected( $min_tier, '4k' ); ?>>4K — UHD (3840×2160)</option>
-                            </select>
-                        </td>
-                    </tr>
-                </table>
-                <?php submit_button( 'Save Settings &amp; Re-scan', 'primary', 'submit', false ); ?>
-            </form>
-
-            <form method="post" style="display:inline;margin-left:0.75em">
-                <?php wp_nonce_field( 'rincwc_rescan', 'rincwc_nonce' ); ?>
-                <input type="hidden" name="rincwc_action" value="rescan">
-                <?php submit_button( 'Re-scan', 'secondary', 'submit', false ); ?>
-            </form>
-
-            <?php if ( $timestamp ) : ?>
-                <span class="rincwc-timestamp">
-                    Last scanned: <?php echo esc_html( $timestamp ); ?>
-                </span>
-            <?php else : ?>
-                <span class="rincwc-timestamp">Not yet scanned — click Re-scan to begin.</span>
-            <?php endif; ?>
-        </div>
-
-        <?php if ( empty( $results ) ) : ?>
-            <p class="rincwc-empty">No landscape wallpaper candidates found matching the current settings.</p>
-        <?php else :
-            $total_candidates = array_sum( array_map( fn( $g ) => count( $g['candidates'] ), $results ) );
-        ?>
-            <p class="rincwc-summary">Found <strong><?php echo esc_html( $total_candidates ); ?></strong>
-            candidate<?php echo $total_candidates !== 1 ? 's' : ''; ?> across
-            <strong><?php echo esc_html( count( $results ) ); ?></strong>
-            <?php echo count( $results ) !== 1 ? 'galleries' : 'gallery'; ?>.</p>
-
-            <div class="rincwc-sort-bar">
-                <strong>Sort by:</strong>
-                <?php
-                $sorts = [
-                    'newest'      => 'Newest first',
-                    'oldest'      => 'Oldest first',
-                    'most_faves'  => 'Most favorites',
-                    'least_faves' => 'Least favorites',
-                    'comments'    => 'Comments',
-                ];
-                foreach ( $sorts as $key => $label ) :
-                    $url   = add_query_arg( 'sort', $key, self::page_url() );
-                    $class = $sort === $key ? 'rincwc-sort-link rincwc-sort-active' : 'rincwc-sort-link';
-                ?>
-                    <a href="<?php echo esc_url( $url ); ?>" class="<?php echo esc_attr( $class ); ?>"><?php echo esc_html( $label ); ?></a>
-                <?php endforeach; ?>
-            </div>
-
-            <?php foreach ( $results as $gallery ) :
-                self::render_gallery_card( $gallery );
-            endforeach; ?>
-        <?php endif; ?>
-        </div>
-        <?php
-    }
-
-    private static function page_url(): string {
-        return admin_url( 'admin.php?page=rincwc-wallpaper-candidates' );
-    }
-
-    private static function sort_results( array $results, string $sort ): array {
-        usort( $results, function ( $a, $b ) use ( $sort ) {
-            switch ( $sort ) {
-                case 'oldest':
-                    return strcmp( $a['published_at'], $b['published_at'] );
-                case 'most_faves':
-                    return $b['favorites_count'] <=> $a['favorites_count'];
-                case 'least_faves':
-                    return $a['favorites_count'] <=> $b['favorites_count'];
-                case 'comments':
-                    return $b['comment_count'] <=> $a['comment_count'];
-                default: // newest
-                    return strcmp( $b['published_at'], $a['published_at'] );
-            }
-        } );
-        return $results;
-    }
-
-    private static function render_gallery_card( array $gallery ): void {
-        $cat_parts = [];
-        foreach ( $gallery['categories'] as $cat ) {
-            if ( $cat['url'] ) {
-                $cat_parts[] = '<a href="' . esc_url( $cat['url'] ) . '">' . esc_html( $cat['name'] ) . '</a>';
-            } else {
-                $cat_parts[] = esc_html( $cat['name'] );
+        if ( isset( $_POST['rincwc_action'], $_POST['rincwc_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['rincwc_nonce'] ) ), 'rincwc_scan_gallery' ) ) {
+            $gallery_id = (int) ( $_POST['rincwc_gallery_id'] ?? 0 );
+            $action     = sanitize_key( $_POST['rincwc_action'] );
+            if ( $gallery_id ) {
+                $preview = RinCity_Wallpaper_Scanner::scan_gallery( $gallery_id, $action === 'commit_scan' );
+                $notice  = $preview['message'] ?? '';
             }
         }
-        $cat_html = implode( ', ', $cat_parts );
-        $fav_n    = $gallery['favorites_count'];
-        $com_n    = $gallery['comment_count'];
-        ?>
-        <div class="rincwc-gallery-card">
-            <h2 class="rincwc-gallery-title">
-                <a href="<?php echo esc_url( $gallery['url'] ); ?>"><?php echo esc_html( $gallery['title'] ); ?></a>
-            </h2>
-            <p class="rincwc-gallery-meta">
-                <?php if ( $cat_html ) : ?>
-                    <?php echo wp_kses( $cat_html, [ 'a' => [ 'href' => [] ] ] ); ?> &bull;
-                <?php endif; ?>
-                Published <?php echo esc_html( date( 'M j, Y', strtotime( $gallery['published_at'] ) ) ); ?>
-                &bull; <?php echo esc_html( $fav_n ); ?> favorite<?php echo $fav_n !== 1 ? 's' : ''; ?>
-                &bull; <?php echo esc_html( $com_n ); ?> comment<?php echo $com_n !== 1 ? 's' : ''; ?>
-            </p>
-            <table class="widefat striped rincwc-candidates-table">
-                <thead>
-                    <tr>
-                        <th>Preview</th>
-                        <th>Position</th>
-                        <th>Resolution</th>
-                        <th>File size</th>
-                        <th>Aspect</th>
-                        <th>4K</th>
-                        <th>1440p</th>
-                        <th>1080p</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ( $gallery['candidates'] as $candidate ) :
-                        self::render_candidate_row( $candidate );
-                    endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-        <?php
+
+        $summary   = RinCity_Wallpaper_Scanner::database_summary();
+        $galleries = RinCWC_Data::scan_target_galleries();
+
+        echo '<div class="wrap rincwc-admin">';
+        self::render_inline_styles();
+        echo '<h1>Wallpaper Candidates</h1>';
+
+        if ( $notice ) {
+            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $notice ) . '</p></div>';
+        }
+
+        echo '<div class="rincwc-admin-panel">';
+        echo '<h2>Scan Gallery</h2>';
+        echo '<input type="text" id="rincwc-gallery-search" placeholder="Filter galleries…" class="rincwc-gallery-search">';
+        echo '<form method="post">';
+        wp_nonce_field( 'rincwc_scan_gallery', 'rincwc_nonce' );
+        echo '<input type="hidden" name="rincwc_action" value="dry_run">';
+        echo '<select name="rincwc_gallery_id" id="rincwc-gallery-select" class="rincwc-gallery-select">';
+        echo '<option value="">Select an Envira gallery</option>';
+        foreach ( $galleries as $gallery ) {
+            $label    = sprintf( '%s (%d, %s)', $gallery->post_title, $gallery->ID, date( 'Y-m-d', strtotime( $gallery->post_date ) ) );
+            $selected = selected( $prescan_id, (int) $gallery->ID, false );
+            echo '<option value="' . esc_attr( $gallery->ID ) . '"' . $selected . '>' . esc_html( $label ) . '</option>';
+        }
+        echo '</select> ';
+        submit_button( 'Dry Run Scan', 'secondary', 'submit', false );
+        echo '</form>';
+        echo '</div>';
+
+        if ( $preview ) {
+            self::render_preview( $preview );
+        }
+
+        self::render_summary( $summary );
+
+        echo '</div>';
     }
 
-    private static function render_candidate_row( array $c ): void {
-        ?>
-        <tr>
-            <td class="rincwc-thumb-cell">
-                <img src="<?php echo esc_url( $c['thumbnail_url'] ); ?>"
-                     alt=""
-                     width="240"
-                     loading="lazy"
-                     style="width:240px;height:auto;display:block">
-            </td>
-            <td><?php echo esc_html( $c['position'] . ' of ' . $c['set_total'] ); ?></td>
-            <td><?php echo esc_html( number_format( $c['width'] ) . ' × ' . number_format( $c['height'] ) ); ?></td>
-            <td><?php echo esc_html( self::format_filesize( $c['filesize'] ) ); ?></td>
-            <td><?php echo esc_html( $c['aspect_ratio'] . ':1' ); ?></td>
-            <?php foreach ( [ '4k', '1440p', '1080p' ] as $tier_key ) :
-                $tier = $c['tiers'][ $tier_key ];
-            ?>
-            <td class="rincwc-tier-cell <?php echo $tier['qualifies'] ? 'rincwc-tier-yes' : 'rincwc-tier-no'; ?>">
-                <?php if ( $tier['qualifies'] ) : ?>
-                    &#10003;
-                    <?php if ( $tier['direction'] !== 'none' && $tier['crop_px'] > 0 ) : ?>
-                        <span class="rincwc-crop-note">
-                            <?php if ( $tier['direction'] === 'sides' ) : ?>
-                                crop <?php echo esc_html( $tier['crop_px'] ); ?>px/side
-                            <?php else : ?>
-                                crop <?php echo esc_html( $tier['crop_px'] ); ?>px top+bottom
-                            <?php endif; ?>
-                            <br><span class="rincwc-pct">(<?php echo esc_html( $tier['pct_retained'] ); ?>% kept)</span>
-                        </span>
-                    <?php endif; ?>
-                <?php else : ?>
-                    <span class="rincwc-tier-dash">&mdash;</span>
-                <?php endif; ?>
-            </td>
-            <?php endforeach; ?>
-        </tr>
-        <?php
+    private static function render_summary( array $summary ): void {
+        $review_base = admin_url( 'admin.php?page=rincwc-review' );
+        $scan_base   = admin_url( 'admin.php?page=rincwc-wallpaper-candidates' );
+
+        echo '<div class="rincwc-admin-panel">';
+        echo '<h2>Database Summary</h2>';
+        echo '<p><strong>' . esc_html( $summary['visible'] ) . '</strong> visible candidates, ';
+        echo '<strong>' . esc_html( $summary['excluded'] ) . '</strong> excluded, ';
+        echo '<strong>' . esc_html( $summary['selected'] ) . '</strong> selected, ';
+        echo '<strong>' . esc_html( $summary['approved'] ) . '</strong> approved.</p>';
+
+        if ( empty( $summary['galleries'] ) ) {
+            echo '<p>No DB candidates yet. Run a scan to populate the catalog.</p>';
+            echo '</div>';
+            return;
+        }
+
+        echo '<input type="text" id="rincwc-summary-search" placeholder="Filter galleries…" class="rincwc-gallery-search" style="margin:8px 0">';
+
+        echo '<table id="rincwc-summary-table" class="widefat striped rincwc-sortable">';
+        echo '<thead><tr>';
+        echo '<th data-col="0" class="sortable">Gallery</th>';
+        echo '<th data-col="1" class="sortable">Pub date</th>';
+        echo '<th data-col="2" class="sortable num">Images</th>';
+        echo '<th data-col="3" class="sortable num">Excluded</th>';
+        echo '<th data-col="4" class="sortable num">Selected</th>';
+        echo '<th data-col="5" class="sortable num">Approved</th>';
+        echo '<th data-col="6" class="sortable num">Candidates</th>';
+        echo '<th>Actions</th>';
+        echo '</tr></thead><tbody>';
+        foreach ( $summary['galleries'] as $gallery_id => $gallery ) {
+            $selected    = (int) ( $gallery['selected'] ?? 0 );
+            $approved    = (int) ( $gallery['approved'] ?? 0 );
+            $candidates  = $gallery['images'] - $gallery['excluded'] - $selected - $approved;
+            $review_url  = esc_url( $review_base . '#rincwc-gallery-' . $gallery_id );
+            $rescan_url  = esc_url( $scan_base . '&prescan=' . $gallery_id );
+            echo '<tr data-title="' . esc_attr( strtolower( $gallery['title'] ) ) . '">';
+            echo '<td>' . esc_html( $gallery['title'] ) . ' <span class="description">#' . esc_html( (string) $gallery_id ) . '</span></td>';
+            echo '<td>' . esc_html( $gallery['pub_date'] ?? '' ) . '</td>';
+            echo '<td>' . esc_html( (string) $gallery['images'] ) . '</td>';
+            echo '<td>' . esc_html( (string) $gallery['excluded'] ) . '</td>';
+            echo '<td>' . esc_html( (string) $selected ) . '</td>';
+            echo '<td>' . esc_html( (string) $approved ) . '</td>';
+            echo '<td>' . esc_html( (string) $candidates ) . '</td>';
+            echo '<td class="rincwc-actions"><a href="' . $review_url . '">Review</a> · <a href="' . $rescan_url . '">Rescan</a></td>';
+            echo '</tr>';
+        }
+        echo '</tbody></table>';
+        echo '</div>';
     }
 
-    private static function format_filesize( int $bytes ): string {
-        if ( $bytes >= 1024 * 1024 ) {
-            return round( $bytes / ( 1024 * 1024 ), 1 ) . ' MB';
+    private static function render_preview( array $preview ): void {
+        $gallery = $preview['gallery'] ?? [];
+        $counts  = $preview['counts'] ?? [];
+
+        echo '<div class="rincwc-admin-panel">';
+        echo '<h2>Scan Results';
+        if ( ! empty( $gallery['title'] ) ) {
+            echo ': ' . esc_html( $gallery['title'] );
         }
-        if ( $bytes >= 1024 ) {
-            return round( $bytes / 1024 ) . ' KB';
+        echo '</h2>';
+
+        if ( empty( $preview['ok'] ) ) {
+            echo '<p>' . esc_html( $preview['message'] ?? 'Scan failed.' ) . '</p></div>';
+            return;
         }
-        return $bytes . ' B';
+
+        $seen       = (int) ( $counts['seen'] ?? 0 );
+        $candidates = (int) ( $counts['candidates'] ?? 0 );
+        $new        = (int) ( $counts['new'] ?? 0 );
+        $updated    = (int) ( $counts['updated'] ?? 0 );
+        $portrait   = (int) ( $counts['portrait'] ?? 0 );
+        $too_small  = (int) ( $counts['too_small'] ?? 0 );
+        $scale_fail = (int) ( $counts['scale_fail'] ?? 0 );
+        $no_file    = (int) ( $counts['no_file'] ?? 0 );
+        $no_dims    = (int) ( $counts['no_dims'] ?? 0 );
+        echo '<p><strong>' . esc_html( (string) $seen ) . '</strong> gallery images checked. ';
+        echo '<strong>' . esc_html( (string) $candidates ) . '</strong> 4K landscape candidates';
+        if ( $new || $updated ) {
+            echo ' (' . esc_html( (string) $new ) . ' new, ' . esc_html( (string) $updated ) . ' updated)';
+        }
+        echo '.</p>';
+        $skip_parts = [];
+        if ( $portrait )  { $skip_parts[] = "{$portrait} portrait"; }
+        if ( $too_small ) { $skip_parts[] = "{$too_small} <4K"; }
+        if ( $scale_fail ){ $skip_parts[] = "{$scale_fail} too narrow for 16:9"; }
+        if ( $no_file )   { $skip_parts[] = "{$no_file} file not found"; }
+        if ( $no_dims )   { $skip_parts[] = "{$no_dims} unreadable"; }
+        if ( $skip_parts ) {
+            echo '<p>Skipped: ' . esc_html( implode( ', ', $skip_parts ) ) . '.</p>';
+        }
+
+        if ( ( $preview['message'] ?? '' ) !== 'Scan committed.' ) {
+            echo '<form method="post" class="rincwc-commit-form">';
+            wp_nonce_field( 'rincwc_scan_gallery', 'rincwc_nonce' );
+            echo '<input type="hidden" name="rincwc_action" value="commit_scan">';
+            echo '<input type="hidden" name="rincwc_gallery_id" value="' . esc_attr( (string) ( $preview['gallery_id'] ?? 0 ) ) . '">';
+            submit_button( 'Commit These Results to DB', 'primary', 'submit', false );
+            echo '</form>';
+        }
+
+        echo '<table class="widefat striped rincwc-scan-table"><thead><tr>';
+        echo '<th>Pos</th><th>Attachment</th><th>File</th><th>Dimensions</th><th>Status</th><th>Reason</th>';
+        echo '</tr></thead><tbody>';
+        foreach ( $preview['rows'] as $row ) {
+            $status = sanitize_html_class( $row['status'] ?? 'skipped' );
+            echo '<tr class="rincwc-row-' . esc_attr( $status ) . '">';
+            echo '<td>' . esc_html( ( $row['position'] ?? '' ) . '/' . ( $row['total'] ?? '' ) ) . '</td>';
+            echo '<td>' . esc_html( (string) ( $row['attach_id'] ?? '' ) ) . '</td>';
+            echo '<td>' . esc_html( $row['filename'] ?? '' ) . '</td>';
+            echo '<td>' . esc_html( ( $row['width'] ?? 0 ) && ( $row['height'] ?? 0 ) ? $row['width'] . '×' . $row['height'] : '-' ) . '</td>';
+            echo '<td>' . esc_html( $row['status'] ?? '' ) . '</td>';
+            echo '<td>' . esc_html( $row['reason'] ?? '' ) . '</td>';
+            echo '</tr>';
+        }
+        echo '</tbody></table>';
+        echo '</div>';
     }
 
     private static function render_inline_styles(): void {
         ?>
         <style>
-        .rincwc-settings-wrap {
+        .rincwc-admin-panel {
             background: #fff;
             border: 1px solid #c3c4c7;
-            padding: 1em 1.5em 0.5em;
-            margin-bottom: 1.5em;
+            padding: 1em 1.25em;
+            margin: 1em 0;
         }
-        .rincwc-settings-table { margin-top: 0; }
-        .rincwc-timestamp {
-            color: #666;
-            font-size: 0.88em;
-            margin-left: 1.5em;
-            vertical-align: middle;
-        }
-        .rincwc-sort-bar { margin: 0.75em 0 1em; }
-        .rincwc-sort-link { margin-right: 1em; }
-        .rincwc-sort-active { font-weight: bold; }
-        .rincwc-gallery-card { margin-bottom: 2.5em; }
-        .rincwc-gallery-title { margin-bottom: 0.2em; }
-        .rincwc-gallery-meta { margin-top: 0; color: #555; font-size: 0.9em; }
-        .rincwc-candidates-table th { white-space: nowrap; }
-        .rincwc-thumb-cell { width: 256px; vertical-align: top; padding: 4px; }
-        .rincwc-tier-cell { vertical-align: top; text-align: center; }
-        .rincwc-tier-yes { color: #1a7a1a; }
-        .rincwc-tier-no { color: #bbb; }
-        .rincwc-crop-note { display: block; font-size: 0.82em; color: #555; margin-top: 0.2em; }
-        .rincwc-pct { color: #888; }
-        .rincwc-tier-dash { color: #ccc; }
-        .rincwc-empty { color: #666; font-style: italic; }
+        .rincwc-admin-panel h2 { margin-top: 0; }
+        .rincwc-gallery-search { width: 320px; max-width: 100%; margin-bottom: 6px; display: block; }
+        .rincwc-gallery-select { min-width: 420px; max-width: 100%; margin-top: 4px; }
+        .rincwc-commit-form { margin: 0 0 1em; }
+        .rincwc-scan-table .rincwc-row-new td { background: #edfaef; }
+        .rincwc-scan-table .rincwc-row-existing td { background: #f0f6fc; color: #555; }
+        .rincwc-scan-table .rincwc-row-skipped td { color: #999; font-style: italic; }
+        .rincwc-sortable th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+        .rincwc-sortable th.sortable::after { content: ' ↕'; opacity: 0.4; font-size: 11px; }
+        .rincwc-sortable th.sort-asc::after { content: ' ↑'; opacity: 1; }
+        .rincwc-sortable th.sort-desc::after { content: ' ↓'; opacity: 1; }
+        #rincwc-summary-table .rincwc-actions { white-space: nowrap; }
         </style>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+
+            // --- Scan gallery dropdown search ---
+            var galSearch = document.getElementById('rincwc-gallery-search');
+            var galSelect = document.getElementById('rincwc-gallery-select');
+            if (galSearch && galSelect) {
+                var allOptions = Array.from(galSelect.options).map(function(o) {
+                    return { value: o.value, text: o.text };
+                });
+                galSearch.addEventListener('input', function() {
+                    var q = galSearch.value.toLowerCase();
+                    var cur = galSelect.value;
+                    while (galSelect.options.length) galSelect.remove(0);
+                    allOptions.forEach(function(o) {
+                        if (!q || !o.value || o.text.toLowerCase().indexOf(q) !== -1) {
+                            var opt = document.createElement('option');
+                            opt.value = o.value;
+                            opt.text = o.text;
+                            if (o.value === cur) opt.selected = true;
+                            galSelect.add(opt);
+                        }
+                    });
+                });
+            }
+
+            // --- Summary table search ---
+            var sumSearch = document.getElementById('rincwc-summary-search');
+            var tbl = document.getElementById('rincwc-summary-table');
+            if (sumSearch && tbl) {
+                sumSearch.addEventListener('input', function() {
+                    var q = sumSearch.value.toLowerCase();
+                    Array.from(tbl.tBodies[0].rows).forEach(function(row) {
+                        row.style.display = (!q || row.dataset.title.indexOf(q) !== -1) ? '' : 'none';
+                    });
+                });
+            }
+
+            // --- Summary table column sort ---
+            if (tbl) {
+                var sortCol = -1, sortDir = 1;
+                tbl.querySelectorAll('th.sortable').forEach(function(th) {
+                    th.addEventListener('click', function() {
+                        var col = parseInt(th.dataset.col, 10);
+                        var isNum = th.classList.contains('num');
+                        if (sortCol === col) { sortDir *= -1; } else { sortCol = col; sortDir = 1; }
+                        tbl.querySelectorAll('th.sortable').forEach(function(h) {
+                            h.classList.remove('sort-asc', 'sort-desc');
+                        });
+                        th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+                        var tbody = tbl.tBodies[0];
+                        var rows = Array.from(tbody.rows);
+                        rows.sort(function(a, b) {
+                            var av = a.cells[col] ? a.cells[col].textContent.trim() : '';
+                            var bv = b.cells[col] ? b.cells[col].textContent.trim() : '';
+                            if (isNum) {
+                                av = parseFloat(av) || 0;
+                                bv = parseFloat(bv) || 0;
+                                return (av - bv) * sortDir;
+                            }
+                            return av.localeCompare(bv) * sortDir;
+                        });
+                        rows.forEach(function(r) { tbody.appendChild(r); });
+                    });
+                });
+            }
+        });
+        </script>
         <?php
     }
 }
