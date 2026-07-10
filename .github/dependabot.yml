@@ -1,7 +1,9 @@
 version: 2
 updates:
-  - package-ecosystem: "pip"
-    directory: "/rincity-throwback-posts"
-    schedule:
-      interval: "weekly"
-    auto-merge: enable
+- package-ecosystem: pip
+  directory: /rincity-throwback-posts
+  schedule:
+    interval: weekly
+  auto-merge: enable
+  reviewers:
+  - jasmeralia
