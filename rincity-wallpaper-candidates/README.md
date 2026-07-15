@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.10.0
+**Version:** 3.11.0
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -70,7 +70,10 @@ galleries.
     (`#rincwc-gallery-{id}`) that auto-expand that gallery and collapse the rest.
 - **Watermarks** — upload/register watermark PNGs (or PSD/PSB, auto-flattened to a PNG
   via Imagick with the original discarded), set the default watermark, delete unused
-  files, and set per-gallery overrides (with its own search-as-you-type filter).
+  files, and set per-gallery overrides (with its own search-as-you-type filter). The
+  same page exports all portable review state as JSON and imports it through a dry-run
+  diff, opt-in conflict resolution, best-effort DB apply, and client-driven crop /
+  watermark regeneration with restored approval provenance.
 - **Settings** — configure the 4K/1440p/1080p target Envira galleries, the test-approve
   toggle, and per-gallery scanner cutoffs (only galleries with at least one scanned
   candidate row are listed), with a search-as-you-type filter over the cutoffs table
@@ -80,8 +83,25 @@ galleries.
 ## Storage
 
 Version 3 stores state in `wp_rincwc_*` tables (images, selections, watermarks,
-gallery_wm, comments). The v2 CSV migration has been removed; a JSON export/import
-is planned separately.
+gallery_wm, comments). The v2 CSV migration has been removed. JSON export/import uses
+`gallery_id` + `attach_id` for images, PNG SHA-256 (with name fallback) for watermarks,
+and image + author login + creation time for comments. Exported JSON embeds watermark
+PNGs but references source gallery images; generated crop/watermark JPEGs are rebuilt
+through the existing per-image REST pipeline after import.
+
+## REST API
+
+All routes use the `rincity/v1` namespace and require an authenticated administrator.
+Review routes include `POST /wpc/select`, `/wpc/deselect`, `/wpc/approve`,
+`/wpc/unapprove`, `/wpc/watermark`, `/wpc/crop-custom`, `/wpc/crop-offset`,
+`/wpc/generate-crops`, `/wpc/apply-watermarks`, `/wpc/sync-galleries`, and
+`/wpc/set-gallery-cutoff`; queue discovery uses `GET /wpc/pending-crops` and
+`GET /wpc/pending-watermarks`. Comments use `GET`/`POST /wpc/comments` and
+`PUT`/`DELETE /wpc/comments/{id}`. Watermark records use `GET`/`POST
+`/wpc/watermarks`, `DELETE /wpc/watermarks/{id}`, and `POST /wpc/gallery-wm`.
+Portable state uses `GET /wpc/export`, `POST /wpc/import/dry-run`, and `POST
+/wpc/import/apply`. The apply response supplies per-image regeneration work; the admin
+client drives `generate-crops`, `apply-watermarks`, and `approve` sequentially.
 
 ## Deploy
 
@@ -91,6 +111,7 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.11.0** — Added complete admin-only JSON export/import for review-state images, selections, approval provenance, comments, cutoffs, per-gallery watermark overrides, and embedded watermark PNGs: imports now preview a per-row/per-field diff with ID-mismatch protection and comment provenance/conflict choices, apply database changes best-effort without a transaction, fall back missing users to the importing admin with summary notes, then regenerate crops/watermarks and restore approvals one image at a time through the existing REST endpoints.
 - **3.10.0** — Renamed the "N sets passed initial inspection" set-count segment to
   "N sets initially inspected" — the old wording read as a near-duplicate of the
   **Initial inspection** filter button, when the two are actually opposite ends of the

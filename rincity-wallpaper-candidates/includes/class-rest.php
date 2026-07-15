@@ -47,6 +47,9 @@ final class RinCWC_Rest {
         ] );
         register_rest_route( self::NS, '/wpc/gallery-wm', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'gallery_wm' ], 'permission_callback' => $admin ] );
         register_rest_route( self::NS, '/wpc/set-gallery-cutoff', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'set_gallery_cutoff' ], 'permission_callback' => $admin ] );
+        register_rest_route( self::NS, '/wpc/export', [ 'methods' => 'GET', 'callback' => [ __CLASS__, 'export_json' ], 'permission_callback' => $admin ] );
+        register_rest_route( self::NS, '/wpc/import/dry-run', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'import_dry_run' ], 'permission_callback' => $admin ] );
+        register_rest_route( self::NS, '/wpc/import/apply', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'import_apply' ], 'permission_callback' => $admin ] );
     }
 
     public static function is_admin(): bool {
@@ -114,12 +117,30 @@ final class RinCWC_Rest {
     }
 
     public static function approve( WP_REST_Request $req ): WP_REST_Response {
-        if ( ! RinCWC_Data::approve_allowed() ) {
+        $has_approved_by = $req->get_param( 'approved_by' ) !== null;
+        $has_approved_at = $req->get_param( 'approved_at' ) !== null;
+        if ( $has_approved_by !== $has_approved_at ) {
+            return new WP_REST_Response( [ 'error' => 'approved_by and approved_at must be supplied together' ], 400 );
+        }
+        $has_override = $has_approved_by && $has_approved_at;
+        if ( ! $has_override && ! RinCWC_Data::approve_allowed() ) {
             return new WP_REST_Response( [ 'error' => 'Not allowed' ], 403 );
         }
+        $approved_by = $has_override ? (int) $req->get_param( 'approved_by' ) : 0;
+        $approved_at = $has_override ? sanitize_text_field( (string) $req->get_param( 'approved_at' ) ) : null;
+        if ( $has_override && ( ! get_userdata( $approved_by ) || ! self::valid_mysql_datetime( $approved_at ) ) ) {
+            return new WP_REST_Response( [ 'error' => 'Invalid approval provenance' ], 400 );
+        }
         $image = self::image_from_request( $req );
+        if ( $has_override ) {
+            $image_id = (int) ( $image['id'] ?? 0 );
+            $token    = sanitize_text_field( (string) ( $req->get_param( 'import_token' ) ?? '' ) );
+            if ( ! $image_id || ! RinCWC_Export_Import::verify_approval_token( $token, $image_id, $approved_by, $approved_at ) ) {
+                return new WP_REST_Response( [ 'error' => 'Invalid import approval token' ], 403 );
+            }
+        }
         if ( $image ) {
-            $ok = RinCWC_Data::approve( (int) $image['gallery_id'], (int) $image['attach_id'] );
+            $ok = RinCWC_Data::approve( (int) $image['gallery_id'], (int) $image['attach_id'], $approved_by, $approved_at );
             return new WP_REST_Response( [ 'ok' => $ok, 'status' => $ok ? RinCWC_Data::STATUS_APPROVED : null ], $ok ? 200 : 400 );
         }
         $gid = (int) ( $req->get_param( 'gallery_id' ) ?? 0 );
@@ -127,8 +148,44 @@ final class RinCWC_Rest {
         if ( ! $gid || ! $aid ) {
             return new WP_REST_Response( [ 'error' => 'Missing fields' ], 400 );
         }
-        $ok = RinCWC_Data::approve( $gid, $aid );
+        $ok = RinCWC_Data::approve( $gid, $aid, $approved_by, $approved_at );
         return new WP_REST_Response( [ 'ok' => $ok, 'status' => $ok ? RinCWC_Data::STATUS_APPROVED : null ], $ok ? 200 : 400 );
+    }
+
+    public static function export_json( WP_REST_Request $req ): WP_REST_Response {
+        try {
+            $document = RinCWC_Export_Import::build_export();
+        } catch ( RuntimeException $e ) {
+            return new WP_REST_Response( [ 'error' => $e->getMessage() ], 500 );
+        }
+        $response = new WP_REST_Response( $document, 200 );
+        $response->header( 'Content-Type', 'application/json; charset=' . get_option( 'blog_charset' ) );
+        $response->header( 'Content-Disposition', 'attachment; filename="rincwc-export-' . gmdate( 'Y-m-d-His' ) . '.json"' );
+        $response->header( 'X-Content-Type-Options', 'nosniff' );
+        return $response;
+    }
+
+    public static function import_dry_run( WP_REST_Request $req ): WP_REST_Response {
+        $document = self::import_document_from_request( $req );
+        if ( is_wp_error( $document ) ) {
+            return new WP_REST_Response( [ 'error' => $document->get_error_message() ], 400 );
+        }
+        return new WP_REST_Response( RinCWC_Export_Import::dry_run( $document ), 200 );
+    }
+
+    public static function import_apply( WP_REST_Request $req ): WP_REST_Response {
+        $document = self::import_document_from_request( $req );
+        if ( is_wp_error( $document ) ) {
+            return new WP_REST_Response( [ 'error' => $document->get_error_message() ], 400 );
+        }
+        $overwrite_keys = $req->get_param( 'overwrite_image_keys' );
+        $comment_choices = $req->get_param( 'comment_choices' );
+        $result = RinCWC_Export_Import::apply( $document, [
+            'force'                => ! empty( $req->get_param( 'force' ) ),
+            'overwrite_image_keys' => is_array( $overwrite_keys ) ? array_map( 'sanitize_text_field', $overwrite_keys ) : [],
+            'comment_choices'      => is_array( $comment_choices ) ? array_map( 'sanitize_key', $comment_choices ) : [],
+        ] );
+        return new WP_REST_Response( $result, 200 );
     }
 
     public static function unapprove( WP_REST_Request $req ): WP_REST_Response {
@@ -430,5 +487,22 @@ final class RinCWC_Rest {
             return null;
         }
         return RinCWC_Data::get_image( $image_id );
+    }
+
+    private static function import_document_from_request( WP_REST_Request $req ) {
+        $params  = $req->get_json_params();
+        $payload = is_array( $params ) && array_key_exists( 'payload', $params ) ? $params['payload'] : $params;
+        if ( is_string( $payload ) ) {
+            $payload = json_decode( $payload, true );
+            if ( json_last_error() !== JSON_ERROR_NONE ) {
+                return new WP_Error( 'rincwc_import_json', 'Invalid JSON: ' . json_last_error_msg() );
+            }
+        }
+        return RinCWC_Export_Import::validate_document( $payload );
+    }
+
+    private static function valid_mysql_datetime( string $value ): bool {
+        $date = DateTime::createFromFormat( '!Y-m-d H:i:s', $value );
+        return $date && $date->format( 'Y-m-d H:i:s' ) === $value;
     }
 }
