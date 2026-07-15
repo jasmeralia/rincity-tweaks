@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.11.1
+**Version:** 3.11.2
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -70,10 +70,11 @@ galleries.
     (`#rincwc-gallery-{id}`) that auto-expand that gallery and collapse the rest.
 - **Watermarks** — upload/register watermark PNGs (or PSD/PSB, auto-flattened to a PNG
   via Imagick with the original discarded), set the default watermark, delete unused
-  files, and set per-gallery overrides (with its own search-as-you-type filter). The
-  same page exports all portable review state as JSON and imports it through a dry-run
-  diff, opt-in conflict resolution, best-effort DB apply, and client-driven crop /
-  watermark regeneration with restored approval provenance.
+  files, and set per-gallery overrides (with its own search-as-you-type filter).
+- **Export/Import** — its own admin page that exports all portable review state as
+  JSON and imports it through a dry-run diff, opt-in conflict resolution, best-effort
+  DB apply, and client-driven crop/watermark regeneration with restored approval
+  provenance.
 - **Settings** — configure the 4K/1440p/1080p target Envira galleries, the test-approve
   toggle, and per-gallery scanner cutoffs (only galleries with at least one scanned
   candidate row are listed), with a search-as-you-type filter over the cutoffs table
@@ -111,6 +112,9 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.11.2** — Moved the export/import UI off the Watermarks page onto its own
+  dedicated "Export/Import" admin page (`RinCWC_Export_Import_Page`); no behavior
+  change, just a clearer home for a feature that isn't watermark-specific.
 - **3.11.1** — Scoped import regeneration to selections whose own effective watermark actually changes, preserving explicit per-selection watermark pins and unaffected gallery overrides; dry-run watermark rows now warn when an imported PNG matched locally by name but has different content.
 - **3.11.0** — Added complete admin-only JSON export/import for review-state images, selections, approval provenance, comments, cutoffs, per-gallery watermark overrides, and embedded watermark PNGs: imports now preview a per-row/per-field diff with ID-mismatch protection and comment provenance/conflict choices, apply database changes best-effort without a transaction, fall back missing users to the importing admin with summary notes, then regenerate crops/watermarks and restore approvals one image at a time through the existing REST endpoints.
 - **3.10.0** — Renamed the "N sets passed initial inspection" set-count segment to
