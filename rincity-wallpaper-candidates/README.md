@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.11.2
+**Version:** 3.11.3
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -19,6 +19,10 @@ galleries.
   already-processed crop output, never source photos. A Database Summary table below
   lists every scanned gallery with Images/Excluded/Selected/Approved/Candidates counts,
   sortable columns, a search-as-you-type filter, and Review/Rescan action links per row.
+  A **Scan All Galleries** button scans and commits every target gallery in one go —
+  one REST call per gallery from the client, with live progress, so a server with
+  hundreds of galleries (e.g. a fresh install with no scan history) can't hit PHP's
+  `max_execution_time` in a single request; the page reloads once every gallery's done.
 - **Review** — the main workflow page. Galleries are grouped into cards, newest first,
   each showing any `envira-category` tags starting with `Model:` or `Dustrat` next to
   the title/publish date. Toolbar is two rows: filters + search on the first, batch
@@ -112,6 +116,14 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.11.3** — Added a "Scan All Galleries" button to the Wallpaper admin page. New
+  `POST /wpc/scan-gallery` REST endpoint scans and commits a single gallery (mirroring
+  the existing `generate-crops`/`apply-watermarks` per-item pattern); the client loops
+  over every target gallery, one REST call each, with a live progress bar, and reloads
+  the page once done. Previously `RinCity_Wallpaper_Scanner::scan_all()` existed but
+  had no UI or REST entry point — only reachable via `wp eval`. Added to unblock the
+  JSON import feature on any server that's never had the scanner run before (e.g.
+  gelfling, which currently has zero rows in `wp_rincwc_images`).
 - **3.11.2** — Moved the export/import UI off the Watermarks page onto its own
   dedicated "Export/Import" admin page (`RinCWC_Export_Import_Page`); no behavior
   change, just a clearer home for a feature that isn't watermark-specific.

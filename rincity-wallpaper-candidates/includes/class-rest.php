@@ -50,6 +50,7 @@ final class RinCWC_Rest {
         register_rest_route( self::NS, '/wpc/export', [ 'methods' => 'GET', 'callback' => [ __CLASS__, 'export_json' ], 'permission_callback' => $admin ] );
         register_rest_route( self::NS, '/wpc/import/dry-run', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'import_dry_run' ], 'permission_callback' => $admin ] );
         register_rest_route( self::NS, '/wpc/import/apply', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'import_apply' ], 'permission_callback' => $admin ] );
+        register_rest_route( self::NS, '/wpc/scan-gallery', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'scan_gallery' ], 'permission_callback' => $admin ] );
     }
 
     public static function is_admin(): bool {
@@ -479,6 +480,19 @@ final class RinCWC_Rest {
         $position = (int) $req->get_param( 'position' );
         RinCWC_Data::set_gallery_cutoff( $gallery_id, $position );
         return new WP_REST_Response( [ 'ok' => true, 'gallery_id' => $gallery_id, 'position' => $position ], 200 );
+    }
+
+    // Processes one gallery per request, mirroring generate_crops()/apply_watermarks() —
+    // the client drives "Scan All Galleries" as a loop over this endpoint so a large
+    // gallery count never risks hitting PHP's max_execution_time in one request.
+    public static function scan_gallery( WP_REST_Request $req ): WP_REST_Response {
+        $gallery_id = (int) ( $req->get_param( 'gallery_id' ) ?? 0 );
+        if ( ! $gallery_id ) {
+            return new WP_REST_Response( [ 'error' => 'gallery_id required' ], 400 );
+        }
+        $commit = $req->get_param( 'commit' ) === null ? true : ! empty( $req->get_param( 'commit' ) );
+        $result = RinCity_Wallpaper_Scanner::scan_gallery( $gallery_id, $commit );
+        return new WP_REST_Response( $result, ! empty( $result['ok'] ) ? 200 : 400 );
     }
 
     private static function image_from_request( WP_REST_Request $req ): ?array {
