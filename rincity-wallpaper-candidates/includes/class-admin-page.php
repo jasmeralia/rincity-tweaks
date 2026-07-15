@@ -66,6 +66,8 @@ final class RinCity_Wallpaper_Admin_Page {
         echo '</form>';
         echo '</div>';
 
+        self::render_scan_all( $galleries );
+
         if ( $preview ) {
             self::render_preview( $preview );
         }
@@ -73,6 +75,77 @@ final class RinCity_Wallpaper_Admin_Page {
         self::render_summary( $summary );
 
         echo '</div>';
+    }
+
+    /**
+     * Scans every target gallery client-side, one REST call per gallery, so a
+     * server with hundreds of galleries (e.g. a fresh install with no scan
+     * history yet) can't hit PHP's max_execution_time in one request.
+     */
+    private static function render_scan_all( array $galleries ): void {
+        $ids = wp_json_encode( array_values( array_map( static fn( $g ) => (int) $g->ID, $galleries ) ) );
+
+        echo '<div class="rincwc-admin-panel">';
+        echo '<h2>Scan All Galleries</h2>';
+        echo '<p>Scans every target gallery (<strong>' . count( $galleries ) . '</strong> total) and commits new/updated candidates to the database — useful the first time this plugin runs on a server, or to pick up galleries added since the last scan.</p>';
+        echo '<button type="button" id="rincwc-scan-all" class="button button-secondary">Scan All Galleries</button>';
+        echo '<div id="rincwc-scan-all-progress" hidden><div class="rincwc-scan-all-progress-track"><span></span></div><p id="rincwc-scan-all-status"></p></div>';
+        echo '</div>';
+        ?>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var button   = document.getElementById('rincwc-scan-all');
+            var progress = document.getElementById('rincwc-scan-all-progress');
+            var status   = document.getElementById('rincwc-scan-all-status');
+            var track    = progress ? progress.querySelector('span') : null;
+            var galleryIds = <?php echo $ids; ?>;
+            var nonce = '<?php echo esc_js( wp_create_nonce( 'wp_rest' ) ); ?>';
+            var restUrl = '<?php echo esc_url_raw( rest_url( 'rincity/v1/wpc/scan-gallery' ) ); ?>';
+
+            if (!button) return;
+
+            button.addEventListener('click', function() {
+                button.disabled = true;
+                progress.hidden = false;
+                var totals = { new: 0, updated: 0, candidates: 0, errors: 0 };
+
+                function scanNext(index) {
+                    if (index >= galleryIds.length) {
+                        status.textContent = 'Done: ' + totals.new + ' new, ' + totals.updated +
+                            ' updated, ' + totals.candidates + ' candidates across ' + galleryIds.length +
+                            ' galleries' + (totals.errors ? ' (' + totals.errors + ' errors)' : '') +
+                            '. Reloading…';
+                        window.location.reload();
+                        return;
+                    }
+                    track.style.width = (index / galleryIds.length * 100) + '%';
+                    status.textContent = 'Scanning gallery ' + (index + 1) + '/' + galleryIds.length + '…';
+
+                    fetch(restUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': nonce },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ gallery_id: galleryIds[index], commit: true })
+                    }).then(function(response) { return response.json(); }).then(function(result) {
+                        if (result && result.ok && result.counts) {
+                            totals.new += result.counts.new || 0;
+                            totals.updated += result.counts.updated || 0;
+                            totals.candidates += result.counts.candidates || 0;
+                        } else {
+                            totals.errors++;
+                        }
+                        scanNext(index + 1);
+                    }).catch(function() {
+                        totals.errors++;
+                        scanNext(index + 1);
+                    });
+                }
+
+                scanNext(0);
+            });
+        });
+        </script>
+        <?php
     }
 
     private static function render_summary( array $summary ): void {
@@ -215,6 +288,8 @@ final class RinCity_Wallpaper_Admin_Page {
         .rincwc-sortable th.sort-asc::after { content: ' ↑'; opacity: 1; }
         .rincwc-sortable th.sort-desc::after { content: ' ↓'; opacity: 1; }
         #rincwc-summary-table .rincwc-actions { white-space: nowrap; }
+        .rincwc-scan-all-progress-track { height: 14px; max-width: 700px; background: #dcdcde; border-radius: 3px; overflow: hidden; margin-top: 8px; }
+        .rincwc-scan-all-progress-track span { display: block; width: 0; height: 100%; background: #2271b1; transition: width .15s; }
         </style>
         <script>
         document.addEventListener('DOMContentLoaded', function() {
