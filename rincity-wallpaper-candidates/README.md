@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.11.3
+**Version:** 3.11.4
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -116,6 +116,9 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.11.4** — Import's regeneration progress label now reads "Gallery Title #position"
+  instead of the raw `gallery_id:attach_id` pair, matching the same naming convention
+  `RinCWC_Gallery_Sync` already uses — nobody recognizes numeric IDs offhand.
 - **3.11.3** — Added a "Scan All Galleries" button to the Wallpaper admin page. New
   `POST /wpc/scan-gallery` REST endpoint scans and commits a single gallery (mirroring
   the existing `generate-crops`/`apply-watermarks` per-item pattern); the client loops

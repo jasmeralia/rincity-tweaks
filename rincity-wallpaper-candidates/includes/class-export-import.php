@@ -558,6 +558,8 @@ final class RinCWC_Export_Import {
                     'image_id'        => $image_id,
                     'gallery_id'      => $gallery_id,
                     'attach_id'       => $attach_id,
+                    'gallery_title'   => (string) $local['gallery_title'],
+                    'position'        => (int) $local['position'],
                     'needs_watermark' => ! empty( $source['selection']['wm_corner'] ),
                     'needs_reapprove' => $source['status'] === RinCWC_Data::STATUS_APPROVED,
                 ];

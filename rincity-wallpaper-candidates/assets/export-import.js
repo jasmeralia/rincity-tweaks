@@ -259,7 +259,7 @@
         let completed = 0;
         for ( let index = 0; index < jobs.length; index++ ) {
             const job = jobs[ index ];
-            const label = `${job.gallery_id}:${job.attach_id}`;
+            const label = job.gallery_title ? `${job.gallery_title} #${job.position}` : `${job.gallery_id}:${job.attach_id}`;
             updateProgress( index, jobs.length, `Generating crop ${index + 1}/${jobs.length} (${label})...` );
             try {
                 const crop = await api( 'generate-crops', 'POST', { image_id: job.image_id } );
