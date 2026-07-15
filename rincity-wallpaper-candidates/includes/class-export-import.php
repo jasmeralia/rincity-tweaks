@@ -911,17 +911,25 @@ final class RinCWC_Export_Import {
         return $counts;
     }
 
+    /**
+     * A local watermark whose file the current process can't actually read (e.g. a
+     * path outside WordPress's own tree with permissions that don't line up on this
+     * server) can't be reused for compositing no matter what its DB row says — skip
+     * indexing it entirely so find_local_watermark() treats it as no match, and the
+     * import recreates it fresh under RINCWC_WATERMARKS_DIR from the embedded bytes.
+     */
     private static function local_watermark_index(): array {
         $index = [ 'by_hash' => [], 'by_name' => [], 'hash_by_id' => [] ];
         foreach ( RinCWC_Data::get_watermarks() as $watermark ) {
-            $id   = (int) $watermark['id'];
             $path = (string) $watermark['file_path'];
             $hash = is_readable( $path ) ? hash_file( 'sha256', $path ) : false;
-            $indexed = $watermark + [ 'local_sha256' => $hash ?: null ];
-            if ( $hash ) {
-                $index['by_hash'][ $hash ] = $indexed;
-                $index['hash_by_id'][ $id ] = $hash;
+            if ( ! $hash ) {
+                continue;
             }
+            $id      = (int) $watermark['id'];
+            $indexed = $watermark + [ 'local_sha256' => $hash ];
+            $index['by_hash'][ $hash ] = $indexed;
+            $index['hash_by_id'][ $id ] = $hash;
             $index['by_name'][ strtolower( (string) $watermark['name'] ) ] = $indexed;
         }
         return $index;

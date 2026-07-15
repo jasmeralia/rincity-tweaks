@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.11.4
+**Version:** 3.11.5
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -116,6 +116,18 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.11.5** — Fixed a real bug found deploying to gelfling: the seeded default
+  watermark's `file_path` is `RINCWC_WM_FILE` (`~/rincity-infra/images/RC_WM_Plain.png`,
+  outside WordPress's own tree), and on gelfling the web server user can't traverse
+  into that home directory at all — so every watermark composite silently failed,
+  leaving imported selections stuck at `wm_applied=0` forever. `find_local_watermark()`
+  had matched the imported default watermark *by name* against that broken local row
+  without ever checking the file was actually readable, short-circuiting past the
+  import's own "write a fresh copy under `RINCWC_WATERMARKS_DIR`" path — the one that
+  already runs correctly for any watermark it judges genuinely new.
+  `local_watermark_index()` now skips indexing any local watermark whose file isn't
+  readable, so it's treated as no match at all and gets properly recreated from the
+  imported bytes instead of reusing a file that was never usable.
 - **3.11.4** — Import's regeneration progress label now reads "Gallery Title #position"
   instead of the raw `gallery_id:attach_id` pair, matching the same naming convention
   `RinCWC_Gallery_Sync` already uses — nobody recognizes numeric IDs offhand.
