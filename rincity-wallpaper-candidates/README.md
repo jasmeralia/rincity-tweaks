@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.11.0
+**Version:** 3.11.1
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -111,6 +111,7 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.11.1** — Scoped import regeneration to selections whose own effective watermark actually changes, preserving explicit per-selection watermark pins and unaffected gallery overrides; dry-run watermark rows now warn when an imported PNG matched locally by name but has different content.
 - **3.11.0** — Added complete admin-only JSON export/import for review-state images, selections, approval provenance, comments, cutoffs, per-gallery watermark overrides, and embedded watermark PNGs: imports now preview a per-row/per-field diff with ID-mismatch protection and comment provenance/conflict choices, apply database changes best-effort without a transaction, fall back missing users to the importing admin with summary notes, then regenerate crops/watermarks and restore approvals one image at a time through the existing REST endpoints.
 - **3.10.0** — Renamed the "N sets passed initial inspection" set-count segment to
   "N sets initially inspected" — the old wording read as a near-duplicate of the

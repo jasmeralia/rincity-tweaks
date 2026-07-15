@@ -158,13 +158,25 @@
 
     function renderWatermarkDiff( report ) {
         report.appendChild( element( 'h3', 'Watermarks' ) );
-        const watermarkTable = table( [ 'Name', 'Default', 'Result', 'Matched by' ] );
+        const watermarkTable = table( [ 'Name', 'Default', 'Result', 'Matched by', 'Content' ] );
         diff.watermarks.forEach( watermark => {
             const row = element( 'tr' );
             appendCell( row, watermark.name );
             appendCell( row, watermark.is_default ? 'yes' : 'no' );
             appendCell( row, watermark.result );
             appendCell( row, watermark.matched_by || '—' );
+            let content = '—';
+            let contentClass = '';
+            if ( watermark.content_differs ) {
+                content = 'Warning: name matches, but PNG content differs from the import.';
+                contentClass = 'rincwc-import-fallbacks';
+            } else if ( watermark.matched_by === 'sha256' ) {
+                content = 'Same SHA-256';
+            } else if ( watermark.matched_by === 'name' ) {
+                content = 'Name-only match; local content could not be verified';
+                contentClass = 'rincwc-import-fallbacks';
+            }
+            appendCell( row, content, contentClass );
             watermarkTable.tBodies[ 0 ].appendChild( row );
         } );
         report.appendChild( watermarkTable );

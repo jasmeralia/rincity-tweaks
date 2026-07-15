@@ -680,7 +680,8 @@ final class RinCWC_Data {
         return $row ?: null;
     }
 
-    public static function set_default_watermark( int $id ): bool {
+    /** $mark_pending=false lets import invalidate only selections whose resolution moved. */
+    public static function set_default_watermark( int $id, bool $mark_pending = true ): bool {
         global $wpdb;
         $wm = self::get_watermark( $id );
         if ( ! $wm ) {
@@ -688,7 +689,7 @@ final class RinCWC_Data {
         }
         $wpdb->update( RinCWC_DB::watermarks_table(), [ 'is_default' => 0 ], [ 'is_default' => 1 ] );
         $ok = $wpdb->update( RinCWC_DB::watermarks_table(), [ 'is_default' => 1 ], [ 'id' => $id ] ) !== false;
-        if ( $ok ) {
+        if ( $ok && $mark_pending ) {
             self::mark_all_watermarks_pending();
         }
         return $ok;
@@ -714,14 +715,15 @@ final class RinCWC_Data {
         return ( $sel + $gal ) > 0;
     }
 
-    public static function set_gallery_watermark( int $gallery_id, int $wm_file_id ): bool {
+    /** $mark_pending=false lets import invalidate only selections whose resolution moved. */
+    public static function set_gallery_watermark( int $gallery_id, int $wm_file_id, bool $mark_pending = true ): bool {
         global $wpdb;
         if ( ! $gallery_id ) {
             return false;
         }
         if ( ! $wm_file_id ) {
             $ok = $wpdb->delete( RinCWC_DB::gallery_wm_table(), [ 'gallery_id' => $gallery_id ] ) !== false;
-            if ( $ok ) {
+            if ( $ok && $mark_pending ) {
                 self::mark_gallery_watermarks_pending( $gallery_id );
             }
             return $ok;
@@ -733,7 +735,7 @@ final class RinCWC_Data {
             'gallery_id' => $gallery_id,
             'wm_file_id' => $wm_file_id,
         ] ) !== false;
-        if ( $ok ) {
+        if ( $ok && $mark_pending ) {
             self::mark_gallery_watermarks_pending( $gallery_id );
         }
         return $ok;

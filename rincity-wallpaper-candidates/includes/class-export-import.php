@@ -389,11 +389,13 @@ final class RinCWC_Export_Import {
         foreach ( $document['watermarks'] as $watermark ) {
             $match = self::find_local_watermark( $watermark, $watermark_index );
             $watermark_results[] = [
-                'name'       => $watermark['name'],
-                'sha256'     => $watermark['sha256'],
-                'is_default' => $watermark['is_default'],
-                'result'     => $match ? 'existing' : 'new',
-                'matched_by' => $match['matched_by'] ?? null,
+                'name'            => $watermark['name'],
+                'sha256'          => $watermark['sha256'],
+                'is_default'      => $watermark['is_default'],
+                'result'          => $match ? 'existing' : 'new',
+                'matched_by'      => $match['matched_by'] ?? null,
+                'content_differs' => ! empty( $match['content_differs'] ),
+                'local_sha256'    => $match['local_sha256'] ?? null,
             ];
         }
 
@@ -421,6 +423,7 @@ final class RinCWC_Export_Import {
         $overwrite_keys = array_fill_keys( array_map( 'strval', (array) ( $options['overwrite_image_keys'] ?? [] ) ), true );
         $comment_choices = is_array( $options['comment_choices'] ?? null ) ? $options['comment_choices'] : [];
         $before_diff    = self::dry_run( $document );
+        $watermark_ids_before = self::resolved_watermark_ids_for_document( $document );
         $summary        = [
             'watermarks_created' => 0,
             'watermarks_reused'  => 0,
@@ -437,8 +440,6 @@ final class RinCWC_Export_Import {
 
         $watermarks = self::apply_watermarks_from_document( $document, $summary );
         $hash_to_id = $watermarks['hash_to_id'];
-        $context_all_changed = $watermarks['default_changed'];
-        $changed_galleries   = [];
 
         $gallery_meta = self::gallery_metadata_index();
         foreach ( $document['gallery_watermark_overrides'] as $override ) {
@@ -459,11 +460,8 @@ final class RinCWC_Export_Import {
             if ( ! $changed ) {
                 continue;
             }
-            if ( RinCWC_Data::set_gallery_watermark( $gallery_id, $watermark_id ) ) {
+            if ( RinCWC_Data::set_gallery_watermark( $gallery_id, $watermark_id, false ) ) {
                 $summary['overrides_applied']++;
-                if ( $changed ) {
-                    $changed_galleries[ $gallery_id ] = true;
-                }
             } else {
                 $summary['errors'][] = "Could not apply watermark override for gallery {$gallery_id}.";
             }
@@ -492,16 +490,16 @@ final class RinCWC_Export_Import {
         }
         $regenerate      = [];
         $needs_reapprove = [];
+        $watermark_ids_after = self::resolved_watermark_ids_for_document( $document );
 
         foreach ( $document['images'] as $source ) {
             $gallery_id = (int) $source['gallery_id'];
             $attach_id  = (int) $source['attach_id'];
             $key        = "{$gallery_id}:{$attach_id}";
             $diff       = $diff_by_key[ $key ] ?? [ 'result' => 'unmatched' ];
-            $context_changed = $context_all_changed || isset( $changed_galleries[ $gallery_id ] );
             $should_apply = $diff['result'] === 'would_add'
                 || ( $diff['result'] === 'would_overwrite' && ( $force || isset( $overwrite_keys[ $key ] ) ) )
-                || ( $diff['result'] === 'unchanged' && $context_changed && in_array( $source['status'], [ RinCWC_Data::STATUS_SELECTED, RinCWC_Data::STATUS_APPROVED ], true ) );
+                || self::unchanged_image_needs_regeneration( $source, $diff, $watermark_ids_before, $watermark_ids_after, $key );
 
             if ( ! $should_apply ) {
                 $summary['images_skipped']++;
@@ -632,7 +630,6 @@ final class RinCWC_Export_Import {
         $index       = self::local_watermark_index();
         $hash_to_id  = [];
         $default_id  = 0;
-        $default_changed = false;
         wp_mkdir_p( RINCWC_WATERMARKS_DIR );
 
         foreach ( $document['watermarks'] as $watermark ) {
@@ -672,13 +669,51 @@ final class RinCWC_Export_Import {
 
         if ( $default_id ) {
             $current_default = RinCWC_Data::get_default_watermark();
-            $default_changed = (int) ( $current_default['id'] ?? 0 ) !== $default_id;
-            if ( $default_changed && ! RinCWC_Data::set_default_watermark( $default_id ) ) {
+            if ( (int) ( $current_default['id'] ?? 0 ) !== $default_id
+                && ! RinCWC_Data::set_default_watermark( $default_id, false ) ) {
                 $summary['errors'][] = 'Could not set the imported default watermark.';
-                $default_changed = false;
             }
         }
-        return [ 'hash_to_id' => $hash_to_id, 'default_changed' => $default_changed ];
+        return [ 'hash_to_id' => $hash_to_id ];
+    }
+
+    /**
+     * Snapshot each imported image's locally resolved watermark. A non-zero
+     * selection wm_file_id is an explicit pin; only an empty pin resolves through
+     * the gallery override/default hierarchy and can move when that context changes.
+     */
+    private static function resolved_watermark_ids_for_document( array $document ): array {
+        $resolved = [];
+        foreach ( $document['images'] as $source ) {
+            $gallery_id = (int) $source['gallery_id'];
+            $attach_id  = (int) $source['attach_id'];
+            $key        = "{$gallery_id}:{$attach_id}";
+            $local      = RinCWC_Data::get_image_by_gallery_attach( $gallery_id, $attach_id );
+            if ( ! $local || self::image_identity_mismatch( $source, $local ) ) {
+                continue;
+            }
+            $selection = RinCWC_Data::get_selection( (int) $local['id'] );
+            if ( ! $selection ) {
+                continue;
+            }
+            $watermark_id = (int) ( $selection['wm_file_id'] ?? 0 );
+            if ( ! $watermark_id ) {
+                $effective    = RinCWC_Data::get_effective_watermark( $gallery_id );
+                $watermark_id = (int) ( $effective['id'] ?? 0 );
+            }
+            $resolved[ $key ] = $watermark_id;
+        }
+        return $resolved;
+    }
+
+    /** True only when an otherwise-unchanged selection's own resolution moved. */
+    private static function unchanged_image_needs_regeneration( array $source, array $diff, array $before, array $after, string $key ): bool {
+        return $diff['result'] === 'unchanged'
+            && $source['selection'] !== null
+            && in_array( $source['status'], [ RinCWC_Data::STATUS_SELECTED, RinCWC_Data::STATUS_APPROVED ], true )
+            && array_key_exists( $key, $before )
+            && array_key_exists( $key, $after )
+            && $before[ $key ] !== $after[ $key ];
     }
 
     private static function analyze_comment( array $image, array $comment, string $source_hostname, array &$fallbacks ): array {
@@ -880,11 +915,12 @@ final class RinCWC_Export_Import {
             $id   = (int) $watermark['id'];
             $path = (string) $watermark['file_path'];
             $hash = is_readable( $path ) ? hash_file( 'sha256', $path ) : false;
+            $indexed = $watermark + [ 'local_sha256' => $hash ?: null ];
             if ( $hash ) {
-                $index['by_hash'][ $hash ] = $watermark;
+                $index['by_hash'][ $hash ] = $indexed;
                 $index['hash_by_id'][ $id ] = $hash;
             }
-            $index['by_name'][ strtolower( (string) $watermark['name'] ) ] = $watermark;
+            $index['by_name'][ strtolower( (string) $watermark['name'] ) ] = $indexed;
         }
         return $index;
     }
@@ -892,11 +928,19 @@ final class RinCWC_Export_Import {
     private static function find_local_watermark( array $watermark, array $index ): ?array {
         $hash = (string) ( $watermark['sha256'] ?? '' );
         if ( $hash && isset( $index['by_hash'][ $hash ] ) ) {
-            return $index['by_hash'][ $hash ] + [ 'matched_by' => 'sha256' ];
+            return $index['by_hash'][ $hash ] + [
+                'matched_by'      => 'sha256',
+                'content_differs' => false,
+            ];
         }
         $name = strtolower( (string) ( $watermark['name'] ?? '' ) );
         if ( $name && isset( $index['by_name'][ $name ] ) ) {
-            return $index['by_name'][ $name ] + [ 'matched_by' => 'name' ];
+            $match      = $index['by_name'][ $name ];
+            $local_hash = (string) ( $match['local_sha256'] ?? '' );
+            return $match + [
+                'matched_by'      => 'name',
+                'content_differs' => $hash !== '' && $local_hash !== '' && ! hash_equals( $hash, $local_hash ),
+            ];
         }
         return null;
     }
