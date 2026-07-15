@@ -5,3 +5,5 @@ updates:
   schedule:
     interval: weekly
   auto-merge: enable
+  reviewers:
+  - jasmeralia
