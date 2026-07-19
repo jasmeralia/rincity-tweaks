@@ -208,6 +208,48 @@ final class RinCWC_DB {
         return (int) $wpdb->insert_id;
     }
 
+    /** Find a comment by the stable import identity: image, author, creation time. */
+    public static function find_import_comment( string $image_key, int $user_id, string $created_at ): ?array {
+        global $wpdb;
+        $row = $wpdb->get_row(
+            $wpdb->prepare(
+                'SELECT * FROM ' . self::comments_table() . ' WHERE image_key = %s AND user_id = %d AND created_at = %s LIMIT 1',
+                $image_key,
+                $user_id,
+                $created_at
+            ),
+            ARRAY_A
+        );
+        return $row ?: null;
+    }
+
+    /** Insert a comment while preserving its exported timestamps and resolved author. */
+    public static function import_comment( string $image_key, int $user_id, string $body, string $created_at, string $updated_at ): int {
+        global $wpdb;
+        $ok = $wpdb->insert( self::comments_table(), [
+            'image_key'  => $image_key,
+            'user_id'    => $user_id,
+            'body'       => $body,
+            'created_at' => $created_at,
+            'updated_at' => $updated_at,
+        ] );
+        return $ok ? (int) $wpdb->insert_id : 0;
+    }
+
+    /** Replace an imported conflict without applying the ordinary ownership check. */
+    public static function import_update_comment( int $id, int $user_id, string $body, string $updated_at ): bool {
+        global $wpdb;
+        return $wpdb->update(
+            self::comments_table(),
+            [
+                'user_id'    => $user_id,
+                'body'       => $body,
+                'updated_at' => $updated_at,
+            ],
+            [ 'id' => $id ]
+        ) !== false;
+    }
+
     public static function update( int $id, int $user_id, string $body ): bool {
         global $wpdb;
         $row = $wpdb->get_row( $wpdb->prepare(

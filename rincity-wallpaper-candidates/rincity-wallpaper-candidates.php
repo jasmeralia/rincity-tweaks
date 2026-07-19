@@ -2,7 +2,7 @@
 /**
  * Plugin Name: RinCity Wallpaper Candidates
  * Description: Wallpaper candidate scanner and interactive review/selection tool.
- * Version:     3.10.0
+ * Version:     3.11.5
  * Author:      Morgan Blackthorne
  */
 
@@ -20,9 +20,11 @@ define( 'RINCWC_WM_FILE',   '/home/morgan/rincity-infra/images/RC_WM_Plain.png' 
 
 require_once RINCWC_PLUGIN_DIR . 'includes/class-data.php';
 require_once RINCWC_PLUGIN_DIR . 'includes/class-db.php';
+require_once RINCWC_PLUGIN_DIR . 'includes/class-export-import.php';
 require_once RINCWC_PLUGIN_DIR . 'includes/class-scanner.php';
 require_once RINCWC_PLUGIN_DIR . 'includes/class-rest.php';
 require_once RINCWC_PLUGIN_DIR . 'includes/class-watermarks.php';
+require_once RINCWC_PLUGIN_DIR . 'includes/class-export-import-page.php';
 require_once RINCWC_PLUGIN_DIR . 'includes/class-settings-page.php';
 require_once RINCWC_PLUGIN_DIR . 'includes/class-gallery-sync.php';
 require_once RINCWC_PLUGIN_DIR . 'includes/class-admin-page.php';
@@ -36,5 +38,6 @@ if ( is_admin() ) {
     RinCity_Wallpaper_Admin_Page::register();
     RinCWC_Review_Page::register();
     RinCWC_Watermarks::register();
+    RinCWC_Export_Import_Page::register();
     RinCWC_Settings_Page::register();
 }

@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.10.0
+**Version:** 3.11.5
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -19,6 +19,10 @@ galleries.
   already-processed crop output, never source photos. A Database Summary table below
   lists every scanned gallery with Images/Excluded/Selected/Approved/Candidates counts,
   sortable columns, a search-as-you-type filter, and Review/Rescan action links per row.
+  A **Scan All Galleries** button scans and commits every target gallery in one go —
+  one REST call per gallery from the client, with live progress, so a server with
+  hundreds of galleries (e.g. a fresh install with no scan history) can't hit PHP's
+  `max_execution_time` in a single request; the page reloads once every gallery's done.
 - **Review** — the main workflow page. Galleries are grouped into cards, newest first,
   each showing any `envira-category` tags starting with `Model:` or `Dustrat` next to
   the title/publish date. Toolbar is two rows: filters + search on the first, batch
@@ -71,6 +75,10 @@ galleries.
 - **Watermarks** — upload/register watermark PNGs (or PSD/PSB, auto-flattened to a PNG
   via Imagick with the original discarded), set the default watermark, delete unused
   files, and set per-gallery overrides (with its own search-as-you-type filter).
+- **Export/Import** — its own admin page that exports all portable review state as
+  JSON and imports it through a dry-run diff, opt-in conflict resolution, best-effort
+  DB apply, and client-driven crop/watermark regeneration with restored approval
+  provenance.
 - **Settings** — configure the 4K/1440p/1080p target Envira galleries, the test-approve
   toggle, and per-gallery scanner cutoffs (only galleries with at least one scanned
   candidate row are listed), with a search-as-you-type filter over the cutoffs table
@@ -80,8 +88,25 @@ galleries.
 ## Storage
 
 Version 3 stores state in `wp_rincwc_*` tables (images, selections, watermarks,
-gallery_wm, comments). The v2 CSV migration has been removed; a JSON export/import
-is planned separately.
+gallery_wm, comments). The v2 CSV migration has been removed. JSON export/import uses
+`gallery_id` + `attach_id` for images, PNG SHA-256 (with name fallback) for watermarks,
+and image + author login + creation time for comments. Exported JSON embeds watermark
+PNGs but references source gallery images; generated crop/watermark JPEGs are rebuilt
+through the existing per-image REST pipeline after import.
+
+## REST API
+
+All routes use the `rincity/v1` namespace and require an authenticated administrator.
+Review routes include `POST /wpc/select`, `/wpc/deselect`, `/wpc/approve`,
+`/wpc/unapprove`, `/wpc/watermark`, `/wpc/crop-custom`, `/wpc/crop-offset`,
+`/wpc/generate-crops`, `/wpc/apply-watermarks`, `/wpc/sync-galleries`, and
+`/wpc/set-gallery-cutoff`; queue discovery uses `GET /wpc/pending-crops` and
+`GET /wpc/pending-watermarks`. Comments use `GET`/`POST /wpc/comments` and
+`PUT`/`DELETE /wpc/comments/{id}`. Watermark records use `GET`/`POST
+`/wpc/watermarks`, `DELETE /wpc/watermarks/{id}`, and `POST /wpc/gallery-wm`.
+Portable state uses `GET /wpc/export`, `POST /wpc/import/dry-run`, and `POST
+/wpc/import/apply`. The apply response supplies per-image regeneration work; the admin
+client drives `generate-crops`, `apply-watermarks`, and `approve` sequentially.
 
 ## Deploy
 
@@ -91,6 +116,34 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.11.5** — Fixed a real bug found deploying to gelfling: the seeded default
+  watermark's `file_path` is `RINCWC_WM_FILE` (`~/rincity-infra/images/RC_WM_Plain.png`,
+  outside WordPress's own tree), and on gelfling the web server user can't traverse
+  into that home directory at all — so every watermark composite silently failed,
+  leaving imported selections stuck at `wm_applied=0` forever. `find_local_watermark()`
+  had matched the imported default watermark *by name* against that broken local row
+  without ever checking the file was actually readable, short-circuiting past the
+  import's own "write a fresh copy under `RINCWC_WATERMARKS_DIR`" path — the one that
+  already runs correctly for any watermark it judges genuinely new.
+  `local_watermark_index()` now skips indexing any local watermark whose file isn't
+  readable, so it's treated as no match at all and gets properly recreated from the
+  imported bytes instead of reusing a file that was never usable.
+- **3.11.4** — Import's regeneration progress label now reads "Gallery Title #position"
+  instead of the raw `gallery_id:attach_id` pair, matching the same naming convention
+  `RinCWC_Gallery_Sync` already uses — nobody recognizes numeric IDs offhand.
+- **3.11.3** — Added a "Scan All Galleries" button to the Wallpaper admin page. New
+  `POST /wpc/scan-gallery` REST endpoint scans and commits a single gallery (mirroring
+  the existing `generate-crops`/`apply-watermarks` per-item pattern); the client loops
+  over every target gallery, one REST call each, with a live progress bar, and reloads
+  the page once done. Previously `RinCity_Wallpaper_Scanner::scan_all()` existed but
+  had no UI or REST entry point — only reachable via `wp eval`. Added to unblock the
+  JSON import feature on any server that's never had the scanner run before (e.g.
+  gelfling, which currently has zero rows in `wp_rincwc_images`).
+- **3.11.2** — Moved the export/import UI off the Watermarks page onto its own
+  dedicated "Export/Import" admin page (`RinCWC_Export_Import_Page`); no behavior
+  change, just a clearer home for a feature that isn't watermark-specific.
+- **3.11.1** — Scoped import regeneration to selections whose own effective watermark actually changes, preserving explicit per-selection watermark pins and unaffected gallery overrides; dry-run watermark rows now warn when an imported PNG matched locally by name but has different content.
+- **3.11.0** — Added complete admin-only JSON export/import for review-state images, selections, approval provenance, comments, cutoffs, per-gallery watermark overrides, and embedded watermark PNGs: imports now preview a per-row/per-field diff with ID-mismatch protection and comment provenance/conflict choices, apply database changes best-effort without a transaction, fall back missing users to the importing admin with summary notes, then regenerate crops/watermarks and restore approvals one image at a time through the existing REST endpoints.
 - **3.10.0** — Renamed the "N sets passed initial inspection" set-count segment to
   "N sets initially inspected" — the old wording read as a near-duplicate of the
   **Initial inspection** filter button, when the two are actually opposite ends of the

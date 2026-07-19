@@ -379,6 +379,40 @@ final class RinCWC_Data {
         return $row ?: null;
     }
 
+    /**
+     * Rows carrying review state for the portable JSON export. Comment count is
+     * joined by image key because comments deliberately have no image-table FK.
+     */
+    public static function export_rows(): array {
+        global $wpdb;
+        $images     = RinCWC_DB::images_table();
+        $selections = RinCWC_DB::selections_table();
+        $comments   = RinCWC_DB::comments_table();
+
+        return $wpdb->get_results(
+            "SELECT i.*,
+                    s.id AS selection_id,
+                    s.crop_variant,
+                    s.custom_crop_scale,
+                    s.custom_crop_x,
+                    s.custom_crop_y,
+                    s.wm_corner,
+                    s.wm_file_id,
+                    s.wm_applied,
+                    COALESCE(c.comment_count, 0) AS comment_count
+             FROM {$images} i
+             LEFT JOIN {$selections} s ON s.image_id = i.id
+             LEFT JOIN (
+                 SELECT image_key, COUNT(*) AS comment_count
+                 FROM {$comments}
+                 GROUP BY image_key
+             ) c ON c.image_key = CONCAT(i.gallery_id, ':', i.attach_id)
+             WHERE i.status <> 'CANDIDATE' OR s.id IS NOT NULL OR c.comment_count > 0
+             ORDER BY i.gallery_id ASC, i.position ASC",
+            ARRAY_A
+        ) ?: [];
+    }
+
     public static function get_visible_images(): array {
         return self::get_review_images( false );
     }
@@ -443,7 +477,9 @@ final class RinCWC_Data {
             'image_id'      => $image_id,
             'crop_variant' => $variant ?: null,
             'wm_corner'    => sanitize_text_field( $data['wm_corner'] ?? $existing['wm_corner'] ?? '' ),
-            'wm_file_id'   => isset( $data['wm_file_id'] ) ? (int) $data['wm_file_id'] : ( $existing['wm_file_id'] ?? null ),
+            'wm_file_id'   => array_key_exists( 'wm_file_id', $data )
+                ? ( $data['wm_file_id'] === null ? null : (int) $data['wm_file_id'] )
+                : ( $existing['wm_file_id'] ?? null ),
         ];
         if ( ! in_array( (string) $row['wm_corner'], self::VALID_WM_CORNERS, true ) ) {
             return false;
@@ -572,7 +608,7 @@ final class RinCWC_Data {
         ] );
     }
 
-    public static function set_status( int $image_id, string $status, int $user_id = 0 ): bool {
+    public static function set_status( int $image_id, string $status, int $approved_by = 0, ?string $approved_at = null ): bool {
         global $wpdb;
         if ( ! in_array( $status, self::VALID_STATUSES, true ) ) {
             return false;
@@ -580,8 +616,8 @@ final class RinCWC_Data {
 
         $data = [ 'status' => $status ];
         if ( $status === self::STATUS_APPROVED ) {
-            $data['approved_by'] = $user_id ?: get_current_user_id();
-            $data['approved_at'] = current_time( 'mysql' );
+            $data['approved_by'] = $approved_by ?: get_current_user_id();
+            $data['approved_at'] = $approved_at !== null ? $approved_at : current_time( 'mysql' );
         } else {
             $data['approved_by'] = null;
             $data['approved_at'] = null;
@@ -590,7 +626,7 @@ final class RinCWC_Data {
         return $wpdb->update( RinCWC_DB::images_table(), $data, [ 'id' => $image_id ] ) !== false;
     }
 
-    public static function approve( int $gallery_id, int $attach_id ): bool {
+    public static function approve( int $gallery_id, int $attach_id, int $approved_by = 0, ?string $approved_at = null ): bool {
         $image = self::get_image_by_gallery_attach( $gallery_id, $attach_id );
         if ( ! $image ) {
             return false;
@@ -599,7 +635,7 @@ final class RinCWC_Data {
         if ( ! $selection || empty( $selection['crop_variant'] ) || empty( $selection['wm_corner'] ) || empty( $selection['wm_applied'] ) ) {
             return false;
         }
-        return self::set_status( (int) $image['id'], self::STATUS_APPROVED );
+        return self::set_status( (int) $image['id'], self::STATUS_APPROVED, $approved_by, $approved_at );
     }
 
     public static function unapprove( int $gallery_id, int $attach_id ): bool {
@@ -644,7 +680,8 @@ final class RinCWC_Data {
         return $row ?: null;
     }
 
-    public static function set_default_watermark( int $id ): bool {
+    /** $mark_pending=false lets import invalidate only selections whose resolution moved. */
+    public static function set_default_watermark( int $id, bool $mark_pending = true ): bool {
         global $wpdb;
         $wm = self::get_watermark( $id );
         if ( ! $wm ) {
@@ -652,7 +689,7 @@ final class RinCWC_Data {
         }
         $wpdb->update( RinCWC_DB::watermarks_table(), [ 'is_default' => 0 ], [ 'is_default' => 1 ] );
         $ok = $wpdb->update( RinCWC_DB::watermarks_table(), [ 'is_default' => 1 ], [ 'id' => $id ] ) !== false;
-        if ( $ok ) {
+        if ( $ok && $mark_pending ) {
             self::mark_all_watermarks_pending();
         }
         return $ok;
@@ -678,14 +715,15 @@ final class RinCWC_Data {
         return ( $sel + $gal ) > 0;
     }
 
-    public static function set_gallery_watermark( int $gallery_id, int $wm_file_id ): bool {
+    /** $mark_pending=false lets import invalidate only selections whose resolution moved. */
+    public static function set_gallery_watermark( int $gallery_id, int $wm_file_id, bool $mark_pending = true ): bool {
         global $wpdb;
         if ( ! $gallery_id ) {
             return false;
         }
         if ( ! $wm_file_id ) {
             $ok = $wpdb->delete( RinCWC_DB::gallery_wm_table(), [ 'gallery_id' => $gallery_id ] ) !== false;
-            if ( $ok ) {
+            if ( $ok && $mark_pending ) {
                 self::mark_gallery_watermarks_pending( $gallery_id );
             }
             return $ok;
@@ -697,7 +735,7 @@ final class RinCWC_Data {
             'gallery_id' => $gallery_id,
             'wm_file_id' => $wm_file_id,
         ] ) !== false;
-        if ( $ok ) {
+        if ( $ok && $mark_pending ) {
             self::mark_gallery_watermarks_pending( $gallery_id );
         }
         return $ok;
