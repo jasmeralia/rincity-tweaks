@@ -4,6 +4,5 @@ updates:
   directory: /rincity-throwback-posts
   schedule:
     interval: weekly
-  auto-merge: enable
   reviewers:
   - jasmeralia
