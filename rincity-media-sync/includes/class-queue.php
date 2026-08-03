@@ -14,7 +14,11 @@ final class RinMS_Queue {
         if ( null === $key || ! is_file( $path ) || ! is_readable( $path ) ) {
             return;
         }
-        self::enqueue( 'put', (string) realpath( $path ) );
+        $real = realpath( $path );
+        if ( false === $real ) {
+            return; // File removed between the is_file() check and here; nothing to sync.
+        }
+        self::enqueue( 'put', $real );
     }
 
     /** Add a path to the delete queue without requiring the file to still exist. */
@@ -47,12 +51,10 @@ final class RinMS_Queue {
         }
 
         $worker = RINMS_PLUGIN_DIR . 'bin/rincity-media-sync-worker.sh';
-        $command = $environment . '/usr/bin/setsid ' . escapeshellarg( $worker )
-            . ' >/dev/null 2>&1 < /dev/null &';
-        exec( $command, $output, $exit_code );
-        if ( 0 !== $exit_code ) {
-            syslog( LOG_ERR, 'rincity-media-sync: failed to spawn detached worker' );
-        }
+        // Trailing `&` backgrounds setsid and the shell returns 0 immediately either way,
+        // so exec()'s own exit code can never detect a spawn failure here -- the WP-Cron
+        // drain (rincity_media_sync_drain) is the recovery path for that case instead.
+        exec( $environment . '/usr/bin/setsid ' . escapeshellarg( $worker ) . ' >/dev/null 2>&1 < /dev/null &' );
     }
 
     private static function enqueue( string $operation, string $path ): void {
