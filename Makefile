@@ -3,9 +3,9 @@ PLUGINS     := $(WP_CONTENT)/plugins
 MU_PLUGINS  := $(WP_CONTENT)/mu-plugins
 OWNER       := nobody:nogroup
 
-.PHONY: all rc_tweaks rincity-envira-exif rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-nav-tweaks rincity-news-widget rincity-wallpaper-candidates rincity-wf-block-logger rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds help
+.PHONY: all rc_tweaks rincity-envira-exif rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-media-sync rincity-nav-tweaks rincity-news-widget rincity-wallpaper-candidates rincity-wf-block-logger rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds test help
 
-all: rc_tweaks rincity-envira-exif rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-nav-tweaks rincity-news-widget rincity-wallpaper-candidates rincity-wf-block-logger rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds ## Deploy all plugins
+all: rc_tweaks rincity-envira-exif rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-media-sync rincity-nav-tweaks rincity-news-widget rincity-wallpaper-candidates rincity-wf-block-logger rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds ## Deploy all plugins
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*##"}; {printf "  %-40s %s\n", $$1, $$2}'
@@ -27,6 +27,19 @@ rincity-gallery-favorites: ## Deploy rincity-gallery-favorites to wp-content/plu
 
 rincity-image-size-control: ## Deploy rincity-image-size-control to wp-content/plugins/rincity-image-size-control/
 	sudo rsync -av --chown=$(OWNER) rincity-image-size-control/ $(PLUGINS)/rincity-image-size-control/
+
+rincity-media-sync: ## Deploy rincity-media-sync to wp-content/mu-plugins/
+	sudo install -o nobody -g nogroup -m 644 \
+		rincity-media-sync/rincity-media-sync.php \
+		$(MU_PLUGINS)/rincity-media-sync.php
+	sudo rsync -av --chown=$(OWNER) --delete \
+		--exclude='README.md' --exclude='tests/' --exclude='rincity-media-sync.php' \
+		rincity-media-sync/ $(MU_PLUGINS)/rincity-media-sync/
+	sudo chmod 755 $(MU_PLUGINS)/rincity-media-sync/bin/rincity-media-sync-worker.sh
+	sudo install -d -o nobody -g nogroup -m 755 \
+		/var/tmp/rincity-media-sync/queue/put \
+		/var/tmp/rincity-media-sync/queue/del \
+		/var/tmp/rincity-media-sync/failed
 
 rincity-nav-tweaks: ## Deploy rincity-nav-tweaks to wp-content/plugins/rincity-nav-tweaks/
 	sudo rsync -av --chown=$(OWNER) --exclude='README.md' rincity-nav-tweaks/ $(PLUGINS)/rincity-nav-tweaks/
@@ -51,3 +64,6 @@ rincity-zero-scheduled-seconds: ## Deploy rincity-zero-scheduled-seconds to wp-c
 	sudo install -o nobody -g nogroup -m 644 \
 		rincity-zero-scheduled-seconds/rincity-zero-scheduled-seconds.php \
 		$(MU_PLUGINS)/rincity-zero-scheduled-seconds.php
+
+test: ## Run dependency-free plugin tests
+	php rincity-media-sync/tests/test-paths.php

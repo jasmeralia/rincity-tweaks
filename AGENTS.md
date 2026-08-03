@@ -142,6 +142,7 @@ Keep entries on a single line. Reference Odoo task IDs where relevant.
 | `rincity-envira-search-enhancements` | `plugins/rincity-envira-search-enhancements/` | |
 | `rincity-gallery-favorites` | `plugins/rincity-gallery-favorites/` | Member favorites system |
 | `rincity-image-size-control` | `plugins/rincity-image-size-control/` | Suppresses unwanted intermediate image sizes on upload |
+| `rincity-media-sync` | **mu-plugins** | Asynchronously mirrors media writes/deletes to S3 and invalidates overwritten or deleted CloudFront paths |
 | `rincity-nav-tweaks` | `plugins/rincity-nav-tweaks/` | Fixes mobile submenu expand/collapse and desktop scroll-to-top on the Ashe Pro theme |
 | `rincity-news-widget` | `plugins/rincity-news-widget/` | |
 | `rincity-wallpaper-candidates` | `plugins/rincity-wallpaper-candidates/` | Wallpaper candidate tracking |

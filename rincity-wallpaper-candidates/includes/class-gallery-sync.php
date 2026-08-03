@@ -166,6 +166,10 @@ final class RinCWC_Gallery_Sync {
             . ' -resize ' . escapeshellarg( $w . 'x' . $h )
             . ' -quality 88 ' . escapeshellarg( $dst ) . ' 2>&1';
         shell_exec( $cmd );
+        if ( file_exists( $dst ) ) {
+            /** Publish the new file to S3/CloudFront; no-op if rincity-media-sync is absent. */
+            do_action( 'rincity_media_sync_file', $dst );
+        }
     }
 
     private static function write_gallery( int $gallery_id, array $gallery ): void {

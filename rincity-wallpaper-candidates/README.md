@@ -1,6 +1,6 @@
 # rincity-wallpaper-candidates
 
-**Version:** 3.11.5
+**Version:** 3.11.6
 **Deploy path:** `wp-content/plugins/rincity-wallpaper-candidates/`
 
 ## Description
@@ -116,6 +116,7 @@ make rincity-wallpaper-candidates
 
 ## Changelog
 
+- **3.11.6** — Publish generated crops, watermarked images, and gallery thumbnails through `rincity-media-sync` immediately after ImageMagick writes them (Odoo task #17).
 - **3.11.5** — Fixed a real bug found deploying to gelfling: the seeded default
   watermark's `file_path` is `RINCWC_WM_FILE` (`~/rincity-infra/images/RC_WM_Plain.png`,
   outside WordPress's own tree), and on gelfling the web server user can't traverse

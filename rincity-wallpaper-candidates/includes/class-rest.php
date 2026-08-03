@@ -375,6 +375,9 @@ final class RinCWC_Rest {
             shell_exec( $cmd );
             if ( ! file_exists( $dst ) ) {
                 $all_ok = false;
+            } else {
+                /** Publish the new file to S3/CloudFront; no-op if rincity-media-sync is absent. */
+                do_action( 'rincity_media_sync_file', $dst );
             }
         }
 
@@ -458,6 +461,8 @@ final class RinCWC_Rest {
             if ( ! file_exists( $dst ) ) {
                 return [ 'aid' => (int) $row['attach_id'], 'status' => 'error', 'msg' => $result ?: 'Crop failed' ];
             }
+            /** Publish the new file to S3/CloudFront; no-op if rincity-media-sync is absent. */
+            do_action( 'rincity_media_sync_file', $dst );
             $made++;
         }
 
