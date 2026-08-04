@@ -56,6 +56,35 @@ if ( ! function_exists( "rincity_cover_url_to_path" ) ) {
     }
 }
 
+if ( ! function_exists( "rincity_cover_rewrite_url_host" ) ) {
+    /**
+     * Rewrite a URL's scheme/host/port to match $target_base_url, preserving its
+     * path and query string. Pure string manipulation, no WordPress dependency.
+     */
+    function rincity_cover_rewrite_url_host( string $src, string $target_base_url ): string {
+        if ( $src === "" || $target_base_url === "" ) {
+            return $src;
+        }
+        $target = parse_url( $target_base_url );
+        $source = parse_url( $src );
+        if (
+            ! $target || ! $source
+            || empty( $target["host"] )
+            || empty( $source["path"] )
+            || $source["path"][0] !== "/"
+        ) {
+            return $src;
+        }
+        $scheme    = $target["scheme"] ?? "https";
+        $port      = isset( $target["port"] ) ? ":" . $target["port"] : "";
+        $rewritten = "{$scheme}://{$target["host"]}{$port}{$source["path"]}";
+        if ( ! empty( $source["query"] ) ) {
+            $rewritten .= "?" . $source["query"];
+        }
+        return $rewritten;
+    }
+}
+
 if ( ! function_exists( "rincity_resolve_gallery_cover_url" ) ) {
     /**
      * Resolve the cover URL to emit for a gallery: an existing, correctly
@@ -84,7 +113,20 @@ if ( ! function_exists( "rincity_resolve_gallery_cover_url" ) ) {
         }
 
         if ( function_exists( "envira_resize_image" ) ) {
-            $generated = envira_resize_image( $src, $width, $height, true, $alignment, 100, false );
+            // Envira's Cropping::resize_image() silently no-ops (no error, just 
+            // `return $url` unchanged) if $url doesn't contain site_url() as a substring.
+            // A CDN-rewritten source domain (CDN Enabler et al.) fails that check, so
+            // rewrite to the real site URL for the resize call itself; envira_resize_image()
+            // already re-applies any CDN rewriting to its own return value via the
+            // envira_gallery_resize_image_resized_url filter.
+            $resize_src = $src;
+            if ( function_exists( "site_url" ) ) {
+                $site_url = site_url();
+                if ( $site_url !== "" && strpos( $src, $site_url ) === false ) {
+                    $resize_src = rincity_cover_rewrite_url_host( $src, $site_url );
+                }
+            }
+            $generated = envira_resize_image( $resize_src, $width, $height, true, $alignment, 100, false );
             // Validate the path Envira actually generated, not the candidate we guessed:
             // its naming convention for the requested size/alignment is not guaranteed to
             // match rincity_cover_crop_candidate()'s output exactly.

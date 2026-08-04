@@ -98,4 +98,41 @@ $assert_true(
     "missing file is invalid"
 );
 
+
+// --- rincity_cover_rewrite_url_host(): swaps scheme/host/port to match a target
+// --- base URL while preserving path+query — used to work around Envira's
+// --- Cropping::resize_image() silently no-op'ing when the source URL's domain
+// --- doesn't contain site_url() (e.g. a CDN-rewritten upload baseurl) ---
+$assert_same(
+    "https://test.rin-city.com/wp-content/uploads/2025/02/IMG_6293-scaled.jpg",
+    rincity_cover_rewrite_url_host(
+        "https://cdn.test.rin-city.com/wp-content/uploads/2025/02/IMG_6293-scaled.jpg",
+        "https://test.rin-city.com"
+    ),
+    "CDN-domain source rewritten to the real site_url domain, path preserved"
+);
+$assert_same(
+    "https://test.rin-city.com/wp-content/uploads/2025/02/x.jpg?ver=3",
+    rincity_cover_rewrite_url_host(
+        "https://cdn.test.rin-city.com/wp-content/uploads/2025/02/x.jpg?ver=3",
+        "https://test.rin-city.com"
+    ),
+    "query string is preserved across the host rewrite"
+);
+$assert_same(
+    "",
+    rincity_cover_rewrite_url_host( "", "https://test.rin-city.com" ),
+    "empty source returns empty"
+);
+$assert_same(
+    "https://cdn.test.rin-city.com/wp-content/uploads/x.jpg",
+    rincity_cover_rewrite_url_host( "https://cdn.test.rin-city.com/wp-content/uploads/x.jpg", "" ),
+    "empty target returns source unchanged"
+);
+$assert_same(
+    "not-a-url",
+    rincity_cover_rewrite_url_host( "not-a-url", "https://test.rin-city.com" ),
+    "unparseable/pathless source returns unchanged rather than guessing"
+);
+
 fwrite( STDOUT, "OK: {$assertions} assertions passed.\n" );
