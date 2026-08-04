@@ -135,4 +135,26 @@ $assert_same(
     "unparseable/pathless source returns unchanged rather than guessing"
 );
 
+
+// --- rincity_cover_url_host_differs(): parsed-host comparison, not a raw
+// --- substring match — a CDN host that merely *starts with* the site host
+// --- (e.g. site "a.com" vs CDN "a.com.cdn.net") must still be detected as
+// --- different, which a strpos()-based check would have missed ---
+$assert_true(
+    rincity_cover_url_host_differs( "https://cdn.test.rin-city.com/wp-content/uploads/x.jpg", "https://test.rin-city.com" ),
+    "CDN subdomain is a different host from the real site"
+);
+$assert_true(
+    rincity_cover_url_host_differs( "https://a.com.cdn.net/wp-content/uploads/x.jpg", "https://a.com" ),
+    "CDN host that merely starts with the site host string is still a different host"
+);
+$assert_true(
+    ! rincity_cover_url_host_differs( "https://test.rin-city.com/wp-content/uploads/x.jpg", "https://test.rin-city.com" ),
+    "matching host is not considered different"
+);
+$assert_true(
+    ! rincity_cover_url_host_differs( "https://cdn.test.rin-city.com/x.jpg", "" ),
+    "empty target host never triggers a rewrite"
+);
+
 fwrite( STDOUT, "OK: {$assertions} assertions passed.\n" );

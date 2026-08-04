@@ -77,11 +77,28 @@ if ( ! function_exists( "rincity_cover_rewrite_url_host" ) ) {
         }
         $scheme    = $target["scheme"] ?? "https";
         $port      = isset( $target["port"] ) ? ":" . $target["port"] : "";
-        $rewritten = "{$scheme}://{$target["host"]}{$port}{$source["path"]}";
+        $rewritten = "{$scheme}://{$target['host']}{$port}{$source['path']}";
         if ( ! empty( $source["query"] ) ) {
             $rewritten .= "?" . $source["query"];
         }
         return $rewritten;
+    }
+}
+
+if ( ! function_exists( "rincity_cover_url_host_differs" ) ) {
+    /**
+     * True if $src's host differs from $target_base_url's host — compares parsed
+     * host components, not a raw substring match, so a CDN host that merely starts
+     * with the site host (e.g. site "a.com" vs CDN "a.com.cdn.net") is correctly
+     * treated as different rather than false-positive matching via strpos().
+     */
+    function rincity_cover_url_host_differs( string $src, string $target_base_url ): bool {
+        $target_host = $target_base_url !== "" ? ( parse_url( $target_base_url, PHP_URL_HOST ) ?: "" ) : "";
+        if ( $target_host === "" ) {
+            return false;
+        }
+        $src_host = parse_url( $src, PHP_URL_HOST ) ?: "";
+        return $src_host !== $target_host;
     }
 }
 
@@ -122,7 +139,7 @@ if ( ! function_exists( "rincity_resolve_gallery_cover_url" ) ) {
             $resize_src = $src;
             if ( function_exists( "site_url" ) ) {
                 $site_url = site_url();
-                if ( $site_url !== "" && strpos( $src, $site_url ) === false ) {
+                if ( rincity_cover_url_host_differs( $src, $site_url ) ) {
                     $resize_src = rincity_cover_rewrite_url_host( $src, $site_url );
                 }
             }
