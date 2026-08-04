@@ -85,8 +85,14 @@ if ( ! function_exists( "rincity_resolve_gallery_cover_url" ) ) {
 
         if ( function_exists( "envira_resize_image" ) ) {
             $generated = envira_resize_image( $src, $width, $height, true, $alignment, 100, false );
-            if ( ! is_wp_error( $generated ) && $local_path !== null && rincity_cover_crop_is_valid( $local_path, $width, $height ) ) {
-                return $candidate;
+            // Validate the path Envira actually generated, not the candidate we guessed:
+            // its naming convention for the requested size/alignment is not guaranteed to
+            // match rincity_cover_crop_candidate()'s output exactly.
+            if ( ! is_wp_error( $generated ) && is_string( $generated ) ) {
+                $generated_path = rincity_cover_url_to_path( $generated, $baseurl, $basedir );
+                if ( $generated_path !== null && rincity_cover_crop_is_valid( $generated_path, $width, $height ) ) {
+                    return $generated;
+                }
             }
         }
 
