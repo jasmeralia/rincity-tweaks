@@ -2,7 +2,7 @@
 /**
  * Plugin Name: RinCity Tweaks
  * Description: A plugin to provide several tweaks to customize Envira Gallery functionality for RinCity.
- * Version: 2.1.13
+ * Version: 2.1.14
  * Author: Morgan Blackthorne
  */
 

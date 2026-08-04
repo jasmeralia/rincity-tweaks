@@ -98,4 +98,63 @@ $assert_true(
     "missing file is invalid"
 );
 
+
+// --- rincity_cover_rewrite_url_host(): swaps scheme/host/port to match a target
+// --- base URL while preserving path+query — used to work around Envira's
+// --- Cropping::resize_image() silently no-op'ing when the source URL's domain
+// --- doesn't contain site_url() (e.g. a CDN-rewritten upload baseurl) ---
+$assert_same(
+    "https://test.rin-city.com/wp-content/uploads/2025/02/IMG_6293-scaled.jpg",
+    rincity_cover_rewrite_url_host(
+        "https://cdn.test.rin-city.com/wp-content/uploads/2025/02/IMG_6293-scaled.jpg",
+        "https://test.rin-city.com"
+    ),
+    "CDN-domain source rewritten to the real site_url domain, path preserved"
+);
+$assert_same(
+    "https://test.rin-city.com/wp-content/uploads/2025/02/x.jpg?ver=3",
+    rincity_cover_rewrite_url_host(
+        "https://cdn.test.rin-city.com/wp-content/uploads/2025/02/x.jpg?ver=3",
+        "https://test.rin-city.com"
+    ),
+    "query string is preserved across the host rewrite"
+);
+$assert_same(
+    "",
+    rincity_cover_rewrite_url_host( "", "https://test.rin-city.com" ),
+    "empty source returns empty"
+);
+$assert_same(
+    "https://cdn.test.rin-city.com/wp-content/uploads/x.jpg",
+    rincity_cover_rewrite_url_host( "https://cdn.test.rin-city.com/wp-content/uploads/x.jpg", "" ),
+    "empty target returns source unchanged"
+);
+$assert_same(
+    "not-a-url",
+    rincity_cover_rewrite_url_host( "not-a-url", "https://test.rin-city.com" ),
+    "unparseable/pathless source returns unchanged rather than guessing"
+);
+
+
+// --- rincity_cover_url_host_differs(): parsed-host comparison, not a raw
+// --- substring match — a CDN host that merely *starts with* the site host
+// --- (e.g. site "a.com" vs CDN "a.com.cdn.net") must still be detected as
+// --- different, which a strpos()-based check would have missed ---
+$assert_true(
+    rincity_cover_url_host_differs( "https://cdn.test.rin-city.com/wp-content/uploads/x.jpg", "https://test.rin-city.com" ),
+    "CDN subdomain is a different host from the real site"
+);
+$assert_true(
+    rincity_cover_url_host_differs( "https://a.com.cdn.net/wp-content/uploads/x.jpg", "https://a.com" ),
+    "CDN host that merely starts with the site host string is still a different host"
+);
+$assert_true(
+    ! rincity_cover_url_host_differs( "https://test.rin-city.com/wp-content/uploads/x.jpg", "https://test.rin-city.com" ),
+    "matching host is not considered different"
+);
+$assert_true(
+    ! rincity_cover_url_host_differs( "https://cdn.test.rin-city.com/x.jpg", "" ),
+    "empty target host never triggers a rewrite"
+);
+
 fwrite( STDOUT, "OK: {$assertions} assertions passed.\n" );

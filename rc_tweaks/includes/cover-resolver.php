@@ -56,6 +56,52 @@ if ( ! function_exists( "rincity_cover_url_to_path" ) ) {
     }
 }
 
+if ( ! function_exists( "rincity_cover_rewrite_url_host" ) ) {
+    /**
+     * Rewrite a URL's scheme/host/port to match $target_base_url, preserving its
+     * path and query string. Pure string manipulation, no WordPress dependency.
+     */
+    function rincity_cover_rewrite_url_host( string $src, string $target_base_url ): string {
+        if ( $src === "" || $target_base_url === "" ) {
+            return $src;
+        }
+        $target = parse_url( $target_base_url );
+        $source = parse_url( $src );
+        if (
+            ! $target || ! $source
+            || empty( $target["host"] )
+            || empty( $source["path"] )
+            || $source["path"][0] !== "/"
+        ) {
+            return $src;
+        }
+        $scheme    = $target["scheme"] ?? "https";
+        $port      = isset( $target["port"] ) ? ":" . $target["port"] : "";
+        $rewritten = "{$scheme}://{$target['host']}{$port}{$source['path']}";
+        if ( ! empty( $source["query"] ) ) {
+            $rewritten .= "?" . $source["query"];
+        }
+        return $rewritten;
+    }
+}
+
+if ( ! function_exists( "rincity_cover_url_host_differs" ) ) {
+    /**
+     * True if $src's host differs from $target_base_url's host — compares parsed
+     * host components, not a raw substring match, so a CDN host that merely starts
+     * with the site host (e.g. site "a.com" vs CDN "a.com.cdn.net") is correctly
+     * treated as different rather than false-positive matching via strpos().
+     */
+    function rincity_cover_url_host_differs( string $src, string $target_base_url ): bool {
+        $target_host = $target_base_url !== "" ? ( parse_url( $target_base_url, PHP_URL_HOST ) ?: "" ) : "";
+        if ( $target_host === "" ) {
+            return false;
+        }
+        $src_host = parse_url( $src, PHP_URL_HOST ) ?: "";
+        return $src_host !== $target_host;
+    }
+}
+
 if ( ! function_exists( "rincity_resolve_gallery_cover_url" ) ) {
     /**
      * Resolve the cover URL to emit for a gallery: an existing, correctly
@@ -84,7 +130,20 @@ if ( ! function_exists( "rincity_resolve_gallery_cover_url" ) ) {
         }
 
         if ( function_exists( "envira_resize_image" ) ) {
-            $generated = envira_resize_image( $src, $width, $height, true, $alignment, 100, false );
+            // Envira's Cropping::resize_image() silently no-ops (no error, just 
+            // `return $url` unchanged) if $url doesn't contain site_url() as a substring.
+            // A CDN-rewritten source domain (CDN Enabler et al.) fails that check, so
+            // rewrite to the real site URL for the resize call itself; envira_resize_image()
+            // already re-applies any CDN rewriting to its own return value via the
+            // envira_gallery_resize_image_resized_url filter.
+            $resize_src = $src;
+            if ( function_exists( "site_url" ) ) {
+                $site_url = site_url();
+                if ( rincity_cover_url_host_differs( $src, $site_url ) ) {
+                    $resize_src = rincity_cover_rewrite_url_host( $src, $site_url );
+                }
+            }
+            $generated = envira_resize_image( $resize_src, $width, $height, true, $alignment, 100, false );
             // Validate the path Envira actually generated, not the candidate we guessed:
             // its naming convention for the requested size/alignment is not guaranteed to
             // match rincity_cover_crop_candidate()'s output exactly.
