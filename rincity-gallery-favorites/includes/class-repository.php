@@ -193,9 +193,11 @@ final class RinCity_Gallery_Favorites_Repository {
     }
 
     /**
-     * Returns the cover thumbnail URL for an Envira gallery using the same approach as the
-     * album page (album-page.php): reads the first image src from _eg_gallery_data and
-     * transforms -scaled.ext → -scaled-320x400_c.ext.
+     * Returns the cover thumbnail URL for an Envira gallery: reads the first
+     * image src from _eg_gallery_data and resolves it to the existing 320x400
+     * crop via the shared resolver in rc_tweaks (includes/cover-resolver.php),
+     * which validates on-disk existence/dimensions for both scaled and
+     * non-scaled source filenames.
      */
     private function get_cover_image_url( int $gallery_id ): ?string {
         $gallery_data = get_post_meta( $gallery_id, '_eg_gallery_data', true );
@@ -209,13 +211,8 @@ final class RinCity_Gallery_Favorites_Repository {
             return null;
         }
 
-        $ext     = pathinfo( $src, PATHINFO_EXTENSION );
-        $cropped = preg_replace(
-            '/-scaled\.' . preg_quote( $ext, '/' ) . '$/i',
-            "-scaled-320x400_c.{$ext}",
-            $src
-        );
-
-        return $cropped ?: $src;
+        return function_exists( 'rincity_resolve_gallery_cover_url' )
+            ? rincity_resolve_gallery_cover_url( $src, 320, 400 )
+            : $src;
     }
 }

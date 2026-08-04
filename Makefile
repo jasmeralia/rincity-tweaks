@@ -11,7 +11,7 @@ help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*##"}; {printf "  %-40s %s\n", $$1, $$2}'
 
 rc_tweaks: ## Deploy rc_tweaks to wp-content/plugins/rc_tweaks/
-	sudo rsync -av --chown=$(OWNER) --exclude='README.md' rc_tweaks/ $(PLUGINS)/rc_tweaks/
+	sudo rsync -av --chown=$(OWNER) --exclude='README.md' --exclude='tests/' rc_tweaks/ $(PLUGINS)/rc_tweaks/
 
 rincity-envira-exif: ## Deploy rincity-envira-exif to wp-content/plugins/rincity-envira-exif/
 	sudo rsync -av --chown=$(OWNER) --exclude='README.md' rincity-envira-exif/ $(PLUGINS)/rincity-envira-exif/
@@ -66,4 +66,7 @@ rincity-zero-scheduled-seconds: ## Deploy rincity-zero-scheduled-seconds to wp-c
 		$(MU_PLUGINS)/rincity-zero-scheduled-seconds.php
 
 test: ## Run dependency-free plugin tests
-	php rincity-media-sync/tests/test-paths.php
+	# Use lsphp83, not the bare 'php' package: it lacks GD, which the cover-resolver
+	# test needs to build real fixture images, and it is not what actually serves the site.
+	/usr/local/lsws/lsphp83/bin/php rincity-media-sync/tests/test-paths.php
+	/usr/local/lsws/lsphp83/bin/php rc_tweaks/tests/test-cover-resolver.php

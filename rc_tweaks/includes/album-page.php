@@ -130,21 +130,17 @@ function rincity_envira_album_shortcode( $atts ) {
         $meta = $data['meta'];
 
         // ——————————————————————————————————————————
-        // Instead of envira_resize_image(), do a straight rename
+        // Resolve the cover crop via the shared resolver (includes/cover-resolver.php),
+        // which validates on-disk existence/dimensions for both scaled and non-scaled
+        // source filenames instead of only matching "-scaled.<ext>" sources.
         $src    = $meta['cover_image_url'];
         // read the real crop dims that Envira stored in the album meta
         $width  = ! empty( $data['crop_width'] )  ? intval( $data['crop_width'] )  : 320;
         $height = ! empty( $data['crop_height'] ) ? intval( $data['crop_height'] ) : 400;
 
-        // get the file extension (jpg, png, etc.)
-        $ext = pathinfo( $src, PATHINFO_EXTENSION );
-
-        // replace "-scaled.ext" with "-scaled-{$width}x{$height}_c.ext"
-        $cropped_src = preg_replace(
-            '/-scaled\.' . preg_quote( $ext, '/' ) . '$/i',
-            "-scaled-{$width}x{$height}_c.{$ext}",
-            $src
-        );
+        $cropped_src = function_exists( 'rincity_resolve_gallery_cover_url' )
+            ? rincity_resolve_gallery_cover_url( $src, $width, $height )
+            : $src;
 
         // ——————————————————————————————————————————
         // then render as before

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: RinCity Tweaks
  * Description: A plugin to provide several tweaks to customize Envira Gallery functionality for RinCity.
- * Version: 2.1.12
+ * Version: 2.1.13
  * Author: Morgan Blackthorne
  */
 
@@ -22,6 +22,10 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/widgets.php';
 
 // Include the random gallery redirect
 require_once plugin_dir_path( __FILE__ ) . 'includes/random-gallery-redirect.php';
+
+// Shared resolver for Members Gallery cover crop URLs (used by album-page.php
+// and by rincity-gallery-favorites's repository class)
+require_once plugin_dir_path( __FILE__ ) . 'includes/cover-resolver.php';
 
 // Include the album page functionality
 require_once plugin_dir_path( __FILE__ ) . 'includes/album-page.php';
