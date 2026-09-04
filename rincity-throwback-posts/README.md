@@ -180,6 +180,8 @@ Official docs:
 --bluesky-auth PATH
 --history PATH
 --threshold-days INT
+--min-age-days INT            # default: 90
+--low-pool-threshold INT      # default: 45
 --set-name "SET NAME"
 --seed VALUE
 --template PATH               # Twitter template
@@ -220,6 +222,29 @@ SMTP_PASS=...            # Gmail app password
 Sending is delivered via SMTP over SSL (`smtplib.SMTP_SSL`). A failed email send
 prints a warning but does not fail the run — the throwback post itself (or dry
 run) already completed.
+
+## Eligibility Filters
+
+A manifest entry is eligible for random selection only if both hold:
+
+- It was not posted (per `post_history.json`) within `--threshold-days` days.
+- It was originally published (`date_published` in the manifest) at least
+  `--min-age-days` days ago — this keeps brand-new galleries from being
+  recycled as "throwback" content before they've had their own organic
+  traffic window.
+
+`--set-name` bypasses both filters (exact match against the manifest).
+
+## Low Pool Warning
+
+Every run that uses random selection (i.e. not `--set-name`) checks the size
+of the eligible pool after both filters above. If it drops below
+`--low-pool-threshold` (default 45), a separate warning email is sent to
+`--email-to` (unless `--no-email` is passed) saying the pool is running low
+and that `post_history.json` may need to be pruned or reset soon. This is
+distinct from the per-post summary email and has no cover image attached. If
+the pool is fully exhausted (0 eligible), the run still exits with an error
+(exit code 3) after sending the warning.
 
 ## Notes
 

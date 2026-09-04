@@ -1,7 +1,6 @@
 __pycache__
 .venv
 *.json
-run_throwback.sh
 *.log
 Rin_Covers
 .kanna

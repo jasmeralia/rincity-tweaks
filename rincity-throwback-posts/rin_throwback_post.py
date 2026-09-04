@@ -243,7 +243,13 @@ def _load_history(history_path: Path) -> List[Dict[str, Any]]:
     return data if isinstance(data, list) else []
 
 
-def _eligible_entries(manifest: List[Dict[str, Any]], history: List[Dict[str, Any]], threshold_days: int, now: dt.datetime) -> List[Dict[str, Any]]:
+def _eligible_entries(
+    manifest: List[Dict[str, Any]],
+    history: List[Dict[str, Any]],
+    threshold_days: int,
+    min_age_days: int,
+    now: dt.datetime,
+) -> List[Dict[str, Any]]:
     last: Dict[str, dt.datetime] = {}
     for h in history:
         key = (h.get("set_url") or h.get("set_name") or "").strip()
@@ -264,6 +270,15 @@ def _eligible_entries(manifest: List[Dict[str, Any]], history: List[Dict[str, An
         key = set_url or set_name
         if not key:
             continue
+
+        date_published = (e.get("date_published") or "").strip()
+        try:
+            published_at = _parse_iso8601(date_published)
+        except Exception:
+            continue
+        if _days_ago(published_at, now) < min_age_days:
+            continue
+
         when = last.get(key)
         if when is None or _days_ago(when, now) >= threshold_days:
             eligible.append(e)
@@ -466,6 +481,57 @@ def _send_html_email(
     print(f"Email sent to {to_addr}")
 
 
+def _send_html_email_no_attachment(
+    env: Dict[str, str],
+    to_addr: str,
+    subject: str,
+    html_body: str,
+) -> None:
+    from_addr = env.get("FROM_EMAIL", "")
+    reply_to = env.get("REPLY_TO_EMAIL", from_addr)
+    smtp_host = env.get("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(env.get("SMTP_PORT", "465"))
+    smtp_user = env.get("SMTP_USER", from_addr)
+    smtp_pass = env.get("SMTP_PASS", "")
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = from_addr
+    msg["To"] = to_addr
+    msg["Reply-To"] = reply_to
+    msg["Date"] = email.utils.formatdate(localtime=True)
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+    context = ssl.create_default_context()
+    with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context) as server:
+        server.login(smtp_user, smtp_pass)
+        server.sendmail(from_addr, [to_addr], msg.as_bytes())
+    print(f"Email sent to {to_addr}")
+
+
+def _build_low_pool_warning_html(eligible_count: int, total_count: int, low_pool_threshold: int) -> str:
+    esc = html.escape
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f0f0f0;font-family:system-ui,-apple-system,sans-serif;">
+<div style="max-width:600px;margin:24px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+  <div style="background:#f59e0b;color:#111;text-align:center;padding:8px 16px;font-weight:700;font-size:13px;letter-spacing:1px;">THROWBACK POOL RUNNING LOW</div>
+  <div style="padding:24px;">
+    <h1 style="margin:0 0 4px;font-size:20px;color:#111;">Only {esc(str(eligible_count))} eligible throwback set(s) left</h1>
+    <p style="margin:0 0 18px;color:#666;font-size:13px;">Threshold for this warning: below {esc(str(low_pool_threshold))} eligible sets (out of {esc(str(total_count))} total in the manifest).</p>
+    <div style="background:#f8f8f8;border-left:3px solid #f59e0b;padding:12px 16px;font-size:13px;line-height:1.6;">
+      The pool of galleries that haven't been posted recently (or are old enough to repost) is
+      getting small. Once it's exhausted, the throwback job will fail with
+      &quot;No eligible sets found&quot; until <code>post_history.json</code> is pruned/reset or the
+      history/min-age thresholds are adjusted.
+    </div>
+  </div>
+</div>
+</body>
+</html>"""
+
+
 def _load_auth(auth_path: Path) -> Dict[str, str]:
     auth = _load_json(auth_path)
     if not isinstance(auth, dict):
@@ -643,6 +709,18 @@ def main() -> int:
     p.add_argument("--history", default="post_history.json", help="State file to avoid repeats")
     p.add_argument("--threshold-days", type=int, default=90, help="Do not repeat a set within this many days")
     p.add_argument(
+        "--min-age-days",
+        type=int,
+        default=90,
+        help="Only consider galleries originally published at least this many days ago",
+    )
+    p.add_argument(
+        "--low-pool-threshold",
+        type=int,
+        default=45,
+        help="Send a warning email when the eligible pool drops below this many sets",
+    )
+    p.add_argument(
         "--set-name",
         default=None,
         help="Force a specific set_name from manifest (exact match, ignores history threshold filtering)",
@@ -714,9 +792,28 @@ def main() -> int:
             print(f"WARNING: multiple manifest entries matched set_name; using first match: {args.set_name}")
         chosen = matches[0]
     else:
-        eligible = _eligible_entries(manifest, history, args.threshold_days, now)
+        eligible = _eligible_entries(manifest, history, args.threshold_days, args.min_age_days, now)
+        if len(eligible) < args.low_pool_threshold:
+            print(
+                f"WARNING: eligible throwback pool is low ({len(eligible)} of {len(manifest)}, "
+                f"threshold={args.low_pool_threshold})."
+            )
+            if not args.no_email and args.email_to:
+                try:
+                    subject = f"[rin-city.com] Throwback pool running low ({len(eligible)} eligible)"
+                    warning_html = _build_low_pool_warning_html(
+                        eligible_count=len(eligible),
+                        total_count=len(manifest),
+                        low_pool_threshold=args.low_pool_threshold,
+                    )
+                    _send_html_email_no_attachment(env_cfg, args.email_to, subject, warning_html)
+                except Exception as e:
+                    print(f"WARNING: low-pool warning email failed: {e}", file=sys.stderr)
         if not eligible:
-            print(f"No eligible sets found (threshold_days={args.threshold_days}).", file=sys.stderr)
+            print(
+                f"No eligible sets found (threshold_days={args.threshold_days}, min_age_days={args.min_age_days}).",
+                file=sys.stderr,
+            )
             return 3
         chosen = rng.choice(eligible)
 
