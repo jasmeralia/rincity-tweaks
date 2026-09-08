@@ -3,9 +3,9 @@ PLUGINS     := $(WP_CONTENT)/plugins
 MU_PLUGINS  := $(WP_CONTENT)/mu-plugins
 OWNER       := nobody:nogroup
 
-.PHONY: all rc_tweaks rincity-envira-exif rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-media-sync rincity-nav-tweaks rincity-news-widget rincity-wallpaper-candidates rincity-wf-block-logger rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds test help
+.PHONY: all rc_tweaks rincity-envira-exif rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-media-sync rincity-nav-tweaks rincity-news-widget rincity-plugin-update-email-recipient rincity-wallpaper-candidates rincity-wf-block-logger rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds test help
 
-all: rc_tweaks rincity-envira-exif rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-media-sync rincity-nav-tweaks rincity-news-widget rincity-wallpaper-candidates rincity-wf-block-logger rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds ## Deploy all plugins
+all: rc_tweaks rincity-envira-exif rincity-envira-search-enhancements rincity-envira-zoom rincity-gallery-favorites rincity-image-size-control rincity-media-sync rincity-nav-tweaks rincity-news-widget rincity-plugin-update-email-recipient rincity-wallpaper-candidates rincity-wf-block-logger rincity-wordfence-temp-allowlist rincity-zero-scheduled-seconds ## Deploy all plugins
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*##"}; {printf "  %-40s %s\n", $$1, $$2}'
@@ -46,6 +46,11 @@ rincity-nav-tweaks: ## Deploy rincity-nav-tweaks to wp-content/plugins/rincity-n
 
 rincity-news-widget: ## Deploy rincity-news-widget to wp-content/plugins/rincity-news-widget/
 	sudo rsync -av --chown=$(OWNER) --exclude='README.md' rincity-news-widget/ $(PLUGINS)/rincity-news-widget/
+
+rincity-plugin-update-email-recipient: ## Deploy rincity-plugin-update-email-recipient to wp-content/mu-plugins/
+	sudo install -o nobody -g nogroup -m 644 \
+		rincity-plugin-update-email-recipient/rincity-plugin-update-email-recipient.php \
+		$(MU_PLUGINS)/rincity-plugin-update-email-recipient.php
 
 rincity-wallpaper-candidates: ## Deploy rincity-wallpaper-candidates to wp-content/plugins/rincity-wallpaper-candidates/
 	sudo rsync -av --chown=$(OWNER) rincity-wallpaper-candidates/ $(PLUGINS)/rincity-wallpaper-candidates/
