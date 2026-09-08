@@ -72,6 +72,17 @@ A WordPress plugin (v1.1.3) that fixes mobile submenu expand/collapse on the Ash
 - Strips the `href="#"` attribute from desktop parent nav items via `nav_menu_link_attributes`, so tapping them has no default browser action (no scroll-to-top); desktop submenus continue to open via the theme's native hover behavior
 - Leaves real-link parents (About, Spoil Me!) navigable via their anchor
 
+### [rincity-plugin-update-email-recipient](rincity-plugin-update-email-recipient/)
+
+A WordPress must-use plugin (v1.0.0) that reroutes the WP core plugin/theme background auto-update summary email to a single recipient, independent of `admin_email`. Other WordPress notifications continue using their existing recipients.
+
+**Deploy path:** `wp-content/mu-plugins/rincity-plugin-update-email-recipient.php`
+
+**Required constants in `wp-config.php`:**
+```php
+define( 'RINCITY_PLUGIN_UPDATE_EMAIL_RECIPIENT', 'recipient@example.com' );
+```
+
 ### [rincity-wf-block-logger](rincity-wf-block-logger/)
 
 A WordPress must-use plugin (v1.0.0) that logs Wordfence IP ban events (rate/flood blocks, WAF triggers, manual and automatic-permanent IP blocks) as JSON to the systemd journal, for ingestion by Vector into the `ip-blocks-*` OpenSearch index. See [rincity-wf-block-logger/README.md](rincity-wf-block-logger/README.md) for full documentation.
@@ -126,6 +137,7 @@ rincity-envira-covers  →  cover manifest (JSON)
 | rincity-image-size-control | WordPress 5.0+, PHP 7.0+, Envira Gallery plugin |
 | rincity-nav-tweaks | WordPress 5.0+, PHP 7.0+ |
 | rincity-news-widget | WordPress 5.0+, PHP 7.0+, Envira Gallery plugin |
+| rincity-plugin-update-email-recipient | WordPress 5.0+, PHP 7.0+ |
 | rincity-wf-block-logger | WordPress 5.0+, PHP 7.0+, Wordfence plugin |
 | rincity-wordfence-temp-allowlist | WordPress 5.0+, PHP 7.0+, Wordfence plugin |
 | rincity-zero-scheduled-seconds | WordPress 5.0+, PHP 5.3+ |

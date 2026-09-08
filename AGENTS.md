@@ -145,6 +145,7 @@ Keep entries on a single line. Reference Odoo task IDs where relevant.
 | `rincity-media-sync` | **mu-plugins** | Asynchronously mirrors media writes/deletes to S3 and invalidates overwritten or deleted CloudFront paths |
 | `rincity-nav-tweaks` | `plugins/rincity-nav-tweaks/` | Fixes mobile submenu expand/collapse and desktop scroll-to-top on the Ashe Pro theme |
 | `rincity-news-widget` | `plugins/rincity-news-widget/` | |
+| `rincity-plugin-update-email-recipient` | **mu-plugins** | Reroutes the WP core plugin/theme auto-update summary email to a single recipient, independent of admin_email |
 | `rincity-wallpaper-candidates` | `plugins/rincity-wallpaper-candidates/` | Wallpaper candidate tracking |
 | `rincity-wf-block-logger` | **mu-plugins** | Logs Wordfence IP ban events to the systemd journal for Vector/OpenSearch ingestion |
 | `rincity-wordfence-temp-allowlist` | **mu-plugins** | Auto-allowlist for Morgan's IP |
