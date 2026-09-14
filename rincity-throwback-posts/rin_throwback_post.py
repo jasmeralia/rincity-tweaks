@@ -400,6 +400,26 @@ def _resize_for_email(image_path: Path, max_width: int = 600) -> tuple[Path, Opt
     return tmp_path, tmp_path
 
 
+def _platform_failure_lines(
+    twitter_error: Optional[str],
+    twitter_billing_error: bool,
+    bluesky_error: Optional[str],
+) -> List[str]:
+    esc = html.escape
+    lines: List[str] = []
+    if twitter_error:
+        if twitter_billing_error:
+            lines.append(
+                "X/Twitter: blocked by depleted API credits (402 Payment Required) — "
+                "check billing/autoreload in the X Developer Portal."
+            )
+        else:
+            lines.append(f"X/Twitter posting failed: {esc(twitter_error)}")
+    if bluesky_error:
+        lines.append(f"Bluesky posting failed: {esc(bluesky_error)}")
+    return lines
+
+
 def _build_email_html(
     set_name: str,
     set_url: str,
@@ -408,6 +428,9 @@ def _build_email_html(
     dry_run: bool,
     twitter_post_id: Optional[str] = None,
     bluesky_url: Optional[str] = None,
+    twitter_error: Optional[str] = None,
+    twitter_billing_error: bool = False,
+    bluesky_error: Optional[str] = None,
 ) -> str:
     esc = html.escape
     dry_banner = (
@@ -426,6 +449,17 @@ def _build_email_html(
         '<div style="margin-top:12px;display:flex;gap:16px;">' + " &nbsp;·&nbsp; ".join(social_links) + "</div>"
         if social_links else ""
     )
+    failure_lines = _platform_failure_lines(twitter_error, twitter_billing_error, bluesky_error)
+    warning_html = ""
+    if failure_lines:
+        items = "".join(f"<li>{line}</li>" for line in failure_lines)
+        warning_html = (
+            '<div style="background:#fef3c7;border-left:3px solid #f59e0b;padding:12px 16px;'
+            'font-size:13px;line-height:1.6;margin-bottom:20px;">'
+            "<b>Partial posting failure:</b>"
+            f'<ul style="margin:6px 0 0;padding-left:18px;">{items}</ul>'
+            "</div>"
+        )
     post_html = esc(post_text).replace("\n", "<br>")
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -437,6 +471,7 @@ def _build_email_html(
   <div style="padding:24px;">
     <h1 style="margin:0 0 4px;font-size:20px;color:#111;">{esc(set_name)}</h1>
     <p style="margin:0 0 18px;color:#666;font-size:13px;">Published {esc(published)}</p>
+    {warning_html}
     <div style="background:#f8f8f8;border-left:3px solid #6366f1;padding:12px 16px;font-size:13px;line-height:1.6;margin-bottom:20px;">{post_html}</div>
     <a href="{esc(set_url)}" style="display:inline-block;background:#6366f1;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">View Gallery →</a>
     {social_html}
@@ -532,6 +567,38 @@ def _build_low_pool_warning_html(eligible_count: int, total_count: int, low_pool
 </html>"""
 
 
+def _build_failure_email_html(
+    set_name: str,
+    set_url: str,
+    published: str,
+    twitter_error: Optional[str],
+    twitter_billing_error: bool,
+    bluesky_error: Optional[str],
+) -> str:
+    esc = html.escape
+    items = "".join(
+        f"<li>{line}</li>"
+        for line in _platform_failure_lines(twitter_error, twitter_billing_error, bluesky_error)
+    )
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f0f0f0;font-family:system-ui,-apple-system,sans-serif;">
+<div style="max-width:600px;margin:24px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+  <div style="background:#dc2626;color:#fff;text-align:center;padding:8px 16px;font-weight:700;font-size:13px;letter-spacing:1px;">THROWBACK POST FAILED</div>
+  <div style="padding:24px;">
+    <h1 style="margin:0 0 4px;font-size:20px;color:#111;">{esc(set_name)}</h1>
+    <p style="margin:0 0 18px;color:#666;font-size:13px;">Selected but not posted anywhere — originally published {esc(published)}</p>
+    <div style="background:#f8f8f8;border-left:3px solid #dc2626;padding:12px 16px;font-size:13px;line-height:1.6;">
+      <ul style="margin:0;padding-left:18px;">{items}</ul>
+    </div>
+    <a href="{esc(set_url)}" style="display:inline-block;margin-top:20px;background:#6366f1;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">View Gallery →</a>
+  </div>
+</div>
+</body>
+</html>"""
+
+
 def _load_auth(auth_path: Path) -> Dict[str, str]:
     auth = _load_json(auth_path)
     if not isinstance(auth, dict):
@@ -565,6 +632,51 @@ def _twitter_clients(auth: Dict[str, str]):
         wait_on_rate_limit=True,
     )
     return api_v1, client_v2
+
+
+def _is_billing_error(exc: Exception) -> bool:
+    # X API returns 402 Payment Required when the account's API credits are
+    # depleted. Not one of tweepy's named exceptions (Unauthorized/Forbidden/
+    # TooManyRequests/etc.), so it surfaces as a generic HTTPException — check
+    # the underlying HTTP status directly.
+    status_code = getattr(getattr(exc, "response", None), "status_code", None)
+    return status_code == 402
+
+
+def _attempt_twitter_post(
+    twitter_auth_path: Path,
+    image_path: Path,
+    max_bytes_twitter: int,
+    post_text: str,
+) -> tuple[Optional[str], Optional[str], bool]:
+    """Attempt to post to Twitter/X. Returns (post_id, error_message, is_billing_error)."""
+    if not twitter_auth_path.exists():
+        return None, f"Twitter auth file not found: {twitter_auth_path}", False
+
+    try:
+        auth = _load_auth(twitter_auth_path)
+        api_v1, client_v2 = _twitter_clients(auth)
+    except Exception as e:
+        return None, f"Twitter auth/init failed: {e}", _is_billing_error(e)
+
+    upload_path = image_path
+    tmp_path: Optional[Path] = None
+    try:
+        upload_path, tmp_path = _prepare_image_for_upload(image_path, max_bytes=max_bytes_twitter)
+        media = api_v1.media_upload(filename=str(upload_path))
+        media_id = media.media_id
+    except Exception as e:
+        return None, f"Twitter media upload failed: {e}", _is_billing_error(e)
+    finally:
+        if tmp_path:
+            tmp_path.unlink(missing_ok=True)
+
+    try:
+        resp = client_v2.create_tweet(text=post_text, media_ids=[media_id])
+        twitter_post_id = getattr(resp, "data", {}).get("id") if resp else None
+        return twitter_post_id, None, False
+    except Exception as e:
+        return None, f"Twitter post create failed: {e}", _is_billing_error(e)
 
 
 def _load_bluesky_auth(auth_path: Path) -> Dict[str, str]:
@@ -895,116 +1007,125 @@ def main() -> int:
     twitter_post_id: Optional[str] = None
     bluesky_uri: Optional[str] = None
     bluesky_url: Optional[str] = None
+    twitter_error: Optional[str] = None
+    twitter_billing_error = False
+    bluesky_error: Optional[str] = None
     max_bytes_twitter = args.max_image_mb * 1024 * 1024
     max_bytes_bluesky = min(max_bytes_twitter, 1_000_000)
     bluesky_text = post_text
 
+    # Twitter and Bluesky are attempted independently — a Twitter failure (e.g.
+    # depleted X API credits) must not prevent Bluesky from posting, nor skip
+    # history recording / email for whichever platform(s) did succeed.
     if post_to_twitter:
-        if not twitter_auth_path.exists():
-            print(f"ERROR: Twitter auth file not found: {twitter_auth_path}", file=sys.stderr)
-            return 6
-        try:
-            auth = _load_auth(twitter_auth_path)
-            api_v1, client_v2 = _twitter_clients(auth)
-        except Exception as e:
-            print(f"ERROR: Twitter auth/init failed: {e}", file=sys.stderr)
-            return 6
-
-        upload_path = image_path
-        tmp_path: Optional[Path] = None
-        try:
-            upload_path, tmp_path = _prepare_image_for_upload(image_path, max_bytes=max_bytes_twitter)
-            media = api_v1.media_upload(filename=str(upload_path))
-            media_id = media.media_id
-        except Exception as e:
-            print(f"ERROR: Twitter media upload failed: {e}", file=sys.stderr)
-            return 7
-        finally:
-            if tmp_path:
-                tmp_path.unlink(missing_ok=True)
-
-        try:
-            resp = client_v2.create_tweet(text=post_text, media_ids=[media_id])
-            twitter_post_id = getattr(resp, "data", {}).get("id") if resp else None
-        except Exception as e:
-            print(f"ERROR: Twitter post create failed: {e}", file=sys.stderr)
-            return 8
+        twitter_post_id, twitter_error, twitter_billing_error = _attempt_twitter_post(
+            twitter_auth_path, image_path, max_bytes_twitter, post_text
+        )
+        if twitter_error:
+            if twitter_billing_error:
+                print(
+                    "ERROR: Twitter billing/credits issue (X API 402 Payment Required) — "
+                    f"check X Developer Portal billing/autoreload: {twitter_error}",
+                    file=sys.stderr,
+                )
+            else:
+                print(f"ERROR: {twitter_error}", file=sys.stderr)
 
     if post_to_bluesky:
         if not bluesky_auth_path.exists():
-            print(f"ERROR: Bluesky auth file not found: {bluesky_auth_path}", file=sys.stderr)
-            return 10
-        upload_path = image_path
-        tmp_path = None
-        try:
-            bsky_template_to_use = bluesky_template_path if bluesky_template_path.exists() else template_path
-            bluesky_text = _render_template_text(
-                template_path=bsky_template_to_use,
-                context={**template_context, "max_len": 300},
-                max_len=300,
-            )
-            bsky_auth = _load_bluesky_auth(bluesky_auth_path)
-            bsky_session = _bluesky_login(bsky_auth)
-            upload_path, tmp_path = _prepare_image_for_upload(image_path, max_bytes=max_bytes_bluesky)
-            blob = _bluesky_upload_blob(bsky_session["service"], bsky_session["access_jwt"], upload_path)
-            created_at = now.isoformat().replace("+00:00", "Z")
-            post = _bluesky_create_post(
-                service=bsky_session["service"],
-                access_jwt=bsky_session["access_jwt"],
-                did=bsky_session["did"],
-                text=bluesky_text,
-                created_at=created_at,
-                image_blob=blob,
-                alt_text=f"Cover image for {set_name}",
-            )
-            bluesky_uri = str(post.get("uri")) if post.get("uri") else None
-            if bluesky_uri:
-                profile_ref = str(bsky_session.get("handle") or bsky_session["did"])
-                bluesky_url = _bluesky_web_url_from_at_uri(bluesky_uri, profile_ref)
-        except Exception as e:
-            print(f"ERROR: Bluesky post failed: {e}", file=sys.stderr)
-            return 11
-        finally:
-            if tmp_path:
-                tmp_path.unlink(missing_ok=True)
+            bluesky_error = f"Bluesky auth file not found: {bluesky_auth_path}"
+            print(f"ERROR: {bluesky_error}", file=sys.stderr)
+        else:
+            upload_path = image_path
+            tmp_path = None
+            try:
+                bsky_template_to_use = bluesky_template_path if bluesky_template_path.exists() else template_path
+                bluesky_text = _render_template_text(
+                    template_path=bsky_template_to_use,
+                    context={**template_context, "max_len": 300},
+                    max_len=300,
+                )
+                bsky_auth = _load_bluesky_auth(bluesky_auth_path)
+                bsky_session = _bluesky_login(bsky_auth)
+                upload_path, tmp_path = _prepare_image_for_upload(image_path, max_bytes=max_bytes_bluesky)
+                blob = _bluesky_upload_blob(bsky_session["service"], bsky_session["access_jwt"], upload_path)
+                created_at = now.isoformat().replace("+00:00", "Z")
+                post = _bluesky_create_post(
+                    service=bsky_session["service"],
+                    access_jwt=bsky_session["access_jwt"],
+                    did=bsky_session["did"],
+                    text=bluesky_text,
+                    created_at=created_at,
+                    image_blob=blob,
+                    alt_text=f"Cover image for {set_name}",
+                )
+                bluesky_uri = str(post.get("uri")) if post.get("uri") else None
+                if bluesky_uri:
+                    profile_ref = str(bsky_session.get("handle") or bsky_session["did"])
+                    bluesky_url = _bluesky_web_url_from_at_uri(bluesky_uri, profile_ref)
+            except Exception as e:
+                bluesky_error = f"Bluesky post failed: {e}"
+                print(f"ERROR: {bluesky_error}", file=sys.stderr)
+            finally:
+                if tmp_path:
+                    tmp_path.unlink(missing_ok=True)
 
-    record = {
-        "twitter_post_id": str(twitter_post_id) if twitter_post_id else None,
-        "bluesky_uri": bluesky_uri,
-        "bluesky_url": bluesky_url,
-        "posted_at": now.isoformat(),
-        "filename": filename,
-        "set_name": set_name,
-        "set_url": set_url,
-    }
-    history.append(record)
-    _save_json(history_path, history)
+    any_success = bool(twitter_post_id or bluesky_uri)
+    any_error = bool(twitter_error or bluesky_error)
 
-    print(f"Posted throwback for set: {set_name}")
-    if twitter_post_id:
-        print(f"Twitter URL: https://x.com/i/web/status/{twitter_post_id}")
-    if bluesky_url:
-        print(f"Bluesky URL: {bluesky_url}")
-    elif bluesky_uri:
-        print(f"Bluesky URI: {bluesky_uri}")
+    if any_success:
+        record = {
+            "twitter_post_id": str(twitter_post_id) if twitter_post_id else None,
+            "bluesky_uri": bluesky_uri,
+            "bluesky_url": bluesky_url,
+            "posted_at": now.isoformat(),
+            "filename": filename,
+            "set_name": set_name,
+            "set_url": set_url,
+        }
+        history.append(record)
+        _save_json(history_path, history)
 
-    if not args.no_email and args.email_to:
-        email_img, email_tmp = _resize_for_email(image_path)
-        try:
-            subject = f"[rin-city.com] Throwback posted: {set_name} — {published}"
-            html_body = _build_email_html(
-                set_name=set_name, set_url=set_url, published=published,
-                post_text=bluesky_text or post_text, dry_run=False,
-                twitter_post_id=twitter_post_id, bluesky_url=bluesky_url,
-            )
-            _send_html_email(env_cfg, args.email_to, subject, html_body, email_img)
-        except Exception as e:
-            print(f"WARNING: email failed: {e}", file=sys.stderr)
-        finally:
-            if email_tmp:
-                email_tmp.unlink(missing_ok=True)
+        print(f"Posted throwback for set: {set_name}")
+        if twitter_post_id:
+            print(f"Twitter URL: https://x.com/i/web/status/{twitter_post_id}")
+        if bluesky_url:
+            print(f"Bluesky URL: {bluesky_url}")
+        elif bluesky_uri:
+            print(f"Bluesky URI: {bluesky_uri}")
 
-    return 0
+        if not args.no_email and args.email_to:
+            email_img, email_tmp = _resize_for_email(image_path)
+            try:
+                subject = f"[rin-city.com] Throwback posted: {set_name} — {published}"
+                html_body = _build_email_html(
+                    set_name=set_name, set_url=set_url, published=published,
+                    post_text=bluesky_text or post_text, dry_run=False,
+                    twitter_post_id=twitter_post_id, bluesky_url=bluesky_url,
+                    twitter_error=twitter_error, twitter_billing_error=twitter_billing_error,
+                    bluesky_error=bluesky_error,
+                )
+                _send_html_email(env_cfg, args.email_to, subject, html_body, email_img)
+            except Exception as e:
+                print(f"WARNING: email failed: {e}", file=sys.stderr)
+            finally:
+                if email_tmp:
+                    email_tmp.unlink(missing_ok=True)
+    else:
+        print(f"ERROR: All requested platform(s) failed to post for set: {set_name}", file=sys.stderr)
+        if not args.no_email and args.email_to:
+            try:
+                subject = f"[rin-city.com] Throwback post FAILED: {set_name} — {published}"
+                html_body = _build_failure_email_html(
+                    set_name=set_name, set_url=set_url, published=published,
+                    twitter_error=twitter_error, twitter_billing_error=twitter_billing_error,
+                    bluesky_error=bluesky_error,
+                )
+                _send_html_email_no_attachment(env_cfg, args.email_to, subject, html_body)
+            except Exception as e:
+                print(f"WARNING: failure alert email failed: {e}", file=sys.stderr)
+
+    return 12 if any_error else 0
 
 
 if __name__ == "__main__":
