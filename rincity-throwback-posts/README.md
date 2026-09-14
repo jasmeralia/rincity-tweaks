@@ -246,6 +246,33 @@ distinct from the per-post summary email and has no cover image attached. If
 the pool is fully exhausted (0 eligible), the run still exits with an error
 (exit code 3) after sending the warning.
 
+## Failure Handling
+
+With `--platform both`, Twitter/X and Bluesky are attempted **independently** —
+a failure on one platform does not prevent the other from posting, and does
+not skip history recording or email for whichever platform(s) succeeded.
+
+- If **at least one** platform succeeds, the run records history and sends
+  the normal success email as usual. If the other platform failed, that
+  email includes an additional "Partial posting failure" warning block
+  naming which platform failed and why.
+- If **all** requested platforms fail, nothing is recorded in
+  `post_history.json` (so the same set is retried next run), and instead of
+  the success email a separate failure-alert email is sent (subject
+  `Throwback post FAILED: ...`) listing each platform's error.
+- A Twitter/X `402 Payment Required` response (the account's API credits are
+  depleted) is detected specifically and called out as a billing/credits
+  issue — both in the printed log line and in either email above — rather
+  than surfacing as a generic Twitter failure. Check billing/autoreload in
+  the X Developer Portal when you see this.
+- The run's exit code is `12` if any requested platform failed (even if
+  another one succeeded), `0` if all requested platforms succeeded (or on a
+  dry run). See `run_throwback.sh`: a nonzero exit there also dumps the
+  run's full output to the wrapper's own stderr (not just `cron.log`), which
+  is what makes cron's `MAILTO` delivery and the OpenSearch daily digest's
+  cron-failure check actually fire — both depend on cron seeing output on
+  failure, and a silently swallowed exit code produces neither.
+
 ## Notes
 
 - Default platform is `both`.
