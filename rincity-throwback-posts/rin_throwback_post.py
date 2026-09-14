@@ -26,6 +26,7 @@ Notes:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as dt
 import email.utils
 import html
@@ -46,7 +47,7 @@ from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 try:
     import tweepy  # type: ignore
@@ -93,7 +94,7 @@ def _fit_tags(base: str, tags: str, max_len: int) -> str:
     if len(candidate) <= max_len:
         return tags
     tag_list = [t for t in tags.split() if t.startswith("#")]
-    kept: List[str] = []
+    kept: list[str] = []
     for t in tag_list:
         next_len = len(f"{base}\n\n{' '.join(kept + [t])}")
         if next_len <= max_len:
@@ -103,11 +104,11 @@ def _fit_tags(base: str, tags: str, max_len: int) -> str:
     return " ".join(kept)
 
 
-def _magick_cmd() -> Optional[str]:
+def _magick_cmd() -> str | None:
     return shutil.which("magick") or shutil.which("convert")
 
 
-def _prepare_image_for_upload(image_path: Path, max_bytes: int) -> tuple[Path, Optional[Path]]:
+def _prepare_image_for_upload(image_path: Path, max_bytes: int) -> tuple[Path, Path | None]:
     if image_path.stat().st_size <= max_bytes:
         return image_path, None
 
@@ -184,7 +185,7 @@ def _prepare_image_for_upload(image_path: Path, max_bytes: int) -> tuple[Path, O
     return tmp_path, tmp_path
 
 
-def _render_post_text(template_path: Path, context: Dict[str, Any], max_len: int = 280) -> str:
+def _render_post_text(template_path: Path, context: dict[str, Any], max_len: int = 280) -> str:
     if jinja2 is None:
         raise RuntimeError("jinja2 is not installed. Run: pip install jinja2")
     if not template_path.exists():
@@ -198,12 +199,12 @@ def _render_post_text(template_path: Path, context: Dict[str, Any], max_len: int
     return rendered
 
 
-def _render_template_text(template_path: Path, context: Dict[str, Any], max_len: int) -> str:
+def _render_template_text(template_path: Path, context: dict[str, Any], max_len: int) -> str:
     return _render_post_text(template_path=template_path, context=context, max_len=max_len)
 
 
-def _bluesky_link_facets(text: str) -> List[Dict[str, Any]]:
-    facets: List[Dict[str, Any]] = []
+def _bluesky_link_facets(text: str) -> list[dict[str, Any]]:
+    facets: list[dict[str, Any]] = []
     for match in re.finditer(r"https?://\S+", text):
         raw_url = match.group(0)
         url = raw_url.rstrip(".,;:!?)]}")
@@ -236,7 +237,7 @@ def _normalize_quotes(text: str) -> str:
     )
 
 
-def _load_history(history_path: Path) -> List[Dict[str, Any]]:
+def _load_history(history_path: Path) -> list[dict[str, Any]]:
     if not history_path.exists():
         return []
     data = _load_json(history_path)
@@ -244,13 +245,13 @@ def _load_history(history_path: Path) -> List[Dict[str, Any]]:
 
 
 def _eligible_entries(
-    manifest: List[Dict[str, Any]],
-    history: List[Dict[str, Any]],
+    manifest: list[dict[str, Any]],
+    history: list[dict[str, Any]],
     threshold_days: int,
     min_age_days: int,
     now: dt.datetime,
-) -> List[Dict[str, Any]]:
-    last: Dict[str, dt.datetime] = {}
+) -> list[dict[str, Any]]:
+    last: dict[str, dt.datetime] = {}
     for h in history:
         key = (h.get("set_url") or h.get("set_name") or "").strip()
         ts = h.get("posted_at") or h.get("tweeted_at")
@@ -258,12 +259,13 @@ def _eligible_entries(
             continue
         try:
             when = dt.datetime.fromisoformat(ts)
-        except Exception:
+        except Exception as e:
+            print(f"WARNING: skipping history entry with unparseable posted_at {ts!r}: {e}", file=sys.stderr)
             continue
         if key not in last or when > last[key]:
             last[key] = when
 
-    eligible: List[Dict[str, Any]] = []
+    eligible: list[dict[str, Any]] = []
     for e in manifest:
         set_url = (e.get("set_url") or "").strip()
         set_name = (e.get("set_name") or "").strip()
@@ -274,7 +276,8 @@ def _eligible_entries(
         date_published = (e.get("date_published") or "").strip()
         try:
             published_at = _parse_iso8601(date_published)
-        except Exception:
+        except Exception as e:
+            print(f"WARNING: skipping manifest entry {key!r} with unparseable date_published {date_published!r}: {e}", file=sys.stderr)
             continue
         if _days_ago(published_at, now) < min_age_days:
             continue
@@ -289,7 +292,7 @@ def _normalized_set_name_for_match(name: str) -> str:
     return _normalize_quotes(html.unescape((name or "").strip())).casefold()
 
 
-def _extract_envira_categories(entry: Dict[str, Any]) -> List[str]:
+def _extract_envira_categories(entry: dict[str, Any]) -> list[str]:
     candidate_keys = [
         "envira_categories",
         "categories",
@@ -306,7 +309,7 @@ def _extract_envira_categories(entry: Dict[str, Any]) -> List[str]:
     if raw is None:
         return []
 
-    names: List[str] = []
+    names: list[str] = []
     if isinstance(raw, str):
         names = [part.strip() for part in re.split(r"[,\n]", raw) if part.strip()]
     elif isinstance(raw, list):
@@ -333,7 +336,7 @@ def _extract_envira_categories(entry: Dict[str, Any]) -> List[str]:
     return names
 
 
-def _build_credit_context(categories: List[str]) -> Dict[str, str]:
+def _build_credit_context(categories: list[str]) -> dict[str, str]:
     photographer_credit = ""
     other_model_credit = ""
 
@@ -349,7 +352,7 @@ def _build_credit_context(categories: List[str]) -> Dict[str, str]:
             photographer_credit = f"{c}\n"
             break
 
-    other_models: List[str] = []
+    other_models: list[str] = []
     for category in categories:
         c = category.strip()
         if not c:
@@ -372,8 +375,8 @@ def _build_credit_context(categories: List[str]) -> Dict[str, str]:
     }
 
 
-def _load_env(env_path: Path) -> Dict[str, str]:
-    result: Dict[str, str] = {}
+def _load_env(env_path: Path) -> dict[str, str]:
+    result: dict[str, str] = {}
     if not env_path.exists():
         return result
     for line in env_path.read_text(encoding="utf-8").splitlines():
@@ -385,7 +388,7 @@ def _load_env(env_path: Path) -> Dict[str, str]:
     return result
 
 
-def _resize_for_email(image_path: Path, max_width: int = 600) -> tuple[Path, Optional[Path]]:
+def _resize_for_email(image_path: Path, max_width: int = 600) -> tuple[Path, Path | None]:
     cmd = _magick_cmd()
     if not cmd:
         return image_path, None
@@ -401,12 +404,12 @@ def _resize_for_email(image_path: Path, max_width: int = 600) -> tuple[Path, Opt
 
 
 def _platform_failure_lines(
-    twitter_error: Optional[str],
+    twitter_error: str | None,
     twitter_billing_error: bool,
-    bluesky_error: Optional[str],
-) -> List[str]:
+    bluesky_error: str | None,
+) -> list[str]:
     esc = html.escape
-    lines: List[str] = []
+    lines: list[str] = []
     if twitter_error:
         if twitter_billing_error:
             lines.append(
@@ -426,11 +429,11 @@ def _build_email_html(
     published: str,
     post_text: str,
     dry_run: bool,
-    twitter_post_id: Optional[str] = None,
-    bluesky_url: Optional[str] = None,
-    twitter_error: Optional[str] = None,
+    twitter_post_id: str | None = None,
+    bluesky_url: str | None = None,
+    twitter_error: str | None = None,
     twitter_billing_error: bool = False,
-    bluesky_error: Optional[str] = None,
+    bluesky_error: str | None = None,
 ) -> str:
     esc = html.escape
     dry_banner = (
@@ -439,7 +442,7 @@ def _build_email_html(
         if dry_run else ""
     )
     mock_label = " (mock)" if dry_run else ""
-    social_links: List[str] = []
+    social_links: list[str] = []
     if twitter_post_id:
         url = f"https://x.com/i/web/status/{twitter_post_id}"
         social_links.append(f'<a href="{url}" style="color:#1d9bf0;text-decoration:none;font-size:13px;">View on X/Twitter{mock_label} →</a>')
@@ -482,7 +485,7 @@ def _build_email_html(
 
 
 def _send_html_email(
-    env: Dict[str, str],
+    env: dict[str, str],
     to_addr: str,
     subject: str,
     html_body: str,
@@ -517,7 +520,7 @@ def _send_html_email(
 
 
 def _send_html_email_no_attachment(
-    env: Dict[str, str],
+    env: dict[str, str],
     to_addr: str,
     subject: str,
     html_body: str,
@@ -571,9 +574,9 @@ def _build_failure_email_html(
     set_name: str,
     set_url: str,
     published: str,
-    twitter_error: Optional[str],
+    twitter_error: str | None,
     twitter_billing_error: bool,
-    bluesky_error: Optional[str],
+    bluesky_error: str | None,
 ) -> str:
     esc = html.escape
     items = "".join(
@@ -599,10 +602,10 @@ def _build_failure_email_html(
 </html>"""
 
 
-def _load_auth(auth_path: Path) -> Dict[str, str]:
+def _load_auth(auth_path: Path) -> dict[str, str]:
     auth = _load_json(auth_path)
     if not isinstance(auth, dict):
-        raise RuntimeError("Auth file must be a JSON object.")
+        raise TypeError("Auth file must be a JSON object.")
     required = ["api_key", "api_secret", "access_token", "access_token_secret"]
     missing = [k for k in required if not auth.get(k)]
     if missing:
@@ -610,7 +613,7 @@ def _load_auth(auth_path: Path) -> Dict[str, str]:
     return {k: str(v) for k, v in auth.items()}
 
 
-def _twitter_clients(auth: Dict[str, str]):
+def _twitter_clients(auth: dict[str, str]):
     if tweepy is None:
         raise RuntimeError("tweepy is not installed. Run: pip install tweepy")
 
@@ -648,7 +651,7 @@ def _attempt_twitter_post(
     image_path: Path,
     max_bytes_twitter: int,
     post_text: str,
-) -> tuple[Optional[str], Optional[str], bool]:
+) -> tuple[str | None, str | None, bool]:
     """Attempt to post to Twitter/X. Returns (post_id, error_message, is_billing_error)."""
     if not twitter_auth_path.exists():
         return None, f"Twitter auth file not found: {twitter_auth_path}", False
@@ -660,7 +663,7 @@ def _attempt_twitter_post(
         return None, f"Twitter auth/init failed: {e}", _is_billing_error(e)
 
     upload_path = image_path
-    tmp_path: Optional[Path] = None
+    tmp_path: Path | None = None
     try:
         upload_path, tmp_path = _prepare_image_for_upload(image_path, max_bytes=max_bytes_twitter)
         media = api_v1.media_upload(filename=str(upload_path))
@@ -679,10 +682,10 @@ def _attempt_twitter_post(
         return None, f"Twitter post create failed: {e}", _is_billing_error(e)
 
 
-def _load_bluesky_auth(auth_path: Path) -> Dict[str, str]:
+def _load_bluesky_auth(auth_path: Path) -> dict[str, str]:
     auth = _load_json(auth_path)
     if not isinstance(auth, dict):
-        raise RuntimeError("Bluesky auth file must be a JSON object.")
+        raise TypeError("Bluesky auth file must be a JSON object.")
     required = ["identifier", "app_password"]
     missing = [k for k in required if not auth.get(k)]
     if missing:
@@ -692,7 +695,7 @@ def _load_bluesky_auth(auth_path: Path) -> Dict[str, str]:
     return out
 
 
-def _http_json(url: str, payload: Dict[str, Any], headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+def _http_json(url: str, payload: dict[str, Any], headers: dict[str, str] | None = None) -> dict[str, Any]:
     body = json.dumps(payload).encode("utf-8")
     req_headers = {"Content-Type": "application/json"}
     if headers:
@@ -703,10 +706,8 @@ def _http_json(url: str, payload: Dict[str, Any], headers: Optional[Dict[str, st
             raw = resp.read()
     except urllib.error.HTTPError as e:
         details = ""
-        try:
+        with contextlib.suppress(Exception):
             details = e.read().decode("utf-8", errors="replace")
-        except Exception:
-            pass
         raise RuntimeError(f"HTTP {e.code} calling {url}: {details or e.reason}") from e
     try:
         return json.loads(raw.decode("utf-8"))
@@ -714,7 +715,7 @@ def _http_json(url: str, payload: Dict[str, Any], headers: Optional[Dict[str, st
         raise RuntimeError(f"Invalid JSON response from {url}") from e
 
 
-def _bluesky_login(auth: Dict[str, str]) -> Dict[str, str]:
+def _bluesky_login(auth: dict[str, str]) -> dict[str, str]:
     service = auth.get("service", "https://bsky.social").rstrip("/")
     session = _http_json(
         f"{service}/xrpc/com.atproto.server.createSession",
@@ -731,7 +732,7 @@ def _bluesky_login(auth: Dict[str, str]) -> Dict[str, str]:
     return out
 
 
-def _bluesky_web_url_from_at_uri(at_uri: str, profile_ref: str) -> Optional[str]:
+def _bluesky_web_url_from_at_uri(at_uri: str, profile_ref: str) -> str | None:
     # Expected AT URI format:
     # at://did:plc:.../app.bsky.feed.post/<rkey>
     prefix = "at://"
@@ -747,7 +748,7 @@ def _bluesky_web_url_from_at_uri(at_uri: str, profile_ref: str) -> Optional[str]
     return f"https://bsky.app/profile/{profile_ref}/post/{rkey}"
 
 
-def _bluesky_upload_blob(service: str, access_jwt: str, image_path: Path) -> Dict[str, Any]:
+def _bluesky_upload_blob(service: str, access_jwt: str, image_path: Path) -> dict[str, Any]:
     mime_type, _ = mimetypes.guess_type(str(image_path))
     if not mime_type:
         mime_type = "application/octet-stream"
@@ -766,10 +767,8 @@ def _bluesky_upload_blob(service: str, access_jwt: str, image_path: Path) -> Dic
             raw = resp.read()
     except urllib.error.HTTPError as e:
         details = ""
-        try:
+        with contextlib.suppress(Exception):
             details = e.read().decode("utf-8", errors="replace")
-        except Exception:
-            pass
         raise RuntimeError(f"Bluesky blob upload failed (HTTP {e.code}): {details or e.reason}") from e
     payload = json.loads(raw.decode("utf-8"))
     blob = payload.get("blob")
@@ -784,10 +783,10 @@ def _bluesky_create_post(
     did: str,
     text: str,
     created_at: str,
-    image_blob: Dict[str, Any],
+    image_blob: dict[str, Any],
     alt_text: str,
-) -> Dict[str, Any]:
-    record: Dict[str, Any] = {
+) -> dict[str, Any]:
+    record: dict[str, Any] = {
         "$type": "app.bsky.feed.post",
         "text": text,
         "createdAt": created_at,
@@ -1004,12 +1003,12 @@ def main() -> int:
     post_to_twitter = args.platform in {"twitter", "both"}
     post_to_bluesky = args.platform in {"bluesky", "both"}
 
-    twitter_post_id: Optional[str] = None
-    bluesky_uri: Optional[str] = None
-    bluesky_url: Optional[str] = None
-    twitter_error: Optional[str] = None
+    twitter_post_id: str | None = None
+    bluesky_uri: str | None = None
+    bluesky_url: str | None = None
+    twitter_error: str | None = None
     twitter_billing_error = False
-    bluesky_error: Optional[str] = None
+    bluesky_error: str | None = None
     max_bytes_twitter = args.max_image_mb * 1024 * 1024
     max_bytes_bluesky = min(max_bytes_twitter, 1_000_000)
     bluesky_text = post_text

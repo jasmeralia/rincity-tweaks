@@ -1,5 +1,8 @@
-# Explicit rule selection so lint results don't silently change when a
-# newer ruff version ships broader defaults (E4/E7/E9/F is ruff's own
-# traditional default set).
 [lint]
-select = ["E4", "E7", "E9", "F"]
+# BLE001 (flake8-blind-except) is intentionally not enforced: rin_throwback_post.py
+# wraps heterogeneous third-party/stdlib calls (tweepy, smtplib, urllib, subprocess)
+# in broad try/except Exception blocks by design, to log-and-continue/report rather
+# than crash a production cron job on an exception type we didn't anticipate.
+# Narrowing each site to precise exception types would need exhaustive knowledge of
+# every library's exception surface and risks an unhandled crash if one is missed.
+ignore = ["BLE001"]
