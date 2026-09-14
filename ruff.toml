@@ -1,0 +1,8 @@
+[lint]
+# BLE001 (flake8-blind-except) is intentionally not enforced: rin_throwback_post.py
+# wraps heterogeneous third-party/stdlib calls (tweepy, smtplib, urllib, subprocess)
+# in broad try/except Exception blocks by design, to log-and-continue/report rather
+# than crash a production cron job on an exception type we didn't anticipate.
+# Narrowing each site to precise exception types would need exhaustive knowledge of
+# every library's exception surface and risks an unhandled crash if one is missed.
+ignore = ["BLE001"]

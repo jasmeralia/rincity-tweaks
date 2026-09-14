@@ -88,5 +88,17 @@ status=$?
 set -e
 
 tee -a "${LOG}" < "${TMP_LOG}" > /dev/null
+
+if [[ "${status}" -ne 0 ]]; then
+  # Surface failures on our own stdout/stderr (not just cron.log) so cron's
+  # MAILTO mail delivery actually fires, and so the CRON journal gets the
+  # "MAIL" line the OpenSearch daily-digest cron_failures check looks for.
+  {
+    echo "run_throwback.sh failed (exit ${status}) at $(date -u +%FT%TZ)"
+    echo "---- output ----"
+    cat "${TMP_LOG}"
+  } >&2
+fi
+
 rm -f "${TMP_LOG}"
 exit "${status}"
