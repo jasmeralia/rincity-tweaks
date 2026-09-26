@@ -85,5 +85,4 @@ RIN_DRY_RUN=1 ~/bin/wp-lsphp --path=/usr/local/lsws/wordpress eval-file \
 
 ## Changelog
 
-- **Current** - Manifest entries include `post_id`.
-- Output filenames prefixed with publish date (`YYYY-MM-DD-`) for chronological sorting.
+- **Current** - Manifest entries include `post_id`. Output filenames prefixed with publish date (`YYYY-MM-DD-`) for chronological sorting.
