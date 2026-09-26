@@ -14,6 +14,7 @@ Default files (override via CLI):
   - auth file:      ./twitter_auth.json
   - history/state:  ./post_history.json
   - Twitter template: ./twitter_template.j2
+  - exclude list:   ./excludes.json (sets to never post; matched by name or post_id)
 
 Requires:
   pip install tweepy
@@ -242,6 +243,47 @@ def _load_history(history_path: Path) -> list[dict[str, Any]]:
         return []
     data = _load_json(history_path)
     return data if isinstance(data, list) else []
+
+
+def _load_excludes(exclude_path: Path) -> tuple[set[str], set[int]]:
+    """Load a flat JSON list mixing set names (str) and post IDs (int)."""
+    if not exclude_path.exists():
+        return set(), set()
+    data = _load_json(exclude_path)
+    if not isinstance(data, list):
+        raise TypeError("Exclude file must be a JSON list of set names and/or post IDs.")
+    names: set[str] = set()
+    ids: set[int] = set()
+    for item in data:
+        if isinstance(item, bool):
+            continue
+        if isinstance(item, int):
+            ids.add(item)
+        elif isinstance(item, str):
+            stripped = item.strip()
+            if stripped.isdigit():
+                ids.add(int(stripped))
+            else:
+                names.add(_normalized_set_name_for_match(stripped))
+    return names, ids
+
+
+def _filter_excluded(
+    manifest: list[dict[str, Any]],
+    excluded_names: set[str],
+    excluded_ids: set[int],
+) -> list[dict[str, Any]]:
+    if not excluded_names and not excluded_ids:
+        return manifest
+    kept: list[dict[str, Any]] = []
+    for e in manifest:
+        post_id = e.get("post_id")
+        if isinstance(post_id, int) and post_id in excluded_ids:
+            continue
+        if _normalized_set_name_for_match(str(e.get("set_name") or "")) in excluded_names:
+            continue
+        kept.append(e)
+    return kept
 
 
 def _eligible_entries(
@@ -818,6 +860,11 @@ def main() -> int:
     p.add_argument("--twitter-auth", default=None, help="Twitter auth JSON file (overrides --auth)")
     p.add_argument("--bluesky-auth", default="bluesky_auth.json", help="Bluesky auth JSON file")
     p.add_argument("--history", default="post_history.json", help="State file to avoid repeats")
+    p.add_argument(
+        "--exclude-file",
+        default="excludes.json",
+        help="JSON list of set names and/or post IDs to never select (applies to random selection and --set-name)",
+    )
     p.add_argument("--threshold-days", type=int, default=90, help="Do not repeat a set within this many days")
     p.add_argument(
         "--min-age-days",
@@ -867,6 +914,7 @@ def main() -> int:
     twitter_auth_path = Path(args.twitter_auth) if args.twitter_auth else Path(args.auth)
     bluesky_auth_path = Path(args.bluesky_auth)
     history_path = Path(args.history)
+    exclude_path = Path(args.exclude_file)
     template_path = Path(args.template)
     bluesky_template_path = Path(args.bluesky_template)
     if args.history == "post_history.json" and not history_path.exists():
@@ -888,6 +936,16 @@ def main() -> int:
     if not isinstance(manifest, list):
         print("ERROR: manifest.json must be a list of entries", file=sys.stderr)
         return 2
+
+    try:
+        excluded_names, excluded_ids = _load_excludes(exclude_path)
+    except Exception as e:
+        print(f"ERROR: failed to load exclude file {exclude_path}: {e}", file=sys.stderr)
+        return 2
+    if excluded_names or excluded_ids:
+        before = len(manifest)
+        manifest = _filter_excluded(manifest, excluded_names, excluded_ids)
+        print(f"Excluded {before - len(manifest)} set(s) per {exclude_path} ({before} -> {len(manifest)} in pool).")
 
     history = _load_history(history_path)
     now = dt.datetime.now(dt.timezone.utc)

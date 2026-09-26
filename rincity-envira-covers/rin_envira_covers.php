@@ -127,6 +127,7 @@ class Rin_Envira_Covers_Eval {
 
       $manifest[] = [
         'filename'       => basename($dest),
+        'post_id'        => $post_id,
         'set_name'       => $title,
         'date_published' => $published,
         'set_url'        => $set_url,

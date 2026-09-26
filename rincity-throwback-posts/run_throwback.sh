@@ -7,6 +7,7 @@ WORKDIR="/home/morgan/rincity-tweaks/rincity-throwback-posts"
 MANIFEST="/usr/local/lsws/wordpress/wp-content/uploads/Rin_Covers/manifest.json"
 IMAGES_DIR="/usr/local/lsws/wordpress/wp-content/uploads/Rin_Covers"
 HISTORY="/home/morgan/rincity-tweaks/rincity-throwback-posts/post_history.json"
+EXCLUDE_FILE="/home/morgan/rincity-tweaks/rincity-throwback-posts/excludes.json"
 LOG="/home/morgan/rincity-tweaks/rincity-throwback-posts/cron.log"
 # THRESHOLD_DAYS="3964"
 THRESHOLD_DAYS="300"
@@ -81,6 +82,7 @@ cd "${WORKDIR}"
   --manifest "${MANIFEST}" \
   --images-dir "${IMAGES_DIR}" \
   --history "${HISTORY}" \
+  --exclude-file "${EXCLUDE_FILE}" \
   --threshold-days "${THRESHOLD_DAYS}" \
   --platform "${PLATFORM}" \
   "${EXTRA_ARGS[@]}" > "${TMP_LOG}" 2>&1
