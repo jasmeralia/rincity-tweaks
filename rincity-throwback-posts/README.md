@@ -313,22 +313,21 @@ for random selection, then prints every set still in the pool instead of
 picking one. It never posts anywhere, writes to `post_history.json`, or
 sends email.
 
+On the server, use the wrapper - `list_eligible.sh` mirrors
+`run_throwback.sh`'s production paths (manifest, history, excludes) so it
+works with no arguments, the same way `run_throwback.sh` does:
+
 ```bash
-python3 list_eligible.py
+./list_eligible.sh
 ```
 
-Accepts the same `--manifest`, `--history`, `--exclude-file`,
-`--threshold-days`, and `--min-age-days` flags as `rin_throwback_post.py`
-(same defaults too), plus:
+Any extra arguments are forwarded to `list_eligible.py`, e.g.
+`./list_eligible.sh --sort name --limit 20`.
 
-- `--sort {priority,name,published}` - `priority` (default) lists
-  never-posted sets first (oldest published first), then previously-posted
-  sets that are eligible again (longest since last posted first); `name`
-  sorts alphabetically; `published` sorts by original publish date.
-- `--limit N` - only show the first N rows (default: show all).
-- `--json` - print machine-readable JSON instead of a table.
-
-Example, production paths:
+Running `list_eligible.py` directly (e.g. for local testing against a copied
+manifest) uses relative default paths, matching `rin_throwback_post.py`'s own
+`--manifest`/`--history`/`--exclude-file` defaults - pass them explicitly if
+your working directory isn't next to a real `Rin_Covers/manifest.json`:
 
 ```bash
 python3 list_eligible.py \
@@ -336,6 +335,16 @@ python3 list_eligible.py \
   --history /home/morgan/rincity-tweaks/rincity-throwback-posts/post_history.json \
   --exclude-file /home/morgan/rincity-tweaks/rincity-throwback-posts/excludes.json
 ```
+
+It also accepts `--threshold-days` and `--min-age-days` (same defaults as
+`rin_throwback_post.py`), plus:
+
+- `--sort {priority,name,published}` - `priority` (default) lists
+  never-posted sets first (oldest published first), then previously-posted
+  sets that are eligible again (longest since last posted first); `name`
+  sorts alphabetically; `published` sorts by original publish date.
+- `--limit N` - only show the first N rows (default: show all).
+- `--json` - print machine-readable JSON instead of a table.
 
 ## Notes
 
