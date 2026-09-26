@@ -93,6 +93,10 @@ def main() -> int:
 
     eligible = rtb._eligible_entries(manifest, history, args.threshold_days, args.min_age_days, now)
 
+    already_posted_count = sum(
+        1 for e in manifest if ((e.get("set_url") or "").strip() or (e.get("set_name") or "").strip()) in last_posted
+    )
+
     rows: list[dict[str, Any]] = []
     for e in eligible:
         set_url = (e.get("set_url") or "").strip()
@@ -136,7 +140,8 @@ def main() -> int:
 
     print(
         f"{len(eligible)} of {total} sets eligible "
-        f"({excluded_count} excluded, threshold_days={args.threshold_days}, min_age_days={args.min_age_days})"
+        f"({excluded_count} excluded, {already_posted_count} already posted at least once, "
+        f"threshold_days={args.threshold_days}, min_age_days={args.min_age_days})"
     )
     if not rows:
         return 0
