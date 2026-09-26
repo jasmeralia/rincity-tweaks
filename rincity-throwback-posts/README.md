@@ -379,12 +379,20 @@ Options:
 - `--set-name "SET NAME"` - only show history for one set (case-insensitive,
   exact match).
 - `--limit N` - only show the first N rows (default: show all).
+- `--show-urls` - add Twitter/Bluesky post URL columns to the plain-text
+  table. Ignored with `--json`/`--markdown`, which always include them.
 - `--json` - print machine-readable JSON instead of a table, including the
   full Twitter/Bluesky post URLs.
+- `--markdown` - print a Markdown table instead of a plain-text table, with
+  the set name and each platform rendered as a clickable link (e.g. for
+  pasting into a doc or chat). Mutually exclusive with `--json`.
 
 Handles both the current history format (`posted_at`, `twitter_post_id`,
-`bluesky_uri`/`bluesky_url`) and the legacy pre-Bluesky format (`tweeted_at`,
-`tweet_id`) that older entries were recorded with.
+`twitter_url`, `bluesky_uri`/`bluesky_url`) and the legacy pre-Bluesky format
+(`tweeted_at`, `tweet_id`) that older entries were recorded with. `twitter_url`
+is only stored by `rin_throwback_post.py` from 2026-09-26 onward - for older
+entries that only have `twitter_post_id`/`tweet_id`, the URL is derived on
+the fly the same way it always was.
 
 ## Notes
 

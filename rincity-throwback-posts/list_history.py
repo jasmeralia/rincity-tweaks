@@ -45,8 +45,13 @@ def _entry_platforms(h: dict[str, Any]) -> list[str]:
 
 
 def _entry_twitter_url(h: dict[str, Any]) -> str | None:
+    stored = h.get("twitter_url")
+    if stored:
+        return stored
+    # Legacy/older entries never had twitter_url recorded; derive it from
+    # whichever ID field is present.
     post_id = h.get("twitter_post_id") or h.get("tweet_id")
-    return f"https://x.com/i/web/status/{post_id}" if post_id else None
+    return rtb._twitter_status_url(post_id)
 
 
 def _entry_bluesky_url(h: dict[str, Any]) -> str | None:
@@ -80,7 +85,19 @@ def main() -> int:
     )
     p.add_argument("--set-name", default=None, help="Only show history entries for this set (case-insensitive)")
     p.add_argument("--limit", type=int, default=0, help="Only show the first N rows (0 = all)")
-    p.add_argument("--json", action="store_true", help="Print machine-readable JSON instead of a table")
+    p.add_argument(
+        "--show-urls",
+        action="store_true",
+        help="Add Twitter/Bluesky post URL columns to the plain-text table (ignored with --json/--markdown, "
+        "which always include them)",
+    )
+    output_group = p.add_mutually_exclusive_group()
+    output_group.add_argument("--json", action="store_true", help="Print machine-readable JSON instead of a table")
+    output_group.add_argument(
+        "--markdown",
+        action="store_true",
+        help="Print a Markdown table with clickable links instead of a plain-text table",
+    )
     args = p.parse_args()
 
     history_path = rtb._resolve_history_path(args.history)
@@ -141,21 +158,63 @@ def main() -> int:
         print(json.dumps(out, indent=2))
         return 0
 
+    if args.markdown:
+        _print_markdown_table(rows, total=len(history))
+        return 0
+
     print(f"{len(rows)} of {len(history)} recorded throwback post(s)")
     if not rows:
         return 0
 
     print()
     name_width = max(len("Set Name"), *(len(r["set_name"]) for r in rows))
-    header = f"{'Posted At':<16}  {'Set Name':<{name_width}}  {'Platforms':<15}  URL"
-    print(header)
-    print("-" * len(header))
-    for r in rows:
-        posted = r["posted_at"].strftime("%Y-%m-%d %H:%M")
-        platforms = "+".join(r["platforms"]) if r["platforms"] else "(none recorded)"
-        print(f"{posted:<16}  {r['set_name']:<{name_width}}  {platforms:<15}  {r['set_url']}")
+    if args.show_urls:
+        header = f"{'Posted At':<16}  {'Set Name':<{name_width}}  {'Platforms':<15}  {'Gallery URL':<50}  {'Twitter URL':<45}  Bluesky URL"
+        print(header)
+        print("-" * len(header))
+        for r in rows:
+            posted = r["posted_at"].strftime("%Y-%m-%d %H:%M")
+            platforms = "+".join(r["platforms"]) if r["platforms"] else "(none recorded)"
+            twitter = r["twitter_url"] or ""
+            bluesky = r["bluesky_url"] or ""
+            print(
+                f"{posted:<16}  {r['set_name']:<{name_width}}  {platforms:<15}  "
+                f"{r['set_url']:<50}  {twitter:<45}  {bluesky}"
+            )
+    else:
+        header = f"{'Posted At':<16}  {'Set Name':<{name_width}}  {'Platforms':<15}  URL"
+        print(header)
+        print("-" * len(header))
+        for r in rows:
+            posted = r["posted_at"].strftime("%Y-%m-%d %H:%M")
+            platforms = "+".join(r["platforms"]) if r["platforms"] else "(none recorded)"
+            print(f"{posted:<16}  {r['set_name']:<{name_width}}  {platforms:<15}  {r['set_url']}")
 
     return 0
+
+
+def _markdown_escape(text: str) -> str:
+    return text.replace("|", "\\|")
+
+
+def _print_markdown_table(rows: list[dict[str, Any]], total: int) -> None:
+    print(f"{len(rows)} of {total} recorded throwback post(s)")
+    print()
+    if not rows:
+        return
+    print("| Posted At | Set Name | Platforms |")
+    print("|---|---|---|")
+    for r in rows:
+        posted = r["posted_at"].strftime("%Y-%m-%d %H:%M")
+        name = _markdown_escape(r["set_name"])
+        set_link = f"[{name}]({r['set_url']})" if r["set_url"] else name
+        platform_links = []
+        if r["twitter_url"]:
+            platform_links.append(f"[Twitter]({r['twitter_url']})")
+        if r["bluesky_url"]:
+            platform_links.append(f"[Bluesky]({r['bluesky_url']})")
+        platforms = " · ".join(platform_links) if platform_links else "(none recorded)"
+        print(f"| {posted} | {set_link} | {platforms} |")
 
 
 if __name__ == "__main__":
