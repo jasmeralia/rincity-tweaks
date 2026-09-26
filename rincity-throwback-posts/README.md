@@ -301,6 +301,38 @@ not skip history recording or email for whichever platform(s) succeeded.
   cron-failure check actually fire — both depend on cron seeing output on
   failure, and a silently swallowed exit code produces neither.
 
+## Listing the Eligible Pool
+
+`list_eligible.py` is a read-only companion to `rin_throwback_post.py`. It
+applies the same exclude-list, min-age, and repeat-threshold filtering used
+for random selection, then prints every set still in the pool instead of
+picking one. It never posts anywhere, writes to `post_history.json`, or
+sends email.
+
+```bash
+python3 list_eligible.py
+```
+
+Accepts the same `--manifest`, `--history`, `--exclude-file`,
+`--threshold-days`, and `--min-age-days` flags as `rin_throwback_post.py`
+(same defaults too), plus:
+
+- `--sort {priority,name,published}` - `priority` (default) lists
+  never-posted sets first (oldest published first), then previously-posted
+  sets that are eligible again (longest since last posted first); `name`
+  sorts alphabetically; `published` sorts by original publish date.
+- `--limit N` - only show the first N rows (default: show all).
+- `--json` - print machine-readable JSON instead of a table.
+
+Example, production paths:
+
+```bash
+python3 list_eligible.py \
+  --manifest /usr/local/lsws/wordpress/wp-content/uploads/Rin_Covers/manifest.json \
+  --history /home/morgan/rincity-tweaks/rincity-throwback-posts/post_history.json \
+  --exclude-file /home/morgan/rincity-tweaks/rincity-throwback-posts/excludes.json
+```
+
 ## Notes
 
 - Default platform is `both`.

@@ -286,13 +286,8 @@ def _filter_excluded(
     return kept
 
 
-def _eligible_entries(
-    manifest: list[dict[str, Any]],
-    history: list[dict[str, Any]],
-    threshold_days: int,
-    min_age_days: int,
-    now: dt.datetime,
-) -> list[dict[str, Any]]:
+def _last_posted_map(history: list[dict[str, Any]]) -> dict[str, dt.datetime]:
+    """Map a manifest entry's key (set_url, falling back to set_name) to its most recent posted_at."""
     last: dict[str, dt.datetime] = {}
     for h in history:
         key = (h.get("set_url") or h.get("set_name") or "").strip()
@@ -306,6 +301,17 @@ def _eligible_entries(
             continue
         if key not in last or when > last[key]:
             last[key] = when
+    return last
+
+
+def _eligible_entries(
+    manifest: list[dict[str, Any]],
+    history: list[dict[str, Any]],
+    threshold_days: int,
+    min_age_days: int,
+    now: dt.datetime,
+) -> list[dict[str, Any]]:
+    last = _last_posted_map(history)
 
     eligible: list[dict[str, Any]] = []
     for e in manifest:
