@@ -66,7 +66,7 @@ def main() -> int:
     args = p.parse_args()
 
     manifest_path = Path(args.manifest)
-    history_path = Path(args.history)
+    history_path = rtb._resolve_history_path(args.history)
     exclude_path = Path(args.exclude_file)
 
     if not manifest_path.exists():

@@ -66,6 +66,20 @@ DEFAULT_THRESHOLD_DAYS = 300
 DEFAULT_MIN_AGE_DAYS = 90
 
 
+def _resolve_history_path(history_arg: str) -> Path:
+    """Resolve the history file to read/write, falling back to the legacy
+    tweet_history.json filename (same directory) if the given path doesn't
+    exist. Shared by rin_throwback_post.py, list_eligible.py, and
+    list_history.py so all three agree on which file is "the" history,
+    regardless of whether --history is a bare filename or an absolute path.
+    """
+    history_path = Path(history_arg)
+    if history_path.exists():
+        return history_path
+    legacy = history_path.with_name("tweet_history.json")
+    return legacy if legacy.exists() else history_path
+
+
 def _load_json(path: Path) -> Any:
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
@@ -252,21 +266,29 @@ def _load_history(history_path: Path) -> list[dict[str, Any]]:
 
 
 def _load_excludes(exclude_path: Path) -> tuple[set[str], set[int]]:
-    """Load a flat JSON list mixing set names (str) and post IDs (int)."""
+    """Load a flat JSON list mixing set names (str) and post IDs (int).
+
+    A missing or malformed exclude file raises rather than being treated as
+    "no exclusions" - this is a safety list (e.g. keeps a set out of random
+    posting), and a typo'd path or a bad entry must fail loudly, not fail
+    open. Callers already wrap this in a try/except that aborts the run.
+    """
     if not exclude_path.exists():
-        return set(), set()
+        raise FileNotFoundError(f"exclude file not found: {exclude_path}")
     data = _load_json(exclude_path)
     if not isinstance(data, list):
         raise TypeError("Exclude file must be a JSON list of set names and/or post IDs.")
     names: set[str] = set()
     ids: set[int] = set()
     for item in data:
-        if isinstance(item, bool):
-            continue
+        if isinstance(item, bool) or not isinstance(item, (int, str)):
+            raise TypeError(f"Unsupported exclude entry (must be a set name or post ID): {item!r}")
         if isinstance(item, int):
             ids.add(item)
-        elif isinstance(item, str):
+        else:
             stripped = item.strip()
+            if not stripped:
+                raise ValueError("Exclude file contains a blank entry.")
             if stripped.isdigit():
                 ids.add(int(stripped))
             else:
@@ -931,14 +953,10 @@ def main() -> int:
     images_dir = Path(args.images_dir)
     twitter_auth_path = Path(args.twitter_auth) if args.twitter_auth else Path(args.auth)
     bluesky_auth_path = Path(args.bluesky_auth)
-    history_path = Path(args.history)
+    history_path = _resolve_history_path(args.history)
     exclude_path = Path(args.exclude_file)
     template_path = Path(args.template)
     bluesky_template_path = Path(args.bluesky_template)
-    if args.history == "post_history.json" and not history_path.exists():
-        legacy_history = Path("tweet_history.json")
-        if legacy_history.exists():
-            history_path = legacy_history
     if args.template == "twitter_template.j2" and not template_path.exists():
         for legacy_name in ("post_template.j2", "tweet_template.j2"):
             legacy_template = Path(legacy_name)
