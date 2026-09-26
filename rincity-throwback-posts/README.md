@@ -346,6 +346,38 @@ It also accepts `--threshold-days` and `--min-age-days` (same defaults as
 - `--limit N` - only show the first N rows (default: show all).
 - `--json` - print machine-readable JSON instead of a table.
 
+## Listing Throwback History
+
+`list_history.py` is a read-only companion that prints every post recorded in
+`post_history.json` - which platform(s) it went to and the timestamp it was
+posted, newest first by default. It never posts anywhere or modifies
+`post_history.json`.
+
+On the server, use the wrapper (same pattern as `list_eligible.sh`):
+
+```bash
+./list_history.sh
+```
+
+Running `list_history.py` directly uses the same relative `post_history.json`
+default as `rin_throwback_post.py`; pass `--history` explicitly if your
+working directory isn't next to the real file.
+
+Options:
+
+- `--sort {recent,oldest,name}` - `recent` (default): most recently posted
+  first; `oldest`: least recently posted first; `name`: alphabetical by set
+  name.
+- `--set-name "SET NAME"` - only show history for one set (case-insensitive,
+  exact match).
+- `--limit N` - only show the first N rows (default: show all).
+- `--json` - print machine-readable JSON instead of a table, including the
+  full Twitter/Bluesky post URLs.
+
+Handles both the current history format (`posted_at`, `twitter_post_id`,
+`bluesky_uri`/`bluesky_url`) and the legacy pre-Bluesky format (`tweeted_at`,
+`tweet_id`) that older entries were recorded with.
+
 ## Notes
 
 - Default platform is `both`.
