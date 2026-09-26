@@ -59,6 +59,12 @@ try:
 except Exception:
     jinja2 = None  # type: ignore
 
+# Shared with list_eligible.py so the two scripts can't silently disagree on
+# what "eligible" means. Override per-invocation with --threshold-days /
+# --min-age-days; these are just the defaults run_throwback.sh relies on.
+DEFAULT_THRESHOLD_DAYS = 300
+DEFAULT_MIN_AGE_DAYS = 90
+
 
 def _load_json(path: Path) -> Any:
     with path.open("r", encoding="utf-8") as f:
@@ -871,12 +877,18 @@ def main() -> int:
         default="excludes.json",
         help="JSON list of set names and/or post IDs to never select (applies to random selection and --set-name)",
     )
-    p.add_argument("--threshold-days", type=int, default=90, help="Do not repeat a set within this many days")
+    p.add_argument(
+        "--threshold-days",
+        type=int,
+        default=DEFAULT_THRESHOLD_DAYS,
+        help=f"Do not repeat a set within this many days (default: {DEFAULT_THRESHOLD_DAYS})",
+    )
     p.add_argument(
         "--min-age-days",
         type=int,
-        default=90,
-        help="Only consider galleries originally published at least this many days ago",
+        default=DEFAULT_MIN_AGE_DAYS,
+        help="Only consider galleries originally published at least this many days ago "
+        f"(default: {DEFAULT_MIN_AGE_DAYS})",
     )
     p.add_argument(
         "--low-pool-threshold",

@@ -41,12 +41,18 @@ def main() -> int:
     p.add_argument("--manifest", default="Rin_Covers/manifest.json", help="Path to manifest.json")
     p.add_argument("--history", default="post_history.json", help="State file to avoid repeats")
     p.add_argument("--exclude-file", default="excludes.json", help="JSON list of set names/post IDs to skip")
-    p.add_argument("--threshold-days", type=int, default=90, help="Do not repeat a set within this many days")
+    p.add_argument(
+        "--threshold-days",
+        type=int,
+        default=rtb.DEFAULT_THRESHOLD_DAYS,
+        help=f"Do not repeat a set within this many days (default: {rtb.DEFAULT_THRESHOLD_DAYS})",
+    )
     p.add_argument(
         "--min-age-days",
         type=int,
-        default=90,
-        help="Only consider galleries originally published at least this many days ago",
+        default=rtb.DEFAULT_MIN_AGE_DAYS,
+        help="Only consider galleries originally published at least this many days ago "
+        f"(default: {rtb.DEFAULT_MIN_AGE_DAYS})",
     )
     p.add_argument(
         "--sort",
