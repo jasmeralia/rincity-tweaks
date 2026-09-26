@@ -181,7 +181,7 @@ Official docs:
 --bluesky-auth PATH
 --history PATH
 --exclude-file PATH           # default: excludes.json
---threshold-days INT
+--threshold-days INT           # default: 300
 --min-age-days INT            # default: 90
 --low-pool-threshold INT      # default: 45
 --set-name "SET NAME"
@@ -229,7 +229,11 @@ run) already completed.
 
 A manifest entry is eligible for random selection only if both hold:
 
-- It was not posted (per `post_history.json`) within `--threshold-days` days.
+- It was not posted (per `post_history.json`) within `--threshold-days` days
+  (default: 300 - defined once as `DEFAULT_THRESHOLD_DAYS` in
+  `rin_throwback_post.py` and reused by `list_eligible.py`, so both scripts
+  agree on what "eligible" means without either hardcoding its own copy;
+  `run_throwback.sh` relies on this default rather than overriding it).
 - It was originally published (`date_published` in the manifest) at least
   `--min-age-days` days ago — this keeps brand-new galleries from being
   recycled as "throwback" content before they've had their own organic
