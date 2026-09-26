@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import signal
 import sys
 from pathlib import Path
 from typing import Any
@@ -165,4 +166,7 @@ def _days_ago_label(when: dt.datetime | None, now: dt.datetime) -> str:
 
 
 if __name__ == "__main__":
+    # Let the OS kill us normally on a closed pipe (e.g. `| head`) instead of
+    # raising BrokenPipeError - see https://docs.python.org/3/library/signal.html#note-on-sigpipe
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
     raise SystemExit(main())
