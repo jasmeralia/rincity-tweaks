@@ -194,7 +194,16 @@ def main() -> int:
 
 
 def _markdown_escape(text: str) -> str:
-    return text.replace("|", "\\|")
+    # A table row is one line and a link label can't contain unescaped
+    # brackets, so normalize embedded newlines and escape everything that
+    # would otherwise split a row or break/hijack the [name](url) link.
+    # Backslash must be escaped first so the loop below doesn't
+    # double-escape the backslashes it just inserted.
+    text = text.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
+    text = text.replace("\\", "\\\\")
+    for ch in "|[]<>":
+        text = text.replace(ch, f"\\{ch}")
+    return text
 
 
 def _print_markdown_table(rows: list[dict[str, Any]], total: int) -> None:
