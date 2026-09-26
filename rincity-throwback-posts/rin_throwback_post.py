@@ -87,6 +87,10 @@ def _resolve_history_path(history_arg: str) -> Path:
     return legacy if legacy.exists() else history_path
 
 
+def _twitter_status_url(post_id: str | int | None) -> str | None:
+    return f"https://x.com/i/web/status/{post_id}" if post_id else None
+
+
 def _load_json(path: Path) -> Any:
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
@@ -527,7 +531,7 @@ def _build_email_html(
     mock_label = " (mock)" if dry_run else ""
     social_links: list[str] = []
     if twitter_post_id:
-        url = f"https://x.com/i/web/status/{twitter_post_id}"
+        url = _twitter_status_url(twitter_post_id)
         social_links.append(f'<a href="{url}" style="color:#1d9bf0;text-decoration:none;font-size:13px;">View on X/Twitter{mock_label} →</a>')
     if bluesky_url:
         social_links.append(f'<a href="{esc(bluesky_url)}" style="color:#0085ff;text-decoration:none;font-size:13px;">View on Bluesky{mock_label} →</a>')
@@ -1176,6 +1180,7 @@ def main() -> int:
     if any_success:
         record = {
             "twitter_post_id": str(twitter_post_id) if twitter_post_id else None,
+            "twitter_url": _twitter_status_url(twitter_post_id),
             "bluesky_uri": bluesky_uri,
             "bluesky_url": bluesky_url,
             "posted_at": now.isoformat(),
@@ -1188,7 +1193,7 @@ def main() -> int:
 
         print(f"Posted throwback for set: {set_name}")
         if twitter_post_id:
-            print(f"Twitter URL: https://x.com/i/web/status/{twitter_post_id}")
+            print(f"Twitter URL: {_twitter_status_url(twitter_post_id)}")
         if bluesky_url:
             print(f"Bluesky URL: {bluesky_url}")
         elif bluesky_uri:
