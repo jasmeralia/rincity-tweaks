@@ -20,7 +20,6 @@ import html
 import json
 import signal
 import sys
-from pathlib import Path
 from typing import Any
 
 import rin_throwback_post as rtb
@@ -50,6 +49,19 @@ def _entry_twitter_url(h: dict[str, Any]) -> str | None:
     return f"https://x.com/i/web/status/{post_id}" if post_id else None
 
 
+def _entry_bluesky_url(h: dict[str, Any]) -> str | None:
+    stored = h.get("bluesky_url")
+    if stored:
+        return stored
+    uri = h.get("bluesky_uri")
+    if not uri or not uri.startswith("at://"):
+        return None
+    # No profile handle is stored in history, but the AT URI's own DID is a
+    # valid (if less readable) profile reference for a bsky.app URL.
+    did = uri[len("at://") :].split("/", 1)[0]
+    return rtb._bluesky_web_url_from_at_uri(uri, did)
+
+
 def _display_name(raw: str) -> str:
     return rtb._normalize_quotes(html.unescape((raw or "").strip()))
 
@@ -71,7 +83,7 @@ def main() -> int:
     p.add_argument("--json", action="store_true", help="Print machine-readable JSON instead of a table")
     args = p.parse_args()
 
-    history_path = Path(args.history)
+    history_path = rtb._resolve_history_path(args.history)
     if not history_path.exists():
         print(f"ERROR: history file not found: {history_path}", file=sys.stderr)
         return 2
@@ -92,12 +104,13 @@ def main() -> int:
                 "posted_at": posted_at,
                 "platforms": _entry_platforms(h),
                 "twitter_url": _entry_twitter_url(h),
-                "bluesky_url": h.get("bluesky_url"),
+                "bluesky_url": _entry_bluesky_url(h),
             }
         )
 
     if skipped:
-        print(f"WARNING: skipped {skipped} history entrie(s) with an unparseable/missing posted_at.", file=sys.stderr)
+        noun = "entry" if skipped == 1 else "entries"
+        print(f"WARNING: skipped {skipped} history {noun} with an unparseable/missing posted_at.", file=sys.stderr)
 
     if args.set_name:
         target = rtb._normalized_set_name_for_match(args.set_name)

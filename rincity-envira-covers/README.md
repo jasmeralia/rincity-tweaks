@@ -28,6 +28,7 @@ The script writes cover images to a flat directory and a `manifest.json` alongsi
 [
   {
     "filename": "2026-05-30-bloomlight.jpg",
+    "post_id": 12345,
     "set_name": "Bloomlight",
     "date_published": "2026-05-30T12:00:00-07:00",
     "set_url": "https://rin-city.com/envira/bloomlight/",
@@ -37,7 +38,10 @@ The script writes cover images to a flat directory and a `manifest.json` alongsi
 ]
 ```
 
-`filename` is relative to the output directory. `date_published` is ISO 8601 (`c` format).
+`filename` is relative to the output directory. `post_id` is the Envira gallery's WordPress
+post ID - added so `rincity-throwback-posts`' exclude list can target a specific set by ID as
+well as by name (entries generated before this field was added won't have it).
+`date_published` is ISO 8601 (`c` format).
 `tags` is a space-separated string of `#hashtag`-formatted category/tag slugs.
 `envira_categories` holds the human-readable term names (used by `rincity-throwback-posts`
 for photographer/model credit lines). This manifest is consumed directly by
@@ -81,4 +85,4 @@ RIN_DRY_RUN=1 ~/bin/wp-lsphp --path=/usr/local/lsws/wordpress eval-file \
 
 ## Changelog
 
-- **Current** — Output filenames prefixed with publish date (`YYYY-MM-DD-`) for chronological sorting.
+- **Current** - Manifest entries include `post_id`. Output filenames prefixed with publish date (`YYYY-MM-DD-`) for chronological sorting.
