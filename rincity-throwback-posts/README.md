@@ -267,6 +267,14 @@ without it can only be excluded by name. Excluded entries are filtered out of
 the manifest before any selection logic runs, and the run log reports how
 many sets were excluded and the resulting pool size.
 
+**The exclude file is required, not optional.** This is a safety list, so it
+fails loudly rather than failing open: the command aborts (nonzero exit) if
+`--exclude-file` points at a path that doesn't exist, or if the file contains
+anything other than a flat list of set names and/or post IDs - an unsupported
+entry type (`null`, a float, an object) or a blank string also aborts. A
+typo'd `--exclude-file` path or a bad deploy must never silently behave as
+"no exclusions."
+
 ## Low Pool Warning
 
 Every run that uses random selection (i.e. not `--set-name`) checks the size

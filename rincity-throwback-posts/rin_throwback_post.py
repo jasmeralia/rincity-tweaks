@@ -67,14 +67,21 @@ DEFAULT_MIN_AGE_DAYS = 90
 
 
 def _resolve_history_path(history_arg: str) -> Path:
-    """Resolve the history file to read/write, falling back to the legacy
-    tweet_history.json filename (same directory) if the given path doesn't
-    exist. Shared by rin_throwback_post.py, list_eligible.py, and
-    list_history.py so all three agree on which file is "the" history,
-    regardless of whether --history is a bare filename or an absolute path.
+    """Resolve the history file to read/write. If --history points at the
+    canonical post_history.json basename and it doesn't exist, fall back to
+    the legacy tweet_history.json filename in that same directory. A
+    genuinely custom --history filename (e.g. --history /tmp/new.json) is
+    never redirected, even if a sibling tweet_history.json happens to exist.
+
+    Shared by rin_throwback_post.py, list_eligible.py, and list_history.py
+    so all three agree on which file is "the" history, regardless of
+    whether --history is a bare filename or an absolute path - the original
+    inline version of this only fired for the literal string
+    "post_history.json", so it never actually applied to any real deployment
+    (they all pass an absolute path).
     """
     history_path = Path(history_arg)
-    if history_path.exists():
+    if history_path.exists() or history_path.name != "post_history.json":
         return history_path
     legacy = history_path.with_name("tweet_history.json")
     return legacy if legacy.exists() else history_path
