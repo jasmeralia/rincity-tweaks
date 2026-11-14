@@ -95,6 +95,28 @@ def _load_json(path: Path) -> Any:
         return json.load(f)
 
 
+def _check_for_new_set_today(wp_cli: str, wp_root: str, check_script: str) -> str | None:
+    """Check WordPress's database and return today's new-set skip reason, if any."""
+    command = [wp_cli, f"--path={wp_root}", "eval-file", check_script]
+    try:
+        result = subprocess.run(command, capture_output=True, check=False, text=True)
+    except OSError as exc:
+        raise RuntimeError(f"could not run WP-CLI set check: {exc}") from exc
+
+    if result.stderr:
+        print(result.stderr, file=sys.stderr, end="" if result.stderr.endswith("\n") else "\n")
+    if result.returncode != 0:
+        detail = result.stdout.strip() or "no diagnostic output"
+        raise RuntimeError(f"WP-CLI set check exited {result.returncode}: {detail}")
+
+    marker = result.stdout.strip()
+    if marker == "POST":
+        return None
+    if marker.startswith("SKIP:"):
+        return marker.partition(":")[2].strip()
+    raise RuntimeError(f"unexpected WP-CLI set-check output: {marker!r}")
+
+
 def _save_json(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -904,6 +926,13 @@ def main() -> int:
     p.add_argument("--twitter-auth", default=None, help="Twitter auth JSON file (overrides --auth)")
     p.add_argument("--bluesky-auth", default="bluesky_auth.json", help="Bluesky auth JSON file")
     p.add_argument("--history", default="post_history.json", help="State file to avoid repeats")
+    p.add_argument("--wp-cli", default=None, help="WP-CLI wrapper for the optional new-set database check")
+    p.add_argument("--wp-root", default=None, help="WordPress root for the optional new-set database check")
+    p.add_argument(
+        "--new-set-check-script",
+        default=None,
+        help="WP-CLI eval-file script that checks for a set published today",
+    )
     p.add_argument(
         "--exclude-file",
         default="excludes.json",
@@ -967,6 +996,25 @@ def main() -> int:
     exclude_path = Path(args.exclude_file)
     template_path = Path(args.template)
     bluesky_template_path = Path(args.bluesky_template)
+
+    db_check_args = (args.wp_cli, args.wp_root, args.new_set_check_script)
+    if any(db_check_args) and not all(db_check_args):
+        print("ERROR: --wp-cli, --wp-root, and --new-set-check-script must be used together.", file=sys.stderr)
+        return 2
+    if all(db_check_args):
+        try:
+            skip_reason = _check_for_new_set_today(
+                args.wp_cli,
+                args.wp_root,
+                args.new_set_check_script,
+            )
+        except RuntimeError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
+        if skip_reason:
+            print(f"Skipping throwback: {skip_reason}.")
+            return 0
+
     if args.template == "twitter_template.j2" and not template_path.exists():
         for legacy_name in ("post_template.j2", "tweet_template.j2"):
             legacy_template = Path(legacy_name)
