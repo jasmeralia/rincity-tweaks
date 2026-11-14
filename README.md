@@ -22,7 +22,7 @@ A WP-CLI PHP script that scans Envira galleries and generates a JSON manifest of
 
 ### [rincity-throwback-posts](rincity-throwback-posts/)
 
-A Python 3 application that reads the Envira cover manifest and posts throwback gallery content to X/Twitter and Bluesky. It skips when a new set was published that Pacific day or the manifest is stale. Features include history tracking to avoid repeat posts, Jinja2 templates for post text, and dry-run mode. Runs on a daily cron via `run_throwback.sh`.
+A Python 3 application that reads the Envira cover manifest and posts throwback gallery content to X/Twitter and Bluesky. Its cron wrapper checks WordPress's database and skips when a set was published that Pacific day. Features include history tracking to avoid repeat posts, Jinja2 templates for post text, and dry-run mode. Runs on a daily cron via `run_throwback.sh`.
 
 See [rincity-throwback-posts/README.md](rincity-throwback-posts/README.md) for full documentation.
 
