@@ -76,20 +76,25 @@ if [[ -n "${SET_NAME}" ]]; then
 fi
 
 TMP_LOG="$(mktemp /tmp/rin-throwback-post.XXXXXX)"
+DB_CHECK_ERR="$(mktemp /tmp/rin-throwback-check.XXXXXX)"
+trap 'command rm -f "${TMP_LOG}" "${DB_CHECK_ERR}"' EXIT
 
 set +e
 cd "${WORKDIR}"
-DB_CHECK_RESULT="$("${WP_CLI}" --path="${WP_ROOT}" eval-file "${NEW_SET_CHECK}" 2>&1)"
+DB_CHECK_RESULT="$("${WP_CLI}" --path="${WP_ROOT}" eval-file "${NEW_SET_CHECK}" 2>"${DB_CHECK_ERR}")"
 db_check_status=$?
 set -e
 
 if [[ "${db_check_status}" -ne 0 ]]; then
-  printf '%s\n' "${DB_CHECK_RESULT}" > "${TMP_LOG}"
+  cat "${DB_CHECK_ERR}" > "${TMP_LOG}"
+  printf '%s\n' "${DB_CHECK_RESULT}" >> "${TMP_LOG}"
   run_status="${db_check_status}"
 elif [[ "${DB_CHECK_RESULT}" == SKIP:* ]]; then
-  printf '%s\n' "${DB_CHECK_RESULT}" > "${TMP_LOG}"
+  cat "${DB_CHECK_ERR}" > "${TMP_LOG}"
+  printf '%s\n' "${DB_CHECK_RESULT}" >> "${TMP_LOG}"
   run_status=0
 elif [[ "${DB_CHECK_RESULT}" == "POST" ]]; then
+  cat "${DB_CHECK_ERR}" > "${TMP_LOG}"
   set +e
   "${VENV_PY}" "${SCRIPT}" \
     --manifest "${MANIFEST}" \
@@ -101,7 +106,8 @@ elif [[ "${DB_CHECK_RESULT}" == "POST" ]]; then
   run_status=$?
   set -e
 else
-  printf 'ERROR: unexpected WP-CLI set-check output:\n%s\n' "${DB_CHECK_RESULT}" > "${TMP_LOG}"
+  cat "${DB_CHECK_ERR}" > "${TMP_LOG}"
+  printf 'ERROR: unexpected WP-CLI set-check output:\n%s\n' "${DB_CHECK_RESULT}" >> "${TMP_LOG}"
   run_status=1
 fi
 
@@ -118,5 +124,4 @@ if [[ "${run_status}" -ne 0 ]]; then
   } >&2
 fi
 
-rm -f "${TMP_LOG}"
 exit "${run_status}"
