@@ -79,31 +79,18 @@ TMP_LOG="$(mktemp /tmp/rin-throwback-post.XXXXXX)"
 
 set +e
 cd "${WORKDIR}"
-DB_CHECK_RESULT="$("${WP_CLI}" --path="${WP_ROOT}" eval-file "${NEW_SET_CHECK}" 2>&1)"
-db_check_status=$?
+"${VENV_PY}" "${SCRIPT}" \
+  --manifest "${MANIFEST}" \
+  --images-dir "${IMAGES_DIR}" \
+  --history "${HISTORY}" \
+  --exclude-file "${EXCLUDE_FILE}" \
+  --platform "${PLATFORM}" \
+  --wp-cli "${WP_CLI}" \
+  --wp-root "${WP_ROOT}" \
+  --new-set-check-script "${NEW_SET_CHECK}" \
+  "${EXTRA_ARGS[@]}" > "${TMP_LOG}" 2>&1
+run_status=$?
 set -e
-
-if [[ "${db_check_status}" -ne 0 ]]; then
-  printf '%s\n' "${DB_CHECK_RESULT}" > "${TMP_LOG}"
-  run_status="${db_check_status}"
-elif [[ "${DB_CHECK_RESULT}" == SKIP:* ]]; then
-  printf '%s\n' "${DB_CHECK_RESULT}" > "${TMP_LOG}"
-  run_status=0
-elif [[ "${DB_CHECK_RESULT}" == "POST" ]]; then
-  set +e
-  "${VENV_PY}" "${SCRIPT}" \
-    --manifest "${MANIFEST}" \
-    --images-dir "${IMAGES_DIR}" \
-    --history "${HISTORY}" \
-    --exclude-file "${EXCLUDE_FILE}" \
-    --platform "${PLATFORM}" \
-    "${EXTRA_ARGS[@]}" > "${TMP_LOG}" 2>&1
-  run_status=$?
-  set -e
-else
-  printf 'ERROR: unexpected WP-CLI set-check output:\n%s\n' "${DB_CHECK_RESULT}" > "${TMP_LOG}"
-  run_status=1
-fi
 
 tee -a "${LOG}" < "${TMP_LOG}" > /dev/null
 
@@ -118,5 +105,4 @@ if [[ "${run_status}" -ne 0 ]]; then
   } >&2
 fi
 
-rm -f "${TMP_LOG}"
 exit "${run_status}"
