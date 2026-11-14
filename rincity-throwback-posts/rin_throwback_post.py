@@ -65,7 +65,6 @@ except Exception:
 DEFAULT_THRESHOLD_DAYS = 300
 DEFAULT_MIN_AGE_DAYS = 90
 
-
 def _resolve_history_path(history_arg: str) -> Path:
     """Resolve the history file to read/write. If --history points at the
     canonical post_history.json basename and it doesn't exist, fall back to
@@ -994,9 +993,8 @@ def main() -> int:
         manifest = _filter_excluded(manifest, excluded_names, excluded_ids)
         print(f"Excluded {before - len(manifest)} set(s) per {exclude_path} ({before} -> {len(manifest)} in pool).")
 
-    history = _load_history(history_path)
     now = dt.datetime.now(dt.timezone.utc)
-
+    history = _load_history(history_path)
     rng = random.Random(args.seed) if args.seed is not None else random.Random()
     if args.set_name:
         target = _normalized_set_name_for_match(args.set_name)

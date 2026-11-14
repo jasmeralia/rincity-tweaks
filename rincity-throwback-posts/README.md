@@ -8,17 +8,30 @@ Default behavior posts to **both X/Twitter and Bluesky**.
 
 - Randomly selects an eligible set from `manifest.json`
 - Avoids repeats using `post_history.json`
+- Checks WordPress's database through WP-CLI and skips when a set was published that Pacific calendar day
+- Fails closed without posting if the database check fails
 - Renders Twitter post text with Jinja template (`twitter_template.j2`)
 - Uploads image and posts to:
   - X/Twitter (`--platform twitter`)
   - Bluesky (`--platform bluesky`)
   - Both (`--platform both`)
 - Supports `--dry-run`
-- Sends an HTML summary email (with the cover image embedded inline) after every run, dry or live
+- Sends an HTML summary email (with the cover image embedded inline) after each post or dry run
+
+## Daily Schedule
+
+The intended production user cron runs `run_throwback.sh` daily at 13:00 UTC.
+Before selecting a throwback, the wrapper uses `wp-lsphp` to query published
+Envira galleries in WordPress's database for the current site-local date. If a
+set was published that day, it exits successfully without posting, leaving the
+new-set post as the day's social post. If WP-CLI or the database query fails, it
+exits with an error and does not post. Otherwise, it selects a throwback from the
+cover manifest as usual.
 
 ## Requirements
 
 - Python 3.10+
+- WordPress WP-CLI wrapper at `/home/morgan/bin/wp-lsphp` for the scheduled database check
 - Dependencies:
   - `tweepy`
   - `jinja2`
@@ -198,8 +211,9 @@ Official docs:
 
 ## Email Notifications
 
-After every run — dry or live — an HTML summary email is sent to `--email-to`
-(default `morgan@windsofstorm.net`), unless `--no-email` is passed. The email
+After each post or dry run, an HTML summary email is sent to `--email-to`
+(default `morgan@windsofstorm.net`), unless `--no-email` is passed. A daily
+database skip is logged and exits successfully without sending an email. The email
 includes:
 
 - The cover image, resized to 600px wide and embedded inline

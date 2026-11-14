@@ -151,7 +151,7 @@ Keep entries on a single line. Reference Odoo task IDs where relevant.
 | `rincity-wordfence-temp-allowlist` | **mu-plugins** | Auto-allowlist for Morgan's IP |
 | `rincity-zero-scheduled-seconds` | **mu-plugins** | Forces scheduled post times to :00 seconds |
 | `rincity-envira-covers` | _(cron script, not a WP plugin)_ | Indexes cover images nightly |
-| `rincity-throwback-posts` | _(cron script, not a WP plugin)_ | Daily throwback post creator |
+| `rincity-throwback-posts` | _(cron script, not a WP plugin)_ | Daily throwback poster; its wrapper checks WordPress's database and skips when a set was published that Pacific day |
 
 ---
 
