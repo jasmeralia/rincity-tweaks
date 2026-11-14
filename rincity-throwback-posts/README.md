@@ -8,13 +8,25 @@ Default behavior posts to **both X/Twitter and Bluesky**.
 
 - Randomly selects an eligible set from `manifest.json`
 - Avoids repeats using `post_history.json`
+- Skips the daily throwback when a new set was published that Pacific calendar day
+- Fails closed when the cover manifest was not refreshed that day
 - Renders Twitter post text with Jinja template (`twitter_template.j2`)
 - Uploads image and posts to:
   - X/Twitter (`--platform twitter`)
   - Bluesky (`--platform bluesky`)
   - Both (`--platform both`)
 - Supports `--dry-run`
-- Sends an HTML summary email (with the cover image embedded inline) after every run, dry or live
+- Sends an HTML summary email (with the cover image embedded inline) after each post or dry run
+
+## Daily Schedule
+
+The production user cron runs `run_throwback.sh` daily at 13:00 UTC. The cover
+manifest is refreshed at 12:00 UTC first. The poster skips successfully when a
+gallery was published on the current `America/Los_Angeles` calendar date, leaving
+that day's new-set post as the social post. It also skips if the manifest was not
+updated that Pacific date, so a failed cover refresh cannot produce a throwback
+from stale data. On days with no new set and a fresh manifest, the usual throwback
+is posted.
 
 ## Requirements
 
@@ -198,8 +210,9 @@ Official docs:
 
 ## Email Notifications
 
-After every run — dry or live — an HTML summary email is sent to `--email-to`
-(default `morgan@windsofstorm.net`), unless `--no-email` is passed. The email
+After each post or dry run, an HTML summary email is sent to `--email-to`
+(default `morgan@windsofstorm.net`), unless `--no-email` is passed. Daily
+schedule skips are logged and exit successfully without sending an email. The email
 includes:
 
 - The cover image, resized to 600px wide and embedded inline

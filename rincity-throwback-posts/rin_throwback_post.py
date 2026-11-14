@@ -49,6 +49,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 try:
     import tweepy  # type: ignore
@@ -64,6 +65,46 @@ except Exception:
 # --min-age-days; these are just the defaults run_throwback.sh relies on.
 DEFAULT_THRESHOLD_DAYS = 300
 DEFAULT_MIN_AGE_DAYS = 90
+SITE_TIMEZONE = ZoneInfo("America/Los_Angeles")
+
+
+def _daily_skip_reason(
+    manifest_path: Path,
+    manifest: list[dict[str, Any]],
+    now: dt.datetime,
+) -> str | None:
+    """Skip when today's cover manifest is stale or a set went live today."""
+    today = now.astimezone(SITE_TIMEZONE).date()
+    manifest_updated = dt.datetime.fromtimestamp(
+        manifest_path.stat().st_mtime,
+        SITE_TIMEZONE,
+    ).date()
+    if manifest_updated != today:
+        return (
+            f"cover manifest is not current for {today} Pacific "
+            f"(last updated {manifest_updated})"
+        )
+
+    for entry in manifest:
+        if not isinstance(entry, dict):
+            continue
+        published = entry.get("date_published") or ""
+        if not isinstance(published, str):
+            continue
+        published = published.strip()
+        try:
+            published_at = _parse_iso8601(published)
+        except (TypeError, ValueError):
+            continue
+        if published_at.tzinfo is None:
+            published_at = published_at.replace(tzinfo=SITE_TIMEZONE)
+        if published_at.astimezone(SITE_TIMEZONE).date() == today:
+            name = entry.get("set_name") or "Untitled set"
+            if not isinstance(name, str):
+                name = "Untitled set"
+            name = name.strip()
+            return f"a new set was published today: {name}"
+    return None
 
 
 def _resolve_history_path(history_arg: str) -> Path:
@@ -984,6 +1025,12 @@ def main() -> int:
         print("ERROR: manifest.json must be a list of entries", file=sys.stderr)
         return 2
 
+    now = dt.datetime.now(dt.timezone.utc)
+    skip_reason = _daily_skip_reason(manifest_path, manifest, now)
+    if skip_reason:
+        print(f"Skipping throwback: {skip_reason}.")
+        return 0
+
     try:
         excluded_names, excluded_ids = _load_excludes(exclude_path)
     except Exception as e:
@@ -995,8 +1042,6 @@ def main() -> int:
         print(f"Excluded {before - len(manifest)} set(s) per {exclude_path} ({before} -> {len(manifest)} in pool).")
 
     history = _load_history(history_path)
-    now = dt.datetime.now(dt.timezone.utc)
-
     rng = random.Random(args.seed) if args.seed is not None else random.Random()
     if args.set_name:
         target = _normalized_set_name_for_match(args.set_name)
